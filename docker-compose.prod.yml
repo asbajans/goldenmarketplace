@@ -1,0 +1,140 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: golden-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-golden_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: golden_marketplace
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - golden-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-golden_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: golden-redis
+    restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - golden-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Node.js Backend API
+  api:
+    image: node:18-alpine
+    container_name: golden-api
+    restart: always
+    working_dir: /app
+    
+    # GitHub'dan code indir ve başlat
+    command: sh -c "
+      git clone https://github.com/YOUR_GITHUB_USERNAME/golden-marketplace.git . &&
+      cd backend &&
+      npm install --production &&
+      npm run build &&
+      npm start
+    "
+    
+    volumes:
+      - ./app:/app
+    
+    ports:
+      - "3000:3000"
+    
+    environment:
+      # Database
+      DATABASE_URL: postgresql://${DB_USER:-golden_user}:${DB_PASSWORD}@postgres:5432/golden_marketplace
+      
+      # Redis
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      
+      # JWT
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRE: 7d
+      
+      # Stripe (opsiyonel)
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      
+      # Gold Price API (opsiyonel)
+      GOLD_PRICE_API_KEY: ${GOLD_PRICE_API_KEY:-}
+      
+      # App Config
+      NODE_ENV: production
+      PORT: 3000
+      FRONTEND_URL: ${FRONTEND_URL:-https://yourdomain.com}
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    
+    networks:
+      - golden-network
+    
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend Marketplace (opsiyonel - eğer Docker'da çalıştırmak istersen)
+  marketplace:
+    image: node:18-alpine
+    container_name: golden-marketplace-ui
+    restart: always
+    working_dir: /app
+    
+    command: sh -c "
+      git clone https://github.com/YOUR_GITHUB_USERNAME/golden-marketplace.git . &&
+      cd frontend/marketplace &&
+      npm install --production &&
+      npm run build &&
+      npm install -g serve &&
+      serve -s dist -l 5173
+    "
+    
+    ports:
+      - "5173:5173"
+    
+    environment:
+      REACT_APP_API_URL: ${API_URL:-https://api.yourdomain.com}
+      NODE_ENV: production
+    
+    depends_on:
+      - api
+    
+    networks:
+      - golden-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  golden-network:
+    driver: bridge

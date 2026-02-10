@@ -1,0 +1,189 @@
+name: Deploy to Vercel & Railway
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '18'
+  REGISTRY: ghcr.io
+
+jobs:
+  # Test & Build
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      # Backend Tests
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Lint backend
+        working-directory: ./backend
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Build backend
+        working-directory: ./backend
+        run: npm run build
+
+      # Frontend Tests
+      - name: Build seller panel
+        working-directory: ./frontend/seller-panel
+        run: npm ci && npm run build
+
+      - name: Build admin panel
+        working-directory: ./frontend/admin-panel
+        run: npm ci && npm run build
+
+      - name: Build marketplace
+        working-directory: ./frontend/marketplace
+        run: npm ci && npm run build
+
+  # Deploy to Vercel
+  deploy-vercel:
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Deploy Seller Panel to Vercel
+        uses: BetaHuhn/deploy-to-vercel-action@v1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_SELLER_PROJECT_ID }}
+          WORKING_DIRECTORY: frontend/seller-panel
+          PRODUCTION: true
+
+      - name: Deploy Admin Panel to Vercel
+        uses: BetaHuhn/deploy-to-vercel-action@v1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+          WORKING_DIRECTORY: frontend/admin-panel
+          PRODUCTION: true
+
+      - name: Deploy Marketplace to Vercel
+        uses: BetaHuhn/deploy-to-vercel-action@v1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_MARKETPLACE_PROJECT_ID }}
+          WORKING_DIRECTORY: frontend/marketplace
+          PRODUCTION: true
+
+  # Deploy to Railway
+  deploy-railway:
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Deploy Backend to Railway
+        uses: railway-app/deploy-action@v1
+        with:
+          token: ${{ secrets.RAILWAY_TOKEN }}
+          service: golden-api
+          workingDirectory: ./backend
+          force: true
+
+  # Health Check
+  health-check:
+    needs: [deploy-vercel, deploy-railway]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Wait for deployment
+        run: sleep 30
+
+      - name: Check API Health
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://golden-api.railway.app/health)
+          if [ $response -ne 200 ]; then
+            echo "API Health Check Failed: $response"
+            exit 1
+          fi
+          echo "✅ API is healthy"
+
+      - name: Check Vercel Deployments
+        run: |
+          # Seller
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://seller-panel.vercel.app)
+          echo "Seller Panel: $response"
+          
+          # Admin
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://admin-panel.vercel.app)
+          echo "Admin Panel: $response"
+          
+          # Marketplace
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://marketplace.vercel.app)
+          echo "Marketplace: $response"
+
+  # Notify
+  notify:
+    needs: [health-check]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Slack Notification
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": "Golden Marketplace Deployment",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "✅ Deployment Status: ${{ job.status }}\n🚀 Commit: ${{ github.sha }}\n👤 Author: ${{ github.actor }}"
+                  }
+                }
+              ]
+            }
+
+      - name: Email Notification
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.EMAIL_SERVER }}
+          server_port: ${{ secrets.EMAIL_PORT }}
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "Golden Marketplace Deployment - ${{ job.status }}"
+          body: |
+            Deployment Status: ${{ job.status }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+            
+            Vercel:
+            - Seller: https://seller-panel.vercel.app
+            - Admin: https://admin-panel.vercel.app
+            - Marketplace: https://marketplace.vercel.app
+            
+            Railway:
+            - API: https://golden-api.railway.app
+          to: ${{ secrets.NOTIFICATION_EMAIL }}

@@ -1,0 +1,37 @@
+app = "golden-marketplace-api"
+primary_region = "ams"
+
+[build]
+  builder = "heroku/buildpacks:20"
+
+[build.env]
+  NODE_VERSION = "18.0.0"
+  NPM_VERSION = "9.0.0"
+
+[deploy]
+  release_command = "npm run migrate"
+  strategy = "rolling"
+
+[env]
+  NODE_ENV = "production"
+  LOG_LEVEL = "info"
+
+[[services]]
+  internal_port = 3000
+  processes = ["app"]
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+[postgresql]
+  initial_cluster_size = 1
+  vm_size = "shared-cpu-1x"
+
+[[mounts]]
+  source = "data"
+  destination = "/data"

@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: golden-db
+    environment:
+      POSTGRES_DB: golden_marketplace
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - golden-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: golden-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - golden-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: golden-api
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: golden_marketplace
+      DB_USER: postgres
+      DB_PASSWORD: postgres123
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: your-super-secret-key-change-in-production
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      GOLD_API_KEY: ${GOLD_API_KEY}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/src:/app/src
+    networks:
+      - golden-network
+    command: npm run dev
+
+  # Seller Panel (Frontend)
+  seller-panel:
+    build:
+      context: ./frontend/seller-panel
+      dockerfile: Dockerfile
+    container_name: golden-seller
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: http://localhost:3000/api
+    networks:
+      - golden-network
+    command: npm run dev
+
+  # Admin Panel (Frontend)
+  admin-panel:
+    build:
+      context: ./frontend/admin-panel
+      dockerfile: Dockerfile
+    container_name: golden-admin
+    ports:
+      - "5174:5174"
+    environment:
+      VITE_API_BASE_URL: http://localhost:3000/api
+    networks:
+      - golden-network
+    command: npm run dev
+
+  # Marketplace (Frontend)
+  marketplace:
+    build:
+      context: ./frontend/marketplace
+      dockerfile: Dockerfile
+    container_name: golden-marketplace
+    ports:
+      - "5175:5175"
+    environment:
+      VITE_API_BASE_URL: http://localhost:3000/api
+    networks:
+      - golden-network
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  golden-network:
+    driver: bridge

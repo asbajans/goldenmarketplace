@@ -1,0 +1,36 @@
+{
+  "name": "golden-marketplace-monorepo",
+  "version": "0.1.0",
+  "description": "Golden Marketplace - Multi-marketplace E-Commerce Platform",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --workspaces",
+    "build": "npm run build --workspaces",
+    "test": "npm test --workspaces",
+    "lint": "npm run lint --workspaces",
+    "setup": "npm install --workspaces",
+    "backend": "npm run dev -w backend",
+    "seller": "npm run dev -w frontend/seller-panel",
+    "admin": "npm run dev -w frontend/admin-panel",
+    "marketplace": "npm run dev -w frontend/marketplace"
+  },
+  "workspaces": [
+    "backend",
+    "frontend/seller-panel",
+    "frontend/admin-panel",
+    "frontend/marketplace"
+  ],
+  "keywords": [
+    "e-commerce",
+    "marketplace",
+    "multi-vendor",
+    "stripe",
+    "gold-pricing",
+    "integrations"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
