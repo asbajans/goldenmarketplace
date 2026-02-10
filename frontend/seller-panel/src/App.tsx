@@ -3,7 +3,7 @@ import { Layout, Menu, Card, Statistic, Row, Col, Button, Modal, Form, Input } f
 import {
   DashboardOutlined,
   ShoppingOutlined,
-  UnlinkOutlined,
+  LinkOutlined,
   CreditCardOutlined,
   SettingOutlined,
   LogoutOutlined,
@@ -38,7 +38,7 @@ function App() {
     },
     {
       key: 'integrations',
-      icon: <UnlinkOutlined />,
+      icon: <LinkOutlined />,
       label: 'Entegrasyonlar'
     },
     {

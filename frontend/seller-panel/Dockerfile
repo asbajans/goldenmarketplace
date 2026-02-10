@@ -3,9 +3,10 @@ FROM node:18-alpine AS build
 
 WORKDIR /app
 
-COPY package*.json ./
+	COPY package*.json ./
 
-RUN npm ci
+	# Use npm install when package-lock.json may be missing
+	RUN npm install --no-audit --no-fund
 
 COPY . .
 

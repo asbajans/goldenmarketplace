@@ -1,0 +1,14 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install dependencies (including dev) for local development
+COPY package*.json ./
+RUN npm install --no-audit --no-fund
+
+# Copy source
+COPY . .
+
+# Start in dev mode (uses ts-node / nodemon)
+EXPOSE 3000
+CMD ["npm", "run", "dev"]
