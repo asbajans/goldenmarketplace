@@ -99,10 +99,14 @@ jobs:
     needs: [test, deploy]
     runs-on: ubuntu-latest
     if: always()
+    env:
+      SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
 
     steps:
     - name: Notify Slack (via webhook)
-      if: ${{ secrets.SLACK_WEBHOOK != '' }}
+      if: ${{ env.SLACK_WEBHOOK != '' }}
+      env:
+        SLACK_WEBHOOK: ${{ env.SLACK_WEBHOOK }}
       run: |
         payload='{ "text": "Golden Marketplace CI/CD Pipeline", "blocks": [{ "type": "section", "text": { "type": "mrkdwn", "text": "Pipeline Status: ${{ job.status }}" } }] }'
-        curl -s -X POST -H "Content-Type: application/json" --data "$payload" "${{ secrets.SLACK_WEBHOOK }}"
+        curl -s -X POST -H "Content-Type: application/json" --data "$payload" "$SLACK_WEBHOOK"

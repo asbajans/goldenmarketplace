@@ -149,16 +149,21 @@ jobs:
     needs: [health-check]
     runs-on: ubuntu-latest
     if: always()
+    env:
+      SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+      NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
 
     steps:
       - name: Slack Notification (via webhook)
-        if: ${{ secrets.SLACK_WEBHOOK != '' }}
+        if: ${{ env.SLACK_WEBHOOK != '' }}
+        env:
+          SLACK_WEBHOOK: ${{ env.SLACK_WEBHOOK }}
         run: |
           payload='{ "text": "Golden Marketplace Deployment", "blocks": [{ "type": "section", "text": { "type": "mrkdwn", "text": "✅ Deployment Status: ${{ job.status }}\n🚀 Commit: ${{ github.sha }}\n👤 Author: ${{ github.actor }}" } }] }'
-          curl -s -X POST -H "Content-Type: application/json" --data "$payload" "${{ secrets.SLACK_WEBHOOK }}"
+          curl -s -X POST -H "Content-Type: application/json" --data "$payload" "$SLACK_WEBHOOK"
 
       - name: Email Notification
-        if: ${{ secrets.NOTIFICATION_EMAIL != '' }}
+        if: ${{ env.NOTIFICATION_EMAIL != '' }}
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: ${{ secrets.EMAIL_SERVER }}
@@ -178,4 +183,4 @@ jobs:
             
             Railway:
             - API: https://golden-api.railway.app
-          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          to: ${{ env.NOTIFICATION_EMAIL }}
