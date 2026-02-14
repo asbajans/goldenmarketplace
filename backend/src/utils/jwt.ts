@@ -24,10 +24,10 @@ export class JWTService {
    * Generate a new JWT token
    */
   static generateToken(payload: Omit<TokenPayload, 'iat' | 'exp'>): string {
-    return jwt.sign(payload, JWT_SECRET, {
+    return jwt.sign(payload as any, JWT_SECRET as any, {
       expiresIn: JWT_EXPIRY,
       algorithm: 'HS256'
-    });
+    } as any);
   }
 
   /**
@@ -58,15 +58,15 @@ export class JWTService {
    * Generate both access and refresh tokens
    */
   static generateTokenPair(payload: Omit<TokenPayload, 'iat' | 'exp'>) {
-    const accessToken = jwt.sign(payload, JWT_SECRET, {
+    const accessToken = jwt.sign(payload as any, JWT_SECRET as any, {
       expiresIn: '1h',
       algorithm: 'HS256'
-    });
+    } as any);
 
-    const refreshToken = jwt.sign(payload, JWT_SECRET, {
+    const refreshToken = jwt.sign(payload as any, JWT_SECRET as any, {
       expiresIn: '7d',
       algorithm: 'HS256'
-    });
+    } as any);
 
     return { accessToken, refreshToken };
   }

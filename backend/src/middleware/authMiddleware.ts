@@ -18,16 +18,17 @@ declare global {
   }
 }
 
-export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
+export const authMiddleware = (req: Request, res: Response, next: NextFunction): void => {
   const token = req.headers.authorization?.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({
+    res.status(401).json({
       error: {
         message: 'No token provided',
         status: 401
       }
     });
+    return;
   }
 
   try {
@@ -36,35 +37,38 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
     req.token = token;
     next();
   } catch (error) {
-    return res.status(401).json({
+    res.status(401).json({
       error: {
         message: 'Invalid or expired token',
         status: 401
       }
     });
+    return;
   }
 };
 
-export const adminMiddleware = (req: Request, res: Response, next: NextFunction) => {
+export const adminMiddleware = (req: Request, res: Response, next: NextFunction): void => {
   if (req.user?.userType !== 'admin') {
-    return res.status(403).json({
+    res.status(403).json({
       error: {
         message: 'Admin access required',
         status: 403
       }
     });
+    return;
   }
   next();
 };
 
-export const sellerMiddleware = (req: Request, res: Response, next: NextFunction) => {
+export const sellerMiddleware = (req: Request, res: Response, next: NextFunction): void => {
   if (req.user?.userType !== 'seller' && req.user?.userType !== 'admin') {
-    return res.status(403).json({
+    res.status(403).json({
       error: {
         message: 'Seller access required',
         status: 403
       }
     });
+    return;
   }
   next();
 };

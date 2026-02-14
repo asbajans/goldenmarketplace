@@ -9,17 +9,11 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16'
+  apiVersion: '2023-10-16' as any
 });
 
-interface SubscriptionPlan {
-  id: string;
-  name: string;
-  price: number;
-  currency: string;
-  interval: 'month' | 'year';
-  features: string[];
-}
+// SubscriptionPlan removed (unused) to avoid TS unused-type errors
+
 
 export class StripeService {
   /**
@@ -46,7 +40,7 @@ export class StripeService {
    */
   async cancelSubscription(subscriptionId: string) {
     try {
-      const subscription = await stripe.subscriptions.del(subscriptionId);
+      const subscription = await (stripe.subscriptions as any).del(subscriptionId);
       return subscription;
     } catch (error) {
       console.error('Error canceling subscription:', error);

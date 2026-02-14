@@ -4,6 +4,7 @@
  */
 
 import { Request, Response } from 'express';
+import { Op } from 'sequelize';
 import Product from '../models/Product';
 import goldPriceService from '../services/goldPriceService';
 
@@ -20,11 +21,8 @@ export class ProductController {
       if (storeId) where.storeId = storeId;
       if (category) where.category = category;
       if (search) {
-        where[Symbol.for('sequelize.where')] = {
-          title: {
-            [Symbol.for('sequelize.op').substring()]: search
-          }
-        };
+        // use Sequelize Op for substring searches (Postgres supports ILIKE if needed)
+        where.title = { [Op.substring]: String(search) };
       }
 
       const offset = (parseInt(page as string) - 1) * parseInt(limit as string);

@@ -16,7 +16,7 @@ interface ProductAttributes {
   sku: string;
   basePrice: number;
   goldIndexPrice: number;
-  currency: string;
+  currency?: string; // optional because DB provides a default
   quantity: number;
   images: string[];
   isActive: boolean;
@@ -34,7 +34,7 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public sku!: string;
   public basePrice!: number;
   public goldIndexPrice!: number;
-  public currency!: string;
+  public currency?: string;
   public quantity!: number;
   public images!: string[];
   public isActive!: boolean;

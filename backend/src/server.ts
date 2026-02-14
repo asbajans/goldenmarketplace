@@ -35,7 +35,7 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // Health check route
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
@@ -47,7 +47,7 @@ app.get('/health', (req: Request, res: Response) => {
 // app.use('/api/admin', require('./routes/admin'));
 
 // Error handling middleware
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   logger.error(err);
   
   res.status(err.status || 500).json({
@@ -59,7 +59,7 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 // 404 handling
-app.use((req: Request, res: Response) => {
+app.use((_req: Request, res: Response) => {
   res.status(404).json({
     error: {
       message: 'Route not found',
