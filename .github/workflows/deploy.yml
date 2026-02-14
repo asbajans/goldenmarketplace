@@ -147,6 +147,7 @@ jobs:
 
     steps:
       - name: Slack Notification
+        if: ${{ secrets.SLACK_WEBHOOK != '' }}
         uses: slackapi/slack-github-action@v1
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK }}
@@ -165,6 +166,7 @@ jobs:
             }
 
       - name: Email Notification
+        if: ${{ secrets.NOTIFICATION_EMAIL != '' }}
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: ${{ secrets.EMAIL_SERVER }}
