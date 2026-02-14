@@ -96,21 +96,8 @@ jobs:
     if: always()
 
     steps:
-    - name: Notify Slack
+    - name: Notify Slack (via webhook)
       if: ${{ secrets.SLACK_WEBHOOK != '' }}
-      uses: slackapi/slack-github-action@v1
-      with:
-        webhook-url: ${{ secrets.SLACK_WEBHOOK }}
-        payload: |
-          {
-            "text": "Golden Marketplace CI/CD Pipeline",
-            "blocks": [
-              {
-                "type": "section",
-                "text": {
-                  "type": "mrkdwn",
-                  "text": "Pipeline Status: ${{ job.status }}"
-                }
-              }
-            ]
-          }
+      run: |
+        payload='{ "text": "Golden Marketplace CI/CD Pipeline", "blocks": [{ "type": "section", "text": { "type": "mrkdwn", "text": "Pipeline Status: ${{ job.status }}" } }] }'
+        curl -s -X POST -H "Content-Type: application/json" --data "$payload" "${{ secrets.SLACK_WEBHOOK }}"
