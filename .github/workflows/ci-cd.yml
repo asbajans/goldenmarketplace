@@ -42,8 +42,7 @@ jobs:
       with:
         node-version: '18'
 
-    - name: Install backend dependencies
-      working-directory: ./backend
+    - name: Install workspace dependencies
       run: npm ci
 
     - name: Run backend linting
@@ -63,25 +62,13 @@ jobs:
         REDIS_URL: redis://localhost:6379
       continue-on-error: true
 
-    - name: Install seller panel dependencies
-      working-directory: ./frontend/seller-panel
-      run: npm ci
-
     - name: Build seller panel
       working-directory: ./frontend/seller-panel
       run: npm run build
 
-    - name: Install admin panel dependencies
-      working-directory: ./frontend/admin-panel
-      run: npm ci
-
     - name: Build admin panel
       working-directory: ./frontend/admin-panel
       run: npm run build
-
-    - name: Install marketplace dependencies
-      working-directory: ./frontend/marketplace
-      run: npm ci
 
     - name: Build marketplace
       working-directory: ./frontend/marketplace

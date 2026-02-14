@@ -22,11 +22,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # Backend Tests
-      - name: Install backend dependencies
-        working-directory: ./backend
+      - name: Install workspace dependencies
         run: npm ci
 
+      # Backend Tests
       - name: Lint backend
         working-directory: ./backend
         run: npm run lint
@@ -39,15 +38,15 @@ jobs:
       # Frontend Tests
       - name: Build seller panel
         working-directory: ./frontend/seller-panel
-        run: npm ci && npm run build
+        run: npm run build
 
       - name: Build admin panel
         working-directory: ./frontend/admin-panel
-        run: npm ci && npm run build
+        run: npm run build
 
       - name: Build marketplace
         working-directory: ./frontend/marketplace
-        run: npm ci && npm run build
+        run: npm run build
 
   # Deploy to Vercel
   deploy-vercel:
