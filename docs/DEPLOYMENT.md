@@ -1,101 +1,94 @@
-# Deployment Rehberi
+# Portainer ile Kurulum Rehberi
 
-Golden Marketplace'ı Portainer + Cloudflare Tunnel ile sunucuya kurma kılavuzu.
+Golden Marketplace'ı Portainer üzerinden sunucunuza deploy etme adımları.
 
----
-
-## Gereksinimler
-
-| Yazılım         | Min. Versiyon |
-|-----------------|---------------|
-| Docker          | 20+           |
-| Docker Compose  | 2.0+          |
-| Portainer       | 2.x           |
-| cloudflared     | Kurulu        |
+> Cloudflare Tunnel yönlendirmeleri zaten yapıldı. Bu rehber sadece Portainer tarafını kapsar.
 
 ---
 
-## 1. Port Yapısı
+## Ön Koşullar
 
-| Servis          | Port  | Cloudflare Tunnel Hedefi           |
-|-----------------|-------|------------------------------------|
-| Backend API     | 777   | `api.goldencrafters.com` → `:777`  |
-| Seller Panel    | 5173  | `seller.goldencrafters.com` → `:5173` |
-| Admin Panel     | 5174  | `admin.goldencrafters.com` → `:5174` |
-| Marketplace     | 5175  | `goldencrafters.com` → `:5175`     |
-| PostgreSQL      | 5432  | (sadece internal)                  |
-| Redis           | 6379  | (sadece internal)                  |
-
----
-
-## 2. Ortam Değişkenleri
-
-`stack.env` dosyasını düzenleyin (hassas bilgilerinizi girin):
-
-```env
-# Database
-DB_USER=golden_user
-DB_PASSWORD=GÜVENLİ_VERİTABANI_ŞİFRESİ
-
-# Redis
-REDIS_PASSWORD=GÜVENLİ_REDIS_ŞİFRESİ
-
-# JWT
-JWT_SECRET=RASTGELE_UZUN_STRING
-
-# Public URLs
-FRONTEND_URL=https://goldencrafters.com
-API_URL=https://api.goldencrafters.com
-
-# Stripe
-STRIPE_SECRET_KEY=sk_live_xxxxx
-STRIPE_PUBLISHABLE_KEY=pk_live_xxxxx
-
-# Gold API
-GOLD_PRICE_API_KEY=goldapi_xxxxx
-
-# Runtime
-NODE_ENV=production
-PORT=777
-```
-
-> ⚠️ **stack.env dosyasını asla Git'e push etmeyin!** `.gitignore` dosyasında olduğundan emin olun.
+- ✅ Docker ve Docker Compose sunucuda kurulu
+- ✅ Portainer çalışır durumda
+- ✅ Cloudflare Tunnel yapılandırıldı:
+  - `goldencrafters.com` → `:5175`
+  - `api.goldencrafters.com` → `:777`
+  - `seller.goldencrafters.com` → `:5173`
+  - `admin.goldencrafters.com` → `:5174`
 
 ---
 
-## 3. Portainer ile Deploy
+## Adım 1: Portainer'da Stack Oluşturma
 
-### 3.1 GitHub Repo'dan Stack Oluşturma
+1. Portainer paneline giriş yapın
+2. Sol menüden **Stacks** → **+ Add stack**
+3. İsim: `golden-marketplace`
 
-1. Portainer'a giriş yapın
-2. **Stacks** → **Add Stack**
-3. **Build Method**: Repository
-4. **Repository URL**: `https://github.com/asbajans/goldenmarketplace`
-5. **Compose Path**: `docker-compose.prod.yml`
-6. **Environment Variables**: `stack.env` içeriğini ekleyin
-7. **Deploy the Stack** butonuna tıklayın
+### Build Method: Git Repository
 
-### 3.2 Manuel Stack Oluşturma
+| Alan | Değer |
+|------|-------|
+| **Repository URL** | `https://github.com/asbajans/goldenmarketplace` |
+| **Repository reference** | `refs/heads/main` |
+| **Compose path** | `docker-compose.prod.yml` |
 
-1. Sunucuya SSH ile bağlanın:
-```bash
-git clone https://github.com/asbajans/goldenmarketplace.git
-cd goldenmarketplace
-```
+> **Authentication** gerekiyorsa GitHub username + Personal Access Token girin.
 
-2. `stack.env` dosyasını düzenleyin
+---
 
-3. Çalıştırın:
-```bash
-docker compose --env-file stack.env -f docker-compose.prod.yml up -d
-```
+## Adım 2: Environment Variables
 
-### 3.3 Veritabanı Başlatma (İlk Kurulum)
+Portainer stack sayfasında **Environment variables** bölümüne şu değişkenleri ekleyin:
+
+### Zorunlu
+
+| Değişken | Değer | Açıklama |
+|----------|-------|----------|
+| `DB_USER` | `golden_user` | PostgreSQL kullanıcı adı |
+| `DB_PASSWORD` | `güçlü_şifre_buraya` | PostgreSQL şifresi |
+| `REDIS_PASSWORD` | `güçlü_redis_şifresi` | Redis şifresi |
+| `JWT_SECRET` | `64_karakterlik_rastgele_string` | JWT imzalama anahtarı |
+| `FRONTEND_URL` | `https://goldencrafters.com` | Ana site URL |
+| `API_URL` | `https://api.goldencrafters.com` | API URL |
+| `NODE_ENV` | `production` | Ortam |
+| `PORT` | `777` | Backend portu |
+
+### Opsiyonel (Üçüncü Parti Servisler)
+
+| Değişken | Açıklama |
+|----------|----------|
+| `STRIPE_SECRET_KEY` | Stripe gizli anahtar (ödeme için) |
+| `STRIPE_PUBLISHABLE_KEY` | Stripe açık anahtar |
+| `GOLD_PRICE_API_KEY` | GoldAPI.io anahtarı (altın fiyatı) |
+
+> 💡 **İpucu:** `stack.env` dosyasındaki örnek değerleri referans alabilirsiniz.
+
+---
+
+## Adım 3: Deploy
+
+**"Deploy the stack"** butonuna tıklayın.
+
+Portainer aşağıdaki container'ları oluşturacak:
+
+| Container | Image | Port |
+|-----------|-------|------|
+| `golden-postgres` | `postgres:15-alpine` | 5432 (internal) |
+| `golden-redis` | `redis:7-alpine` | 6379 (internal) |
+| `golden-api` | `ghcr.io/.../backend:latest` | **777** |
+| `golden-marketplace-ui` | `ghcr.io/.../marketplace:latest` | 5173 |
+
+---
+
+## Adım 4: Veritabanı İlk Kurulumu
+
+Stack deploy olduktan sonra, **bir kereye mahsus** veritabanı tablolarını ve test verilerini oluşturun:
+
+1. Portainer → **Containers** → `golden-api` seçin
+2. **Console** → `sh` shell açın
+3. Şu komutları çalıştırın:
 
 ```bash
-# Container'a gir
-docker exec -it golden-api sh
-
 # Tabloları oluştur
 npx ts-node src/scripts/sync-db.ts
 
@@ -103,72 +96,53 @@ npx ts-node src/scripts/sync-db.ts
 npx ts-node src/scripts/seed.ts
 ```
 
----
-
-## 4. Cloudflare Tunnel Yapılandırması
-
-Cloudflare Zero Trust Dashboard'dan tunnel'ınızı yapılandırın:
-
-### 4.1 Tunnel Kuralları
-
-| Public Hostname              | Service               |
-|------------------------------|-----------------------|
-| `goldencrafters.com`         | `http://localhost:5175` |
-| `api.goldencrafters.com`     | `http://localhost:777`  |
-| `seller.goldencrafters.com`  | `http://localhost:5173` |
-| `admin.goldencrafters.com`   | `http://localhost:5174` |
-
-### 4.2 Cloudflare Dashboard Adımları
-
-1. [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → **Networks** → **Tunnels**
-2. Tunnel'ınızı seçin → **Configure**
-3. **Public Hostname** sekmesine gidin
-4. Her bir subdomain için yukarıdaki tabloyu referans alarak kuralları ekleyin:
-   - **Subdomain**: (boş, seller, admin, api)
-   - **Domain**: goldencrafters.com
-   - **Type**: HTTP
-   - **URL**: localhost:PORT
-
-### 4.3 SSL/TLS
-
-Cloudflare Tunnel otomatik olarak SSL sağlar. Ek yapılandırma gerekmez.
-
----
-
-## 5. Güncelleme (Yeni Versiyon Deploy)
-
-### Portainer'dan
-1. **Stacks** → Stack'inizi seçin
-2. **Pull and Rebuild** veya **Redeploy**
-
-### CLI'dan
+Alternatif olarak sunucu terminali üzerinden:
 ```bash
-cd goldenmarketplace
-git pull
-docker compose --env-file stack.env -f docker-compose.prod.yml up -d --build
+docker exec -it golden-api sh
+npx ts-node src/scripts/sync-db.ts
+npx ts-node src/scripts/seed.ts
 ```
 
 ---
 
-## 6. Google Merchant Center
+## Adım 5: Doğrulama
 
-1. [Google Merchant Center](https://merchants.google.com/) → **Feeds** → **Add Feed**
-2. URL: `https://api.goldencrafters.com/api/feed/google.xml`
-3. Periyot: Günlük
+Tarayıcıdan kontrol edin:
 
-## 7. Facebook Katalog
+| Test | URL | Beklenen |
+|------|-----|----------|
+| API Health | `https://api.goldencrafters.com/health` | `{"status":"OK"}` |
+| Marketplace | `https://goldencrafters.com` | Ana sayfa |
+| Seller Panel | `https://seller.goldencrafters.com` | Giriş sayfası |
+| Admin Panel | `https://admin.goldencrafters.com` | Giriş sayfası |
+| Google Feed | `https://api.goldencrafters.com/api/feed/google.xml` | XML çıktısı |
 
-1. [Facebook Business Suite](https://business.facebook.com/) → Catalog Manager
-2. URL: `https://api.goldencrafters.com/api/feed/facebook.json`
+### Test Giriş Bilgileri
+
+| Rol | E-posta | Şifre |
+|-----|---------|-------|
+| Admin | `admin@golden.com` | `admin123` |
+| Satıcı | `seller@golden.com` | `seller123` |
+
+---
+
+## Güncelleme
+
+Yeni versiyon deploy etmek için:
+
+1. Portainer → **Stacks** → `golden-marketplace`
+2. **Pull and redeploy** butonuna tıklayın
+3. Portainer otomatik olarak en son kodu çeker ve container'ları yeniden oluşturur
 
 ---
 
 ## Sorun Giderme
 
-| Sorun | Çözüm |
-|-------|-------|
-| Container ayağa kalkmıyor | `docker logs golden-api` ile logları kontrol edin |
-| DB bağlantı hatası | `stack.env` DB şifresini ve postgres health'ini kontrol edin |
-| Redis bağlantı hatası | `docker logs golden-redis` kontrol edin |
-| API'ye erişilemiyor | Cloudflare Tunnel kurallarını ve port 777'yi kontrol edin |
-| CORS hatası | `server.ts` CORS origin listesini kontrol edin |
+| Sorun | Kontrol |
+|-------|---------|
+| Container başlamıyor | Portainer → Container → **Logs** kontrol edin |
+| DB bağlantı hatası | `DB_PASSWORD` environment variable doğru mu? |
+| Redis hatası | `REDIS_PASSWORD` doğru mu? |
+| API 502/504 | Container healthy mi? Port 777 açık mı? |
+| CORS hatası | `FRONTEND_URL` doğru ayarlandı mı? |
+| Altın fiyatı gelmiyor | `GOLD_PRICE_API_KEY` geçerli mi? |
