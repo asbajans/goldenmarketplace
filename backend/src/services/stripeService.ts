@@ -113,6 +113,44 @@ export class StripeService {
       throw error;
     }
   }
+  /**
+   * Create a Checkout Session
+   */
+  async createCheckoutSession(customerId: string, priceId: string, successUrl: string, cancelUrl: string) {
+    try {
+      if (!process.env.STRIPE_SECRET_KEY) {
+        console.log('Mocking Stripe Checkout Session');
+        // Return a mock URL that acts as the "Stripe Hosted Page"
+        // Since we can't easily host a mock page, we might just return the success URL directly?
+        // No, the frontend expects to redirect.
+        // Let's return the successUrl with a query param that we can intercept?
+        // Or just return the successUrl.
+        return {
+          id: 'cs_mock_' + Math.random().toString(36).substring(7),
+          url: `${successUrl}?session_id=cs_mock_12345`
+        };
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        payment_method_types: ['card'],
+        customer: customerId,
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        success_url: successUrl + '?session_id={CHECKOUT_SESSION_ID}',
+        cancel_url: cancelUrl,
+      });
+
+      return session;
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
+      throw error;
+    }
+  }
 }
 
 export default new StripeService();

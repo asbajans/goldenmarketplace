@@ -15,6 +15,9 @@ interface UserAttributes {
   phone?: string;
   userType: 'seller' | 'customer' | 'admin';
   isActive: boolean;
+  stripeCustomerId?: string;
+  subscriptionStatus?: 'active' | 'inactive' | 'past_due' | 'canceled' | 'trialing';
+  subscriptionPlan?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -28,6 +31,9 @@ class User extends Model<UserAttributes> implements UserAttributes {
   public phone?: string;
   public userType!: 'seller' | 'customer' | 'admin';
   public isActive!: boolean;
+  public stripeCustomerId?: string;
+  public subscriptionStatus?: 'active' | 'inactive' | 'past_due' | 'canceled' | 'trialing';
+  public subscriptionPlan?: string;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -69,6 +75,18 @@ User.init(
     isActive: {
       type: DataTypes.BOOLEAN,
       defaultValue: true
+    },
+    stripeCustomerId: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    subscriptionStatus: {
+      type: DataTypes.ENUM('active', 'inactive', 'past_due', 'canceled', 'trialing'),
+      defaultValue: 'inactive'
+    },
+    subscriptionPlan: {
+      type: DataTypes.STRING,
+      allowNull: true
     }
   },
   {

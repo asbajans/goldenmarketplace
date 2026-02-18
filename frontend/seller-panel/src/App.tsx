@@ -1,222 +1,159 @@
-import React, { useState } from 'react';
-import { Layout, Menu, Card, Statistic, Row, Col, Button, Modal, Form, Input } from 'antd';
+
+import React, { useState, useEffect } from 'react';
+import { Layout, Menu, Button, message, Spin, theme } from 'antd';
 import {
+  MenuUnfoldOutlined,
+  MenuFoldOutlined,
   DashboardOutlined,
   ShoppingOutlined,
-  LinkOutlined,
-  CreditCardOutlined,
-  SettingOutlined,
+  PlusCircleOutlined,
   LogoutOutlined,
-  PlusOutlined
+  CreditCardOutlined,
+  SyncOutlined
 } from '@ant-design/icons';
-import './App.css';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import ProductList from './pages/ProductList';
+import AddProduct from './pages/AddProduct';
+import Subscription from './pages/Subscription';
+import SubscriptionSuccess from './pages/SubscriptionSuccess';
+import IntegrationSettings from './pages/IntegrationSettings';
+import { getCurrentUser, logout } from './api/auth';
 
 const { Header, Sider, Content } = Layout;
 
-interface MenuItem {
-  key: string;
-  icon: React.ReactNode;
-  label: string;
-}
-
-function App() {
+const App: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
-  const [selectedKey, setSelectedKey] = useState('dashboard');
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [form] = Form.useForm();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const {
+    token: { colorBgContainer, borderRadiusLG },
+  } = theme.useToken();
 
-  const menuItems: MenuItem[] = [
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      await getCurrentUser();
+      setIsAuthenticated(true);
+    } catch (error) {
+      setIsAuthenticated(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    setIsAuthenticated(false);
+    message.success('Çıkış yapıldı');
+    navigate('/login');
+  };
+
+  const menuItems = [
     {
-      key: 'dashboard',
+      key: '/dashboard',
       icon: <DashboardOutlined />,
-      label: 'Dashboard'
+      label: 'Panel',
+      onClick: () => navigate('/dashboard')
     },
     {
-      key: 'products',
+      key: '/products',
       icon: <ShoppingOutlined />,
-      label: 'Ürünlerim'
+      label: 'Ürünler',
+      onClick: () => navigate('/products')
     },
     {
-      key: 'integrations',
-      icon: <LinkOutlined />,
-      label: 'Entegrasyonlar'
+      key: '/products/add',
+      icon: <PlusCircleOutlined />,
+      label: 'Ürün Ekle',
+      onClick: () => navigate('/products/add')
     },
     {
-      key: 'subscriptions',
+      key: '/integrations',
+      icon: <SyncOutlined />,
+      label: 'Entegrasyonlar',
+      onClick: () => navigate('/integrations')
+    },
+    {
+      key: '/subscription',
       icon: <CreditCardOutlined />,
-      label: 'Abonelikler'
-    },
-    {
-      key: 'settings',
-      icon: <SettingOutlined />,
-      label: 'Ayarlar'
+      label: 'Abonelik',
+      onClick: () => navigate('/subscription')
     }
   ];
 
-  const handleAddProduct = () => {
-    setIsModalVisible(true);
-  };
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
 
-  const handleModalOk = () => {
-    form.validateFields().then(() => {
-      setIsModalVisible(false);
-      form.resetFields();
-    });
-  };
-
-  const handleModalCancel = () => {
-    setIsModalVisible(false);
-    form.resetFields();
-  };
-
-  const renderContent = () => {
-    switch (selectedKey) {
-      case 'dashboard':
-        return (
-          <div>
-            <h1>Dashboard</h1>
-            <Row gutter={16}>
-              <Col xs={24} sm={12} lg={6}>
-                <Card>
-                  <Statistic title="Toplam Ürün" value={245} />
-                </Card>
-              </Col>
-              <Col xs={24} sm={12} lg={6}>
-                <Card>
-                  <Statistic title="Toplam Satış" value={15420} suffix="₺" />
-                </Card>
-              </Col>
-              <Col xs={24} sm={12} lg={6}>
-                <Card>
-                  <Statistic title="Aktif Entegrasyon" value={5} />
-                </Card>
-              </Col>
-              <Col xs={24} sm={12} lg={6}>
-                <Card>
-                  <Statistic title="Mağaza Puanı" value={4.8} suffix="/5" />
-                </Card>
-              </Col>
-            </Row>
-          </div>
-        );
-
-      case 'products':
-        return (
-          <div>
-            <div style={{ marginBottom: 16 }}>
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleAddProduct}>
-                Yeni Ürün Ekle
-              </Button>
-            </div>
-            <Card>
-              <h2>Ürünlerim</h2>
-              <p>Ürün listesi burada görünecektir...</p>
-            </Card>
-          </div>
-        );
-
-      case 'integrations':
-        return (
-          <Card>
-            <h2>Pazaryeri Entegrasyonları</h2>
-            <Row gutter={16}>
-              {['Etsy', 'Amazon', 'Hepsiburada', 'Trendyol', 'N11'].map((marketplace) => (
-                <Col key={marketplace} xs={24} sm={12} lg={8}>
-                  <Card style={{ marginBottom: 16 }}>
-                    <h3>{marketplace}</h3>
-                    <Button type="default">Bağlan</Button>
-                  </Card>
-                </Col>
-              ))}
-            </Row>
-          </Card>
-        );
-
-      case 'subscriptions':
-        return (
-          <Card>
-            <h2>Abonelikler</h2>
-            <p>Aktif abonelikleriniz burada gösterilir...</p>
-          </Card>
-        );
-
-      case 'settings':
-        return (
-          <Card>
-            <h2>Ayarlar</h2>
-            <p>Mağaza ayarlarınız burada bulunur...</p>
-          </Card>
-        );
-
-      default:
-        return null;
-    }
-  };
+  if (!isAuthenticated) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login onLogin={() => setIsAuthenticated(true)} />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed}>
-        <div
-          style={{
-            height: 64,
-            background: '#fff',
-            margin: 16,
-            borderRadius: 8,
-            textAlign: 'center',
-            lineHeight: '64px',
-            fontWeight: 'bold',
-            color: '#1890ff'
-          }}
-        >
-          {!collapsed && 'Golden'}
-        </div>
+      <Sider trigger={null} collapsible collapsed={collapsed}>
+        <div className="demo-logo-vertical" style={{ height: 32, margin: 16, background: 'rgba(255, 255, 255, 0.2)' }} />
         <Menu
           theme="dark"
           mode="inline"
-          selectedKeys={[selectedKey]}
-          onClick={(e) => setSelectedKey(e.key)}
+          defaultSelectedKeys={[location.pathname]}
           items={menuItems}
         />
       </Sider>
-
       <Layout>
-        <Header
+        <Header style={{ padding: 0, background: colorBgContainer, display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: 24 }}>
+          <Button
+            type="text"
+            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            onClick={() => setCollapsed(!collapsed)}
+            style={{
+              fontSize: '16px',
+              width: 64,
+              height: 64,
+            }}
+          />
+          <Button icon={<LogoutOutlined />} onClick={handleLogout}>Çıkış</Button>
+        </Header>
+        <Content
           style={{
-            background: '#fff',
-            padding: '0 24px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
+            margin: '24px 16px',
+            padding: 24,
+            minHeight: 280,
+            background: colorBgContainer,
+            borderRadius: borderRadiusLG,
+            overflow: 'auto'
           }}
         >
-          <h2 style={{ margin: 0 }}>Satıcı Paneli</h2>
-          <Button icon={<LogoutOutlined />}>Çıkış Yap</Button>
-        </Header>
-
-        <Content style={{ margin: '24px 16px', padding: 24, background: '#f0f2f5', borderRadius: 8 }}>
-          {renderContent()}
+          <Routes>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/products" element={<ProductList />} />
+            <Route path="/products/add" element={<AddProduct onSuccess={() => navigate('/products')} />} />
+            <Route path="/products/edit/:id" element={<AddProduct onSuccess={() => navigate('/products')} />} />
+            <Route path="/integrations" element={<IntegrationSettings />} />
+            <Route path="/subscription" element={<Subscription />} />
+            <Route path="/subscription/success" element={<SubscriptionSuccess />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
         </Content>
       </Layout>
-
-      <Modal title="Yeni Ürün Ekle" open={isModalVisible} onOk={handleModalOk} onCancel={handleModalCancel}>
-        <Form form={form} layout="vertical">
-          <Form.Item label="Ürün Adı" name="title" rules={[{ required: true, message: 'Ürün adı gerekli' }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item label="Kategori" name="category" rules={[{ required: true, message: 'Kategori gerekli' }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item label="Fiyat (₺)" name="basePrice" rules={[{ required: true, message: 'Fiyat gerekli' }]}>
-            <Input type="number" />
-          </Form.Item>
-          <Form.Item label="Miktar" name="quantity" rules={[{ required: true, message: 'Miktar gerekli' }]}>
-            <Input type="number" />
-          </Form.Item>
-        </Form>
-      </Modal>
     </Layout>
   );
-}
+};
 
 export default App;

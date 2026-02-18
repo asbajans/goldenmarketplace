@@ -17,7 +17,7 @@ services:
     networks:
       - golden-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-golden_user}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-golden_user}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -35,7 +35,7 @@ services:
     networks:
       - golden-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD} ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -45,44 +45,44 @@ services:
     image: ghcr.io/asbajans/goldenmarketplace/backend:latest
     container_name: golden-api
     restart: always
-    
+
     ports:
       - "777:3000"
-    
+
     environment:
       # Database
       DATABASE_URL: postgresql://${DB_USER:-golden_user}:${DB_PASSWORD}@postgres:5432/golden_marketplace
-      
+
       # Redis
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
-      
+
       # JWT
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRE: 7d
-      
+
       # Stripe (opsiyonel)
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
-      
+
       # Gold Price API (opsiyonel)
       GOLD_PRICE_API_KEY: ${GOLD_PRICE_API_KEY:-}
-      
+
       # App Config
       NODE_ENV: production
       PORT: 777
-      FRONTEND_URL: ${FRONTEND_URL:-https://yourdomain.com}
-    
+      FRONTEND_URL: ${FRONTEND_URL:-https://goldencrafters.com}
+
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    
+
     networks:
       - golden-network
-    
+
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:777/health"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:777/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -92,17 +92,17 @@ services:
     image: ghcr.io/asbajans/goldenmarketplace/marketplace:latest
     container_name: golden-marketplace-ui
     restart: always
-    
+
     ports:
       - "5173:5173"
-    
+
     environment:
-      REACT_APP_API_URL: ${API_URL:-https://api.yourdomain.com}
+      REACT_APP_API_URL: ${API_URL:-https://api.goldencrafters.com}
       NODE_ENV: production
-    
+
     depends_on:
       - api
-    
+
     networks:
       - golden-network
 

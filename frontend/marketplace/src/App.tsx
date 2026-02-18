@@ -24,127 +24,34 @@ function App() {
     { key: 'sellers', icon: <UserOutlined />, label: 'Satıcılar' }
   ];
 
-  const products = [
-    { id: 1, name: 'Altın Yüzük', price: 1500, rating: 4.5, seller: 'Ali Kuyumcu' },
-    { id: 2, name: 'Gümüş Bilezik', price: 800, rating: 4.8, seller: 'Ayşe Aksesuar' },
-    { id: 3, name: 'Elmas Kolye', price: 5000, rating: 5, seller: 'Gezer Jewels' },
-    { id: 4, name: 'Altın Zincir', price: 2000, rating: 4.6, seller: 'Kuyumcu Plus' },
-    { id: 5, name: 'Türkuaz Taşlı Yüzük', price: 900, rating: 4.3, seller: 'Doğal Taş' },
-    { id: 6, name: 'Antika Broş', price: 1200, rating: 4.9, seller: 'Eski Eser' }
-  ];
+  import { getProducts, Product } from './api/product';
+  import { getGoldPrice, GoldPriceData } from './api/gold';
 
-  const renderContent = () => {
-    switch (selectedKey) {
-      case 'home':
-        return (
-          <div>
-            <Card style={{ marginBottom: 24, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: '#fff' }}>
-              <h1>Golden Marketplace'e Hoş Geldiniz</h1>
-              <p>Binlerce kaliteli ürün arasından seçim yapın</p>
-            </Card>
+  // ...
+  const [products, setProducts] = useState<Product[]>([]);
+  const [goldPrice, setGoldPrice] = useState<GoldPriceData | null>(null);
+  const [loading, setLoading] = useState(false);
 
-            <div style={{ marginBottom: 24 }}>
-              <Input.Search
-                placeholder="Ürün ara..."
-                enterButton={<SearchOutlined />}
-                size="large"
-                style={{ maxWidth: 500 }}
-              />
-            </div>
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [prodData, goldData] = await Promise.all([
+          getProducts(),
+          getGoldPrice()
+        ]);
+        setProducts(prodData || []);
+        setGoldPrice(goldData);
+      } catch (error) {
+        console.error('Failed to fetch data', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
-            <h2>Öne Çıkan Ürünler</h2>
-            <Row gutter={[16, 16]}>
-              {products.map((product) => (
-                <Col key={product.id} xs={24} sm={12} lg={8}>
-                  <Card
-                    hoverable
-                    cover={
-                      <div
-                        style={{
-                          height: 200,
-                          background: '#f0f0f0',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 48
-                        }}
-                      >
-                        ✨
-                      </div>
-                    }
-                  >
-                    <Card.Meta
-                      title={product.name}
-                      description={
-                        <div>
-                          <p>
-                            <strong>{product.price}₺</strong>
-                          </p>
-                          <p>⭐ {product.rating} | {product.seller}</p>
-                        </div>
-                      }
-                    />
-                    <Button type="primary" block style={{ marginTop: 16 }}>
-                      Sepete Ekle
-                    </Button>
-                  </Card>
-                </Col>
-              ))}
-            </Row>
-
-            <div style={{ marginTop: 24, textAlign: 'center' }}>
-              <Pagination defaultCurrent={1} total={150} pageSize={6} />
-            </div>
-          </div>
-        );
-
-      case 'products':
-        return (
-          <Card>
-            <h2>Tüm Ürünler</h2>
-            <Row gutter={[16, 16]}>
-              {products.map((product) => (
-                <Col key={product.id} xs={24} sm={12} lg={8}>
-                  <Card hoverable>
-                    <div
-                      style={{
-                        height: 150,
-                        background: '#f5f5f5',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginBottom: 16,
-                        fontSize: 40
-                      }}
-                    >
-                      ✨
-                    </div>
-                    <Card.Meta
-                      title={product.name}
-                      description={`${product.price}₺ - ${product.seller}`}
-                    />
-                  </Card>
-                </Col>
-              ))}
-            </Row>
-          </Card>
-        );
-
-      case 'sellers':
-        return (
-          <Card>
-            <h2>Satıcılar</h2>
-            <p>Satıcı profilleri burada gösterilir...</p>
-          </Card>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  return (
-    <Layout style={{ minHeight: '100vh' }}>
+// ... in Header
       <Header
         style={{
           background: '#001529',
@@ -155,7 +62,17 @@ function App() {
           alignItems: 'center'
         }}
       >
-        <h1 style={{ color: '#fff', margin: 0 }}>✨ Golden Marketplace</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <h1 style={{ color: '#fff', margin: 0 }}>✨ Golden</h1>
+            {goldPrice && (
+                <div style={{ background: '#d4af37', padding: '4px 12px', borderRadius: '4px', color: '#000', fontWeight: 'bold' }}>
+                    💛 Altın: {Math.round(goldPrice.price).toLocaleString('tr-TR')} {goldPrice.currency}/oz 
+                    <span style={{ fontSize: '0.8em', marginLeft: '5px' }}>
+                        ({goldPrice.change24h > 0 ? '+' : ''}{goldPrice.change24h}%)
+                    </span>
+                </div>
+            )}
+        </div>
         <div>
           <Button type="primary" style={{ marginRight: 16 }} icon={<ShoppingCartOutlined />}>
             Sepet <Badge count={cartCount} />
@@ -185,7 +102,7 @@ function App() {
       <Footer style={{ textAlign: 'center', background: '#001529', color: '#fff' }}>
         <p>&copy; 2026 Golden Marketplace - Tüm hakları saklıdır</p>
       </Footer>
-    </Layout>
+    </Layout >
   );
 }
 

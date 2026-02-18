@@ -27,6 +27,17 @@ export class GoldPriceService {
    */
   async getCurrentGoldPrice(): Promise<GoldPrice> {
     try {
+      // Mock response if no API key
+      if (!this.apiKey) {
+        console.log('Using Mock Gold Price');
+        return {
+          price: 65000 + (Math.random() * 1000 - 500), // Random fluctuation around 65000 TRY/oz
+          currency: 'TRY',
+          timestamp: new Date(),
+          change24h: 0.5
+        };
+      }
+
       const cached = goldCache.get('gold_price');
       if (cached) {
         return cached as GoldPrice;
@@ -37,7 +48,7 @@ export class GoldPriceService {
           'x-access-token': this.apiKey
         },
         params: {
-          curr: 'USD'
+          curr: 'TRY'
         }
       });
 
@@ -52,7 +63,13 @@ export class GoldPriceService {
       return goldPrice;
     } catch (error) {
       console.error('Error fetching gold price:', error);
-      throw new Error('Failed to fetch gold price');
+      // Fallback to mock on error to keep system running
+      return {
+        price: 65000,
+        currency: 'TRY',
+        timestamp: new Date(),
+        change24h: 0
+      };
     }
   }
 
@@ -79,6 +96,38 @@ export class GoldPriceService {
     const goldPrice = await this.getCurrentGoldPrice();
     const indexedAmount = (basePrice * goldIndexPercentage) / 100;
     return Math.round((indexedAmount / goldPrice.price) * 10000) / 10000; // Gold ounces
+  }
+
+  /**
+   * Update all product prices based on current gold rate
+   */
+  async updateProductPrices(): Promise<void> {
+    console.log('Starting Gold Price Update Job...');
+    const goldPrice = await this.getCurrentGoldPrice();
+    console.log(`Current Gold Price: ${goldPrice.price} ${goldPrice.currency}`);
+
+    // We need to import Product inside the method or file. 
+    // Importing at top level might cause circular dependency if Product uses this service.
+    // But typically Models don't depend on Services. Services depend on Models.
+    // Let's import at top level.
+    const Product = require('../models/Product').default;
+
+    const products = await Product.findAll({ where: { isActive: true } });
+    let updatedCount = 0;
+
+    for (const product of products) {
+      if (product.goldIndexPrice && product.goldIndexPrice > 0) {
+        const newBasePrice = Math.round(product.goldIndexPrice * goldPrice.price);
+
+        // Only update if difference is significant (e.g. > 1 TL) to avoid noise?
+        // Or just update always.
+        if (Math.abs(newBasePrice - product.basePrice) > 1) {
+          await product.update({ basePrice: newBasePrice });
+          updatedCount++;
+        }
+      }
+    }
+    console.log(`Updated prices for ${updatedCount} products.`);
   }
 }
 

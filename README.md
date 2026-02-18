@@ -1,106 +1,82 @@
-# Golden Marketplace - E-Commerce Platform
+# Golden Marketplace
 
-Altın endeksli fiyatlandırma ile multi-pazaryeri entegrasyonu destekleyen kapsamlı e-ticaret platformu.
+Altın endeksli çoklu pazaryeri e-ticaret platformu.
 
-## 🚀 Özellikler
-
-- **Multi-Marketplace Integration**: Etsy, Hepsiburada, Amazon, N11, Trendyol ve daha fazlası
-- **Kendi Pazaryeri**: Satıcılar kendi mağazalarını açabilir
-- **Altın Endeksli Fiyatlandırma**: ISO 4217 benzeri altın tabanlı para birimi
-- **Otomatik Fiyat Güncellemeleri**: Altın fiyatlarına bağlı dinamik fiyatlandırma
-- **Subscription Model**: Stripe entegrasyonu ile ödeme yönetimi
-- **Sosyal Medya Entegrasyonu**: Instagram, TikTok, Google Shop
-- **Üç Ayrı Platform**:
-  - 👑 Pazaryeri (Herkese açık)
-  - 🏪 Satıcı Paneli
-  - ⚙️ Süper Admin Paneli
-
-## 📁 Proje Yapısı
+## 🏗️ Mimari
 
 ```
 golden-marketplace/
-├── backend/              # Node.js/Express API
-│   ├── src/
-│   │   ├── models/       # Database models
-│   │   ├── controllers/  # Route controllers
-│   │   ├── services/     # Business logic
-│   │   ├── integrations/ # Marketplace integrations
-│   │   ├── routes/       # API routes
-│   │   ├── middleware/   # Custom middleware
-│   │   ├── config/       # Configuration
-│   │   └── utils/        # Utility functions
-│   └── package.json
+├── backend/          # Node.js + Express + TypeScript API
 ├── frontend/
-│   ├── seller-panel/     # Satıcı yönetim paneli
-│   ├── admin-panel/      # Süper admin paneli
-│   └── marketplace/      # Herkese açık pazaryeri
-├── docs/                 # Dokumentasyon
-└── README.md
+│   ├── marketplace/  # Herkese açık mağaza (Port 5174)
+│   ├── seller-panel/ # Satıcı paneli (Port 5173)
+│   └── admin/        # Yönetici paneli (Port 5175)
+├── docs/             # Dökümanlar
+└── docker-compose.yml
 ```
 
-## 🛠️ Teknoloji Stack
-
-### Backend
-- **Runtime**: Node.js
-- **Framework**: Express.js
-- **Database**: PostgreSQL
-- **ORM**: Sequelize/TypeORM
-- **Authentication**: JWT + OAuth2
-- **Payment**: Stripe API
-- **Task Queue**: Bull/RabbitMQ
-
-### Frontend
-- **Framework**: React + TypeScript
-- **UI Library**: Ant Design / Material-UI
-- **State Management**: Redux / Zustand
-- **API Client**: Axios / TanStack Query
-
-### Marketplace Integrations
-- Etsy API
-- Amazon Selling Partner API
-- Hepsiburada API
-- Trendyol API
-- N11 API
-
-### Social Media
-- Instagram Graph API
-- TikTok Shop API
-- Google Merchant Center API
-
-## 🔐 Güvenlik
-
-- JWT Authentication
-- Role-Based Access Control (RBAC)
-- API Rate Limiting
-- CORS Configuration
-- Environment Variables
-
-## 📦 Kurulum
-
-Detaylı kurulum talimatları için [SETUP.md](./docs/SETUP.md) dosyasını inceleyiniz.
-
-## 🚀 Başlangıç
+## ⚡ Hızlı Başlangıç
 
 ```bash
-# Backend
-cd backend
-npm install
-npm run dev
+# 1. Repo'yu klonla
+git clone https://github.com/asbajans/goldenmarketplace.git
+cd goldenmarketplace
 
-# Frontend (Her biri için ayrı terminal)
-cd frontend/seller-panel
-npm install
-npm start
+# 2. Bağımlılıkları kur
+cd backend && npm install
+cd ../frontend/seller-panel && npm install
+cd ../marketplace && npm install
 
-cd frontend/admin-panel
-npm install
-npm start
+# 3. Veritabanını hazırla
+cd ../../backend
+cp .env.example .env   # .env dosyasını düzenle
+npx ts-node src/scripts/sync-db.ts
+npx ts-node src/scripts/seed.ts
 
-cd frontend/marketplace
-npm install
-npm start
+# 4. Çalıştır
+npm run dev                          # Backend  → http://localhost:777
+cd ../frontend/seller-panel && npm run dev   # Seller   → http://localhost:5173
+cd ../marketplace && npm run dev             # Market   → http://localhost:5175
 ```
 
-## 📄 Lisans
+## 🔑 Varsayılan Hesaplar
 
-MIT License
+| Rol      | E-posta              | Şifre        |
+|----------|----------------------|--------------|
+| Admin    | admin@golden.com     | admin123     |
+| Satıcı   | seller@golden.com    | seller123    |
+| Müşteri  | customer@golden.com  | customer123  |
+
+## 🌐 Production Domain
+
+| Subdomain | Servis |
+|-----------|--------|
+| `goldencrafters.com` | Marketplace |
+| `seller.goldencrafters.com` | Satıcı Paneli |
+| `admin.goldencrafters.com` | Admin Paneli |
+| `api.goldencrafters.com` | Backend API (Port 777) |
+
+## 🛠️ Teknolojiler
+
+| Katman     | Teknoloji                        |
+|------------|----------------------------------|
+| Backend    | Node.js, Express, TypeScript     |
+| Veritabanı | PostgreSQL, Sequelize ORM        |
+| Cache/Queue| Redis, Bull                      |
+| Frontend   | React, Ant Design, Vite          |
+| Ödeme      | Stripe                           |
+| Altın API  | GoldAPI.io                       |
+
+## 📡 API Endpoint'leri
+
+| Endpoint                    | Açıklama                    |
+|-----------------------------|-----------------------------|
+| `POST /api/auth/login`     | Giriş yap                   |
+| `POST /api/auth/register`  | Kayıt ol                     |
+| `GET /api/products`        | Ürün listele                 |
+| `POST /api/products`       | Ürün oluştur (auth)          |
+| `GET /api/gold-price/current` | Güncel altın fiyatı       |
+| `GET /api/integrations`    | Pazaryeri bağlantıları       |
+| `GET /api/feed/google.xml` | Google Shopping beslemesi     |
+| `GET /api/feed/facebook.json` | Facebook katalog          |
+| `GET /api/feed/share/:slug`| Sosyal medya paylaşım verisi |

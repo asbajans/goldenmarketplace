@@ -6,7 +6,9 @@
 import { Request, Response } from 'express';
 import { Op } from 'sequelize';
 import Product from '../models/Product';
+import Store from '../models/Store';
 import goldPriceService from '../services/goldPriceService';
+import { productSyncQueue } from '../jobs/productSyncJob';
 
 export class ProductController {
   /**
@@ -59,13 +61,25 @@ export class ProductController {
    */
   static async createProduct(req: Request, res: Response) {
     try {
-      const { storeId, title, description, category, sku, basePrice, quantity, images } = req.body;
+      const { title, description, category, sku, basePrice, quantity, images } = req.body;
+
+      // Find store for current user
+      // Need to import Store model
+      const store = await Store.findOne({ where: { userId: req.user.id } });
+      if (!store) {
+        return res.status(400).json({
+          error: {
+            message: 'You do not have a store created yet.',
+            status: 400
+          }
+        });
+      }
 
       // Calculate gold indexed price
       const goldIndexPrice = await goldPriceService.getPriceWithGoldIndexing(basePrice);
 
       const product = await Product.create({
-        storeId,
+        storeId: store.id,
         title,
         slug: title.toLowerCase().replace(/\s+/g, '-'),
         description,
@@ -76,6 +90,14 @@ export class ProductController {
         quantity,
         images: images || [],
         isActive: true
+      });
+
+      // Trigger Sync
+      // @ts-ignore
+      productSyncQueue.add({
+        productId: product.id,
+        userId: req.user.id,
+        trigger: 'create'
       });
 
       return res.status(201).json({
@@ -125,6 +147,14 @@ export class ProductController {
         goldIndexPrice,
         quantity: quantity !== undefined ? quantity : product.quantity,
         images: images || product.images
+      });
+
+      // Trigger Sync
+      // @ts-ignore
+      productSyncQueue.add({
+        productId: product.id,
+        userId: req.user.id,
+        trigger: 'update'
       });
 
       return res.status(200).json({
