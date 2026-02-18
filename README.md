@@ -51,7 +51,7 @@ cd ../marketplace && npm run dev             # Market   → http://localhost:517
 
 | Subdomain | Servis |
 |-----------|--------|
-| `goldencrafters.com` | Marketplace |
+| `app.goldencrafters.com` | Marketplace |
 | `seller.goldencrafters.com` | Satıcı Paneli |
 | `admin.goldencrafters.com` | Admin Paneli |
 | `api.goldencrafters.com` | Backend API (Port 777) |

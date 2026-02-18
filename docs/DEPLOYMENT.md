@@ -11,7 +11,7 @@ Golden Marketplace'ı Portainer üzerinden sunucunuza deploy etme adımları.
 - ✅ Docker ve Docker Compose sunucuda kurulu
 - ✅ Portainer çalışır durumda
 - ✅ Cloudflare Tunnel yapılandırıldı:
-  - `goldencrafters.com` → `:5175`
+  - `app.goldencrafters.com` → `:5175`
   - `api.goldencrafters.com` → `:777`
   - `seller.goldencrafters.com` → `:5173`
   - `admin.goldencrafters.com` → `:5174`
@@ -48,7 +48,7 @@ Portainer stack sayfasında **Environment variables** bölümüne şu değişken
 | `DB_PASSWORD` | `güçlü_şifre_buraya` | PostgreSQL şifresi |
 | `REDIS_PASSWORD` | `güçlü_redis_şifresi` | Redis şifresi |
 | `JWT_SECRET` | `64_karakterlik_rastgele_string` | JWT imzalama anahtarı |
-| `FRONTEND_URL` | `https://goldencrafters.com` | Ana site URL |
+| `FRONTEND_URL` | `https://app.goldencrafters.com` | Ana site URL |
 | `API_URL` | `https://api.goldencrafters.com` | API URL |
 | `NODE_ENV` | `production` | Ortam |
 | `PORT` | `777` | Backend portu |
@@ -112,7 +112,7 @@ Tarayıcıdan kontrol edin:
 | Test | URL | Beklenen |
 |------|-----|----------|
 | API Health | `https://api.goldencrafters.com/health` | `{"status":"OK"}` |
-| Marketplace | `https://goldencrafters.com` | Ana sayfa |
+| Marketplace | `https://app.goldencrafters.com` | Ana sayfa |
 | Seller Panel | `https://seller.goldencrafters.com` | Giriş sayfası |
 | Admin Panel | `https://admin.goldencrafters.com` | Giriş sayfası |
 | Google Feed | `https://api.goldencrafters.com/api/feed/google.xml` | XML çıktısı |

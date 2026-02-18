@@ -26,7 +26,7 @@ app.use(helmet());
 app.use(cors({
   origin: [
     'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175',
-    'https://goldencrafters.com', 'https://seller.goldencrafters.com', 'https://admin.goldencrafters.com'
+    'https://app.goldencrafters.com', 'https://seller.goldencrafters.com', 'https://admin.goldencrafters.com'
   ],
   credentials: true
 }));

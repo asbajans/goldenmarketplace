@@ -70,7 +70,7 @@ services:
       # App Config
       NODE_ENV: production
       PORT: 777
-      FRONTEND_URL: ${FRONTEND_URL:-https://goldencrafters.com}
+      FRONTEND_URL: ${FRONTEND_URL:-https://app.goldencrafters.com}
 
     depends_on:
       postgres:
