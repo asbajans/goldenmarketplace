@@ -17,7 +17,7 @@ COPY src ./src
 RUN npm run build
 
 # Expose port
-EXPOSE 3000
+EXPOSE 777
 
 # Start application
 CMD ["npm", "start"]

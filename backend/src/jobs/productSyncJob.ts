@@ -7,12 +7,15 @@ import Product from '../models/Product';
 dotenv.config();
 
 // Create Sync Queue
-export const productSyncQueue = new Queue('product-sync', {
-    redis: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379')
-    }
-});
+export const productSyncQueue = process.env.REDIS_URL
+    ? new Queue('product-sync', process.env.REDIS_URL)
+    : new Queue('product-sync', {
+        redis: {
+            host: process.env.REDIS_HOST || 'localhost',
+            port: parseInt(process.env.REDIS_PORT || '6379'),
+            password: process.env.REDIS_PASSWORD
+        }
+    });
 
 // Process Jobs
 productSyncQueue.process(async (job) => {

@@ -3,13 +3,15 @@ import Queue from 'bull';
 import goldPriceService from '../services/goldPriceService';
 
 // Create a queue for gold price updates
-// Redis connection is handled by Bull defaults (localhost:6379)
-const goldPriceQueue = new Queue('gold-price-updates', {
-    redis: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379'),
-    }
-});
+export const goldPriceQueue = process.env.REDIS_URL
+    ? new Queue('gold-price-updates', process.env.REDIS_URL)
+    : new Queue('gold-price-updates', {
+        redis: {
+            host: process.env.REDIS_HOST || 'localhost',
+            port: parseInt(process.env.REDIS_PORT || '6379'),
+            password: process.env.REDIS_PASSWORD
+        }
+    });
 
 // Process the job
 goldPriceQueue.process(async (_job) => {
