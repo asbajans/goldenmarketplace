@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Form, Input, Button, Card, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
+import { Link } from 'react-router-dom';
 import { login } from '../api/auth';
 
 const Login: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
@@ -44,9 +45,12 @@ const Login: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
                     </Form.Item>
 
                     <Form.Item>
-                        <Button type="primary" htmlType="submit" loading={loading} block>
+                        <Button type="primary" htmlType="submit" loading={loading} block style={{ marginBottom: '10px' }}>
                             Giriş Yap
                         </Button>
+                        <div style={{ textAlign: 'center' }}>
+                            Hesabınız yok mu? <Link to="/register">Hemen Kaydol</Link>
+                        </div>
                     </Form.Item>
                 </Form>
             </Card>

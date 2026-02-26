@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
+import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import ProductList from './pages/ProductList';
 import AddProduct from './pages/AddProduct';
@@ -100,6 +101,7 @@ const App: React.FC = () => {
     return (
       <Routes>
         <Route path="/login" element={<Login onLogin={() => setIsAuthenticated(true)} />} />
+        <Route path="/register" element={<Register />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
