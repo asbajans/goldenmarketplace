@@ -119,6 +119,7 @@ const seed = async () => {
                 category: p.category,
                 gramWeight: p.gramWeight,
                 milyem: p.milyem,
+                profitMargin: 0,
                 priceTRY: Math.round(priceTRY * 100) / 100,
                 priceUSD: Math.round(priceUSD * 100) / 100,
                 quantity: p.quantity,

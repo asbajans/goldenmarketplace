@@ -1,6 +1,6 @@
 
-import React, { useEffect, useState } from 'react';
-import { Card, Button, List, Tag, message, Typography, Row, Col, Spin } from 'antd';
+import { useEffect, useState } from 'react';
+import { Card, Button, Tag, message, Typography, Row, Col, Spin } from 'antd';
 import { ShopOutlined, CheckCircleOutlined, SyncOutlined, DisconnectOutlined } from '@ant-design/icons';
 import client from '../api/client';
 import { useSearchParams } from 'react-router-dom';

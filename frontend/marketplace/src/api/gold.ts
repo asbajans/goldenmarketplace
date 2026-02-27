@@ -2,10 +2,11 @@
 import client from './client';
 
 export interface GoldPriceData {
-    price: number;
-    currency: string;
+    pricePerGramTRY: number;
+    pricePerOzTRY: number;
+    usdTryRate: number;
     timestamp: string;
-    change24h: number;
+    source: string;
 }
 
 export const getGoldPrice = async (): Promise<GoldPriceData> => {

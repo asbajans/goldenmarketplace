@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Layout, Menu, Card, Input, Row, Col, Button, Pagination, Badge } from 'antd';
+import { useState, useEffect } from 'react';
+import { Layout, Menu, Button, Badge } from 'antd';
 import {
   HomeOutlined,
   ShoppingOutlined,
   ShoppingCartOutlined,
-  HeartOutlined,
-  UserOutlined,
-  LogoutOutlined,
-  SearchOutlined
+  UserOutlined
 } from '@ant-design/icons';
 import { getProducts, Product } from './api/product';
 import { getGoldPrice, GoldPriceData } from './api/gold';
@@ -18,7 +15,7 @@ const { Header, Sider, Content, Footer } = Layout;
 function App() {
   const [collapsed, setCollapsed] = useState(false);
   const [selectedKey, setSelectedKey] = useState('home');
-  const [cartCount, setCartCount] = useState(3);
+  const [cartCount] = useState(3);
   const [products, setProducts] = useState<Product[]>([]);
   const [goldPrice, setGoldPrice] = useState<GoldPriceData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -83,10 +80,7 @@ function App() {
           <h1 style={{ color: '#fff', margin: 0 }}>✨ Golden</h1>
           {goldPrice && (
             <div style={{ background: '#d4af37', padding: '4px 12px', borderRadius: '4px', color: '#000', fontWeight: 'bold' }}>
-              💛 Altın: {Math.round(goldPrice.price).toLocaleString('tr-TR')} {goldPrice.currency}/oz
-              <span style={{ fontSize: '0.8em', marginLeft: '5px' }}>
-                ({goldPrice.change24h > 0 ? '+' : ''}{goldPrice.change24h}%)
-              </span>
+              💛 24K Gram: {Math.round(goldPrice.pricePerGramTRY).toLocaleString('tr-TR')} ₺
             </div>
           )}
         </div>
