@@ -16,9 +16,14 @@ interface ProductAttributes {
   sku: string;
   basePrice: number;
   goldIndexPrice: number;
-  currency?: string; // optional because DB provides a default
+  currency?: string;
+  pricingType: 'TL' | 'USD' | 'GRAM';
+  gramWeight?: number;
   quantity: number;
   images: string[];
+  videoUrl?: string;
+  marketplaces?: string[];
+  tags?: string[];
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -35,8 +40,13 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public basePrice!: number;
   public goldIndexPrice!: number;
   public currency?: string;
+  public pricingType!: 'TL' | 'USD' | 'GRAM';
+  public gramWeight?: number;
   public quantity!: number;
   public images!: string[];
+  public videoUrl?: string;
+  public marketplaces?: string[];
+  public tags?: string[];
   public isActive!: boolean;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -88,7 +98,15 @@ Product.init(
     },
     currency: {
       type: DataTypes.STRING,
-      defaultValue: 'XAU' // Gold ounces
+      defaultValue: 'TRY'
+    },
+    pricingType: {
+      type: DataTypes.ENUM('TL', 'USD', 'GRAM'),
+      defaultValue: 'TL'
+    },
+    gramWeight: {
+      type: DataTypes.DECIMAL(15, 4),
+      allowNull: true
     },
     quantity: {
       type: DataTypes.INTEGER,
@@ -96,6 +114,20 @@ Product.init(
       defaultValue: 0
     },
     images: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      defaultValue: []
+    },
+    videoUrl: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    marketplaces: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      defaultValue: []
+    },
+    tags: {
       type: DataTypes.JSON,
       allowNull: true,
       defaultValue: []

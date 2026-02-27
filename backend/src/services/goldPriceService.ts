@@ -21,6 +21,7 @@ interface GoldPrice {
 export class GoldPriceService {
   private apiUrl = process.env.GOLD_API_URL || 'https://api.goldapi.io/api/XAU';
   private apiKey = process.env.GOLD_API_KEY || '';
+  private usdToTryCache = new NodeCache({ stdTTL: 3600 });
 
   /**
    * Fetch current gold price
@@ -71,6 +72,30 @@ export class GoldPriceService {
         change24h: 0
       };
     }
+  }
+
+  /**
+   * Get USD to TRY exchange rate
+   */
+  async getUSDExchangeRate(): Promise<number> {
+    const cached = this.usdToTryCache.get('usd_try');
+    if (cached) return cached as number;
+
+    try {
+      // In a real app, use a currency API. For now, mock it.
+      const rate = 31.5 + (Math.random() * 0.2 - 0.1);
+      this.usdToTryCache.set('usd_try', rate);
+      return rate;
+    } catch (error) {
+      return 31.5;
+    }
+  }
+
+  /**
+   * Convert gram to ounces (1 oz = 31.1035g)
+   */
+  convertGramToOunces(grams: number): number {
+    return grams / 31.1035;
   }
 
   /**

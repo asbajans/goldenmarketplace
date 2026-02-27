@@ -61,9 +61,13 @@ export class ProductController {
    */
   static async createProduct(req: Request, res: Response) {
     try {
-      const { title, description, category, sku, basePrice, quantity, images } = req.body;
+      const {
+        title, description, category, sku, quantity,
+        images, videoUrl, marketplaces, pricingType,
+        basePrice, gramWeight
+      } = req.body;
 
-      // Find store for current user
+      // ... existing store finding code ...
       // Need to import Store model
       const store = await Store.findOne({ where: { userId: req.user.id } });
       if (!store) {
@@ -75,8 +79,21 @@ export class ProductController {
         });
       }
 
-      // Calculate gold indexed price
-      const goldIndexPrice = await goldPriceService.getPriceWithGoldIndexing(basePrice);
+      // Calculate gold indexed price based on pricing type
+      let calculatedBasePrice = basePrice || 0;
+      let finalGramWeight = gramWeight || 0;
+
+      if (pricingType === 'USD') {
+        const usdRate = await goldPriceService.getUSDExchangeRate();
+        calculatedBasePrice = basePrice * usdRate;
+      } else if (pricingType === 'GRAM') {
+        const goldPrice = await goldPriceService.getCurrentGoldPrice();
+        calculatedBasePrice = gramWeight * goldPrice.price;
+        finalGramWeight = gramWeight;
+      }
+
+      const goldIndexPrice = await goldPriceService.amountToGoldOunces(calculatedBasePrice);
+      const tags = ProductController.generateTags(title, category);
 
       const product = await Product.create({
         storeId: store.id,
@@ -85,10 +102,15 @@ export class ProductController {
         description,
         category,
         sku,
-        basePrice,
+        basePrice: calculatedBasePrice,
         goldIndexPrice,
+        pricingType: pricingType || 'TL',
+        gramWeight: finalGramWeight,
         quantity,
         images: images || [],
+        videoUrl,
+        marketplaces: marketplaces || [],
+        tags,
         isActive: true
       });
 
@@ -121,7 +143,10 @@ export class ProductController {
   static async updateProduct(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { title, description, category, basePrice, quantity, images } = req.body;
+      const {
+        title, description, category, basePrice, quantity,
+        images, videoUrl, marketplaces, pricingType, gramWeight
+      } = req.body;
 
       const product = await Product.findByPk(id);
       if (!product) {
@@ -133,20 +158,38 @@ export class ProductController {
         });
       }
 
-      // Recalculate gold price if base price changed
-      let goldIndexPrice = product.goldIndexPrice;
-      if (basePrice) {
-        goldIndexPrice = await goldPriceService.getPriceWithGoldIndexing(basePrice);
+      // Recalculate if price fields changed
+      let calculatedBasePrice = basePrice || product.basePrice;
+      let finalGramWeight = gramWeight || product.gramWeight;
+      const finalPricingType = pricingType || product.pricingType;
+
+      if (pricingType || basePrice || gramWeight) {
+        if (finalPricingType === 'USD') {
+          const usdRate = await goldPriceService.getUSDExchangeRate();
+          calculatedBasePrice = (basePrice || product.basePrice) * usdRate;
+        } else if (finalPricingType === 'GRAM') {
+          const goldPrice = await goldPriceService.getCurrentGoldPrice();
+          calculatedBasePrice = (gramWeight || product.gramWeight) * goldPrice.price;
+          finalGramWeight = gramWeight || product.gramWeight;
+        }
       }
+
+      const goldIndexPrice = await goldPriceService.amountToGoldOunces(calculatedBasePrice);
+      const tags = ProductController.generateTags(title || product.title, category || product.category);
 
       await product.update({
         title: title || product.title,
         description: description || product.description,
         category: category || product.category,
-        basePrice: basePrice || product.basePrice,
+        basePrice: calculatedBasePrice,
         goldIndexPrice,
+        pricingType: finalPricingType,
+        gramWeight: finalGramWeight,
         quantity: quantity !== undefined ? quantity : product.quantity,
-        images: images || product.images
+        images: images || product.images,
+        videoUrl: videoUrl !== undefined ? videoUrl : product.videoUrl,
+        marketplaces: marketplaces || product.marketplaces,
+        tags: tags
       });
 
       // Trigger Sync
@@ -239,6 +282,15 @@ export class ProductController {
         }
       });
     }
+  }
+
+  /**
+   * Generate tags from title and category
+   */
+  private static generateTags(title: string, category: string): string[] {
+    const combined = `${title} ${category}`.toLowerCase();
+    const words = combined.split(/[\s,.-]+/).filter(w => w.length > 2);
+    return Array.from(new Set(words));
   }
 }
 
