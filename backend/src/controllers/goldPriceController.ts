@@ -42,4 +42,16 @@ export class GoldPriceController {
             return res.status(500).json({ error: 'Failed to calculate price' });
         }
     }
+
+    /**
+     * Force refresh gold price cache and return fresh data
+     */
+    static async forceRefresh(_req: Request, res: Response) {
+        try {
+            const price = await goldPriceService.forceRefresh();
+            return res.status(200).json({ message: 'Cache refreshed', ...price });
+        } catch (error) {
+            return res.status(500).json({ error: 'Failed to refresh gold price' });
+        }
+    }
 }
