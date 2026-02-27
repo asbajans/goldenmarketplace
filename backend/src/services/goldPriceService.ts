@@ -1,6 +1,7 @@
 /**
  * Gold Price Service
  * Fetch and cache gold prices for currency indexing
+ * Core formula: gramWeight × (milyem/1000) × gold24KGramPriceTRY
  */
 
 import axios from 'axios';
@@ -12,147 +13,112 @@ dotenv.config();
 const goldCache = new NodeCache({ stdTTL: 3600 }); // Cache for 1 hour
 
 interface GoldPrice {
-  price: number;
-  currency: string;
+  pricePerGramTRY: number;  // 24K gram price in TRY
+  pricePerOzTRY: number;    // Price per troy ounce in TRY
+  usdTryRate: number;       // USD/TRY exchange rate
   timestamp: Date;
-  change24h: number;
 }
 
 export class GoldPriceService {
   private apiUrl = process.env.GOLD_API_URL || 'https://api.goldapi.io/api/XAU';
   private apiKey = process.env.GOLD_API_KEY || '';
-  private usdToTryCache = new NodeCache({ stdTTL: 3600 });
 
   /**
-   * Fetch current gold price
+   * Fetch current 24K gold price per gram in TRY
    */
   async getCurrentGoldPrice(): Promise<GoldPrice> {
     try {
+      const cached = goldCache.get<GoldPrice>('gold_price');
+      if (cached) return cached;
+
       // Mock response if no API key
       if (!this.apiKey) {
-        console.log('Using Mock Gold Price');
-        return {
-          price: 65000 + (Math.random() * 1000 - 500), // Random fluctuation around 65000 TRY/oz
-          currency: 'TRY',
-          timestamp: new Date(),
-          change24h: 0.5
+        console.log('[GoldPrice] Using mock data (no API key)');
+        const pricePerOzTRY = 65000 + (Math.random() * 1000 - 500);
+        const pricePerGramTRY = pricePerOzTRY / 31.1035;
+        const usdTryRate = 38.5;
+        const result: GoldPrice = {
+          pricePerGramTRY: Math.round(pricePerGramTRY * 100) / 100,
+          pricePerOzTRY: Math.round(pricePerOzTRY * 100) / 100,
+          usdTryRate,
+          timestamp: new Date()
         };
-      }
-
-      const cached = goldCache.get('gold_price');
-      if (cached) {
-        return cached as GoldPrice;
+        goldCache.set('gold_price', result);
+        return result;
       }
 
       const response = await axios.get(this.apiUrl, {
-        headers: {
-          'x-access-token': this.apiKey
-        },
-        params: {
-          curr: 'TRY'
-        }
+        headers: { 'x-access-token': this.apiKey },
+        params: { curr: 'TRY' }
       });
 
-      const goldPrice: GoldPrice = {
-        price: response.data.price,
-        currency: response.data.currency,
-        timestamp: new Date(),
-        change24h: response.data.pct_change_1d
+      const pricePerOzTRY = response.data.price;
+      const pricePerGramTRY = pricePerOzTRY / 31.1035;
+
+      // fetch USD/TRY from same API or mock
+      const usdTryRate = response.data.usd_try || 38.5;
+
+      const result: GoldPrice = {
+        pricePerGramTRY: Math.round(pricePerGramTRY * 100) / 100,
+        pricePerOzTRY: Math.round(pricePerOzTRY * 100) / 100,
+        usdTryRate,
+        timestamp: new Date()
       };
 
-      goldCache.set('gold_price', goldPrice);
-      return goldPrice;
+      goldCache.set('gold_price', result);
+      return result;
     } catch (error) {
-      console.error('Error fetching gold price:', error);
-      // Fallback to mock on error to keep system running
+      console.error('[GoldPrice] Error fetching:', error);
+      // Fallback
       return {
-        price: 65000,
-        currency: 'TRY',
-        timestamp: new Date(),
-        change24h: 0
+        pricePerGramTRY: 2090,
+        pricePerOzTRY: 65000,
+        usdTryRate: 38.5,
+        timestamp: new Date()
       };
     }
   }
 
   /**
-   * Get USD to TRY exchange rate
+   * Calculate product price from gram weight and milyem
+   * Formula: gramWeight × (milyem / 1000) × 24K gram TRY
    */
-  async getUSDExchangeRate(): Promise<number> {
-    const cached = this.usdToTryCache.get('usd_try');
-    if (cached) return cached as number;
-
-    try {
-      // In a real app, use a currency API. For now, mock it.
-      const rate = 31.5 + (Math.random() * 0.2 - 0.1);
-      this.usdToTryCache.set('usd_try', rate);
-      return rate;
-    } catch (error) {
-      return 31.5;
-    }
+  async calculateProductPrice(gramWeight: number, milyem: number): Promise<{ priceTRY: number; priceUSD: number }> {
+    const gold = await this.getCurrentGoldPrice();
+    const priceTRY = gramWeight * (milyem / 1000) * gold.pricePerGramTRY;
+    const priceUSD = priceTRY / gold.usdTryRate;
+    return {
+      priceTRY: Math.round(priceTRY * 100) / 100,
+      priceUSD: Math.round(priceUSD * 100) / 100
+    };
   }
 
   /**
-   * Convert gram to ounces (1 oz = 31.1035g)
+   * Update ALL active product prices based on current gold rate
+   * Called hourly by goldPriceJob
    */
-  convertGramToOunces(grams: number): number {
-    return grams / 31.1035;
-  }
+  async updateProductPrices(): Promise<{ updatedCount: number; goldPrice: GoldPrice }> {
+    console.log('[GoldPrice] Starting hourly price update...');
+    const gold = await this.getCurrentGoldPrice();
+    console.log(`[GoldPrice] 24K Gram: ${gold.pricePerGramTRY} TRY | USD/TRY: ${gold.usdTryRate}`);
 
-  /**
-   * Convert amount to gold ounces
-   */
-  async amountToGoldOunces(amount: number): Promise<number> {
-    const goldPrice = await this.getCurrentGoldPrice();
-    return amount / goldPrice.price;
-  }
-
-  /**
-   * Convert gold ounces to amount
-   */
-  async goldOuncesToAmount(ounces: number): Promise<number> {
-    const goldPrice = await this.getCurrentGoldPrice();
-    return ounces * goldPrice.price;
-  }
-
-  /**
-   * Get price with gold indexing applied
-   */
-  async getPriceWithGoldIndexing(basePrice: number, goldIndexPercentage: number = 100): Promise<number> {
-    const goldPrice = await this.getCurrentGoldPrice();
-    const indexedAmount = (basePrice * goldIndexPercentage) / 100;
-    return Math.round((indexedAmount / goldPrice.price) * 10000) / 10000; // Gold ounces
-  }
-
-  /**
-   * Update all product prices based on current gold rate
-   */
-  async updateProductPrices(): Promise<void> {
-    console.log('Starting Gold Price Update Job...');
-    const goldPrice = await this.getCurrentGoldPrice();
-    console.log(`Current Gold Price: ${goldPrice.price} ${goldPrice.currency}`);
-
-    // We need to import Product inside the method or file. 
-    // Importing at top level might cause circular dependency if Product uses this service.
-    // But typically Models don't depend on Services. Services depend on Models.
-    // Let's import at top level.
     const Product = require('../models/Product').default;
-
     const products = await Product.findAll({ where: { isActive: true } });
     let updatedCount = 0;
 
     for (const product of products) {
-      if (product.goldIndexPrice && product.goldIndexPrice > 0) {
-        const newBasePrice = Math.round(product.goldIndexPrice * goldPrice.price);
+      const { priceTRY, priceUSD } = await this.calculateProductPrice(
+        Number(product.gramWeight),
+        Number(product.milyem)
+      );
 
-        // Only update if difference is significant (e.g. > 1 TL) to avoid noise?
-        // Or just update always.
-        if (Math.abs(newBasePrice - product.basePrice) > 1) {
-          await product.update({ basePrice: newBasePrice });
-          updatedCount++;
-        }
-      }
+      // Always update to keep prices current
+      await product.update({ priceTRY, priceUSD });
+      updatedCount++;
     }
-    console.log(`Updated prices for ${updatedCount} products.`);
+
+    console.log(`[GoldPrice] Updated ${updatedCount} product prices.`);
+    return { updatedCount, goldPrice: gold };
   }
 }
 

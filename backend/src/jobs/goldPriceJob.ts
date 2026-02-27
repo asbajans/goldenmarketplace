@@ -15,12 +15,12 @@ export const goldPriceQueue = process.env.REDIS_URL
 
 // Process the job
 goldPriceQueue.process(async (_job) => {
-    console.log('Processing gold price update job...');
+    console.log('[GoldPriceJob] Processing hourly price update...');
     try {
-        await goldPriceService.updateProductPrices();
-        console.log('Gold price update completed successfully.');
+        const result = await goldPriceService.updateProductPrices();
+        console.log(`[GoldPriceJob] Done. Updated ${result.updatedCount} products. 24K Gram: ${result.goldPrice.pricePerGramTRY} TRY`);
     } catch (error) {
-        console.error('Gold price update failed:', error);
+        console.error('[GoldPriceJob] Failed:', error);
         throw error;
     }
 });
@@ -33,14 +33,14 @@ export const initGoldPriceJob = async () => {
         await goldPriceQueue.removeRepeatableByKey(job.key);
     }
 
-    // Add a new repeatable job (every 1 minute for demo purposes, usually 1 hour)
+    // Every hour at minute 0
     await goldPriceQueue.add({}, {
         repeat: {
-            cron: '* * * * *' // Every minute
+            cron: '0 * * * *' // Every hour
         }
     });
 
-    console.log('Gold Price Job scheduled: Every 1 minute');
+    console.log('[GoldPriceJob] Scheduled: Every hour (0 * * * *)');
 };
 
 export default goldPriceQueue;

@@ -1,6 +1,7 @@
 /**
  * Product Model
  * Schema for products in the marketplace
+ * Primary pricing: gramWeight × (milyem/1000) × 24K gold gram price
  */
 
 import { DataTypes, Model } from 'sequelize';
@@ -14,11 +15,10 @@ interface ProductAttributes {
   description?: string;
   category: string;
   sku: string;
-  basePrice: number;
-  goldIndexPrice: number;
-  currency?: string;
-  pricingType: 'TL' | 'USD' | 'GRAM';
-  gramWeight?: number;
+  gramWeight: number;
+  milyem: number;
+  priceTRY: number;
+  priceUSD: number;
   quantity: number;
   images: string[];
   videoUrl?: string;
@@ -37,11 +37,10 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public description?: string;
   public category!: string;
   public sku!: string;
-  public basePrice!: number;
-  public goldIndexPrice!: number;
-  public currency?: string;
-  public pricingType!: 'TL' | 'USD' | 'GRAM';
-  public gramWeight?: number;
+  public gramWeight!: number;
+  public milyem!: number;
+  public priceTRY!: number;
+  public priceUSD!: number;
   public quantity!: number;
   public images!: string[];
   public videoUrl?: string;
@@ -88,25 +87,27 @@ Product.init(
       allowNull: false,
       unique: true
     },
-    basePrice: {
-      type: DataTypes.DECIMAL(15, 4),
-      allowNull: false
-    },
-    goldIndexPrice: {
-      type: DataTypes.DECIMAL(15, 4),
-      allowNull: false
-    },
-    currency: {
-      type: DataTypes.STRING,
-      defaultValue: 'TRY'
-    },
-    pricingType: {
-      type: DataTypes.ENUM('TL', 'USD', 'GRAM'),
-      defaultValue: 'TL'
-    },
     gramWeight: {
       type: DataTypes.DECIMAL(15, 4),
-      allowNull: true
+      allowNull: false,
+      comment: 'Product weight in grams'
+    },
+    milyem: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      comment: 'Gold fineness (333=8K, 585=14K, 750=18K, 916=22K, 999=24K)'
+    },
+    priceTRY: {
+      type: DataTypes.DECIMAL(15, 2),
+      allowNull: false,
+      defaultValue: 0,
+      comment: 'Calculated: gramWeight × (milyem/1000) × 24K gram TRY'
+    },
+    priceUSD: {
+      type: DataTypes.DECIMAL(15, 2),
+      allowNull: false,
+      defaultValue: 0,
+      comment: 'Calculated: priceTRY / USD-TRY rate'
     },
     quantity: {
       type: DataTypes.INTEGER,

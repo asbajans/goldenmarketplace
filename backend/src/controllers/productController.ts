@@ -1,6 +1,6 @@
 /**
  * Product Controller
- * Handle product operations
+ * Handle product operations with gold-gram pricing
  */
 
 import { Request, Response } from 'express';
@@ -23,7 +23,6 @@ export class ProductController {
       if (storeId) where.storeId = storeId;
       if (category) where.category = category;
       if (search) {
-        // use Sequelize Op for substring searches (Postgres supports ILIKE if needed)
         where.title = { [Op.substring]: String(search) };
       }
 
@@ -48,10 +47,7 @@ export class ProductController {
     } catch (error) {
       console.error('Get products error:', error);
       return res.status(500).json({
-        error: {
-          message: 'Internal server error',
-          status: 500
-        }
+        error: { message: 'Internal server error', status: 500 }
       });
     }
   }
@@ -63,49 +59,44 @@ export class ProductController {
     try {
       const {
         title, description, category, sku, quantity,
-        images, videoUrl, marketplaces, pricingType,
-        basePrice, gramWeight
+        images, videoUrl, marketplaces, gramWeight, milyem
       } = req.body;
 
-      // ... existing store finding code ...
-      // Need to import Store model
-      const store = await Store.findOne({ where: { userId: req.user.id } });
-      if (!store) {
+      // Validate required gold fields
+      if (!gramWeight || gramWeight <= 0) {
         return res.status(400).json({
-          error: {
-            message: 'You do not have a store created yet.',
-            status: 400
-          }
+          error: { message: 'Gram ağırlığı zorunludur ve 0\'dan büyük olmalıdır.', status: 400 }
+        });
+      }
+      if (!milyem || ![333, 585, 750, 916, 999].includes(milyem)) {
+        return res.status(400).json({
+          error: { message: 'Geçerli bir milyem değeri giriniz (333, 585, 750, 916, 999).', status: 400 }
         });
       }
 
-      // Calculate gold indexed price based on pricing type
-      let calculatedBasePrice = basePrice || 0;
-      let finalGramWeight = gramWeight || 0;
-
-      if (pricingType === 'USD') {
-        const usdRate = await goldPriceService.getUSDExchangeRate();
-        calculatedBasePrice = basePrice * usdRate;
-      } else if (pricingType === 'GRAM') {
-        const goldPrice = await goldPriceService.getCurrentGoldPrice();
-        calculatedBasePrice = gramWeight * goldPrice.price;
-        finalGramWeight = gramWeight;
+      // Find store for current user
+      const store = await Store.findOne({ where: { userId: req.user.id } });
+      if (!store) {
+        return res.status(400).json({
+          error: { message: 'You do not have a store created yet.', status: 400 }
+        });
       }
 
-      const goldIndexPrice = await goldPriceService.amountToGoldOunces(calculatedBasePrice);
+      // Calculate prices from gram + milyem
+      const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(gramWeight, milyem);
       const tags = ProductController.generateTags(title, category);
 
       const product = await Product.create({
         storeId: store.id,
         title,
-        slug: title.toLowerCase().replace(/\s+/g, '-'),
+        slug: title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
         description,
         category,
         sku,
-        basePrice: calculatedBasePrice,
-        goldIndexPrice,
-        pricingType: pricingType || 'TL',
-        gramWeight: finalGramWeight,
+        gramWeight,
+        milyem,
+        priceTRY,
+        priceUSD,
         quantity,
         images: images || [],
         videoUrl,
@@ -114,7 +105,7 @@ export class ProductController {
         isActive: true
       });
 
-      // Trigger Sync
+      // Trigger marketplace sync
       // @ts-ignore
       productSyncQueue.add({
         productId: product.id,
@@ -129,10 +120,7 @@ export class ProductController {
     } catch (error) {
       console.error('Create product error:', error);
       return res.status(500).json({
-        error: {
-          message: 'Internal server error',
-          status: 500
-        }
+        error: { message: 'Internal server error', status: 500 }
       });
     }
   }
@@ -144,55 +132,45 @@ export class ProductController {
     try {
       const { id } = req.params;
       const {
-        title, description, category, basePrice, quantity,
-        images, videoUrl, marketplaces, pricingType, gramWeight
+        title, description, category, quantity,
+        images, videoUrl, marketplaces, gramWeight, milyem
       } = req.body;
 
       const product = await Product.findByPk(id);
       if (!product) {
         return res.status(404).json({
-          error: {
-            message: 'Product not found',
-            status: 404
-          }
+          error: { message: 'Product not found', status: 404 }
         });
       }
 
-      // Recalculate if price fields changed
-      let calculatedBasePrice = basePrice || product.basePrice;
-      let finalGramWeight = gramWeight || product.gramWeight;
-      const finalPricingType = pricingType || product.pricingType;
+      // Recalculate prices if gram/milyem changed
+      const finalGramWeight = gramWeight || product.gramWeight;
+      const finalMilyem = milyem || product.milyem;
+      const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(
+        Number(finalGramWeight), Number(finalMilyem)
+      );
 
-      if (pricingType || basePrice || gramWeight) {
-        if (finalPricingType === 'USD') {
-          const usdRate = await goldPriceService.getUSDExchangeRate();
-          calculatedBasePrice = (basePrice || product.basePrice) * usdRate;
-        } else if (finalPricingType === 'GRAM') {
-          const goldPrice = await goldPriceService.getCurrentGoldPrice();
-          calculatedBasePrice = (gramWeight || product.gramWeight) * goldPrice.price;
-          finalGramWeight = gramWeight || product.gramWeight;
-        }
-      }
-
-      const goldIndexPrice = await goldPriceService.amountToGoldOunces(calculatedBasePrice);
-      const tags = ProductController.generateTags(title || product.title, category || product.category);
+      const tags = ProductController.generateTags(
+        title || product.title,
+        category || product.category
+      );
 
       await product.update({
         title: title || product.title,
         description: description || product.description,
         category: category || product.category,
-        basePrice: calculatedBasePrice,
-        goldIndexPrice,
-        pricingType: finalPricingType,
         gramWeight: finalGramWeight,
+        milyem: finalMilyem,
+        priceTRY,
+        priceUSD,
         quantity: quantity !== undefined ? quantity : product.quantity,
         images: images || product.images,
         videoUrl: videoUrl !== undefined ? videoUrl : product.videoUrl,
         marketplaces: marketplaces || product.marketplaces,
-        tags: tags
+        tags
       });
 
-      // Trigger Sync
+      // Trigger marketplace sync
       // @ts-ignore
       productSyncQueue.add({
         productId: product.id,
@@ -207,10 +185,7 @@ export class ProductController {
     } catch (error) {
       console.error('Update product error:', error);
       return res.status(500).json({
-        error: {
-          message: 'Internal server error',
-          status: 500
-        }
+        error: { message: 'Internal server error', status: 500 }
       });
     }
   }
@@ -225,10 +200,7 @@ export class ProductController {
       const product = await Product.findByPk(id);
       if (!product) {
         return res.status(404).json({
-          error: {
-            message: 'Product not found',
-            status: 404
-          }
+          error: { message: 'Product not found', status: 404 }
         });
       }
 
@@ -240,46 +212,39 @@ export class ProductController {
     } catch (error) {
       console.error('Delete product error:', error);
       return res.status(500).json({
-        error: {
-          message: 'Internal server error',
-          status: 500
-        }
+        error: { message: 'Internal server error', status: 500 }
       });
     }
   }
 
   /**
-   * Calculate gold indexed price
+   * Calculate gold price preview (for frontend live display)
    */
   static async calculateGoldPrice(req: Request, res: Response) {
     try {
-      const { basePrice } = req.body;
+      const { gramWeight, milyem } = req.body;
 
-      if (!basePrice || basePrice <= 0) {
+      if (!gramWeight || gramWeight <= 0 || !milyem) {
         return res.status(400).json({
-          error: {
-            message: 'Valid base price is required',
-            status: 400
-          }
+          error: { message: 'gramWeight and milyem are required', status: 400 }
         });
       }
 
-      const goldPrice = await goldPriceService.getCurrentGoldPrice();
-      const goldOunces = await goldPriceService.amountToGoldOunces(basePrice);
+      const gold = await goldPriceService.getCurrentGoldPrice();
+      const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(gramWeight, milyem);
 
       return res.status(200).json({
-        basePrice,
-        goldPrice: goldPrice.price,
-        goldOunces,
-        currency: 'XAU'
+        gramWeight,
+        milyem,
+        gold24KGramTRY: gold.pricePerGramTRY,
+        usdTryRate: gold.usdTryRate,
+        priceTRY,
+        priceUSD
       });
     } catch (error) {
       console.error('Calculate gold price error:', error);
       return res.status(500).json({
-        error: {
-          message: 'Failed to calculate gold price',
-          status: 500
-        }
+        error: { message: 'Failed to calculate gold price', status: 500 }
       });
     }
   }
