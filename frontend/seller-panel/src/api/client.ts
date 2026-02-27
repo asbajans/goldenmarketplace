@@ -29,9 +29,15 @@ client.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response && error.response.status === 401) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/login';
+            const currentPath = window.location.pathname;
+            const requestUrl = error.config?.url || '';
+
+            // Don't redirect if already on login/register or if this was an auth check
+            if (!currentPath.includes('/login') && !currentPath.includes('/register') && !requestUrl.includes('/auth/me')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }

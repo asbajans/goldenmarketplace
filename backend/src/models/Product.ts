@@ -17,6 +17,7 @@ interface ProductAttributes {
   sku: string;
   gramWeight: number;
   milyem: number;
+  profitMargin: number;
   priceTRY: number;
   priceUSD: number;
   quantity: number;
@@ -39,6 +40,7 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public sku!: string;
   public gramWeight!: number;
   public milyem!: number;
+  public profitMargin!: number;
   public priceTRY!: number;
   public priceUSD!: number;
   public quantity!: number;
@@ -96,6 +98,12 @@ Product.init(
       type: DataTypes.INTEGER,
       allowNull: false,
       comment: 'Gold fineness (333=8K, 585=14K, 750=18K, 916=22K, 999=24K)'
+    },
+    profitMargin: {
+      type: DataTypes.DECIMAL(5, 2),
+      allowNull: false,
+      defaultValue: 0,
+      comment: 'Profit margin percentage applied on top of gold price'
     },
     priceTRY: {
       type: DataTypes.DECIMAL(15, 2),

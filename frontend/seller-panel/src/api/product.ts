@@ -6,6 +6,7 @@ export interface Product {
     description: string;
     gramWeight: number;
     milyem: number;
+    profitMargin: number;
     priceTRY: number;
     priceUSD: number;
     quantity: number;

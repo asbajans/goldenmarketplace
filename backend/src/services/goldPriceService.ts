@@ -83,9 +83,10 @@ export class GoldPriceService {
    * Calculate product price from gram weight and milyem
    * Formula: gramWeight × (milyem / 1000) × 24K gram TRY
    */
-  async calculateProductPrice(gramWeight: number, milyem: number): Promise<{ priceTRY: number; priceUSD: number }> {
+  async calculateProductPrice(gramWeight: number, milyem: number, profitMargin: number = 0): Promise<{ priceTRY: number; priceUSD: number }> {
     const gold = await this.getCurrentGoldPrice();
-    const priceTRY = gramWeight * (milyem / 1000) * gold.pricePerGramTRY;
+    const materialCost = gramWeight * (milyem / 1000) * gold.pricePerGramTRY;
+    const priceTRY = materialCost * (1 + profitMargin / 100);
     const priceUSD = priceTRY / gold.usdTryRate;
     return {
       priceTRY: Math.round(priceTRY * 100) / 100,
@@ -109,7 +110,8 @@ export class GoldPriceService {
     for (const product of products) {
       const { priceTRY, priceUSD } = await this.calculateProductPrice(
         Number(product.gramWeight),
-        Number(product.milyem)
+        Number(product.milyem),
+        Number(product.profitMargin || 0)
       );
 
       // Always update to keep prices current

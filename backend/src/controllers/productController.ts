@@ -59,7 +59,7 @@ export class ProductController {
     try {
       const {
         title, description, category, sku, quantity,
-        images, videoUrl, marketplaces, gramWeight, milyem
+        images, videoUrl, marketplaces, gramWeight, milyem, profitMargin
       } = req.body;
 
       // Validate required gold fields
@@ -82,8 +82,8 @@ export class ProductController {
         });
       }
 
-      // Calculate prices from gram + milyem
-      const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(gramWeight, milyem);
+      // Calculate prices from gram + milyem + profit margin
+      const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(gramWeight, milyem, profitMargin || 0);
       const tags = ProductController.generateTags(title, category);
 
       const product = await Product.create({
@@ -95,6 +95,7 @@ export class ProductController {
         sku,
         gramWeight,
         milyem,
+        profitMargin: profitMargin || 0,
         priceTRY,
         priceUSD,
         quantity,
@@ -133,7 +134,7 @@ export class ProductController {
       const { id } = req.params;
       const {
         title, description, category, quantity,
-        images, videoUrl, marketplaces, gramWeight, milyem
+        images, videoUrl, marketplaces, gramWeight, milyem, profitMargin
       } = req.body;
 
       const product = await Product.findByPk(id);
@@ -146,8 +147,9 @@ export class ProductController {
       // Recalculate prices if gram/milyem changed
       const finalGramWeight = gramWeight || product.gramWeight;
       const finalMilyem = milyem || product.milyem;
+      const finalProfitMargin = profitMargin !== undefined ? profitMargin : product.profitMargin;
       const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(
-        Number(finalGramWeight), Number(finalMilyem)
+        Number(finalGramWeight), Number(finalMilyem), Number(finalProfitMargin)
       );
 
       const tags = ProductController.generateTags(
@@ -161,6 +163,7 @@ export class ProductController {
         category: category || product.category,
         gramWeight: finalGramWeight,
         milyem: finalMilyem,
+        profitMargin: finalProfitMargin,
         priceTRY,
         priceUSD,
         quantity: quantity !== undefined ? quantity : product.quantity,
@@ -222,7 +225,7 @@ export class ProductController {
    */
   static async calculateGoldPrice(req: Request, res: Response) {
     try {
-      const { gramWeight, milyem } = req.body;
+      const { gramWeight, milyem, profitMargin } = req.body;
 
       if (!gramWeight || gramWeight <= 0 || !milyem) {
         return res.status(400).json({
@@ -231,11 +234,12 @@ export class ProductController {
       }
 
       const gold = await goldPriceService.getCurrentGoldPrice();
-      const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(gramWeight, milyem);
+      const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(gramWeight, milyem, profitMargin || 0);
 
       return res.status(200).json({
         gramWeight,
         milyem,
+        profitMargin: profitMargin || 0,
         gold24KGramTRY: gold.pricePerGramTRY,
         usdTryRate: gold.usdTryRate,
         priceTRY,

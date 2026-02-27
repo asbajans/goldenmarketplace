@@ -2,12 +2,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     Form, Input, Button, InputNumber, message, Upload,
-    Select, Checkbox, Space, Card, Tag, Typography, Statistic, Row, Col, Divider
+    Select, Checkbox, Space, Card, Tag, Typography, Statistic, Row, Col, Divider, Spin
 } from 'antd';
 import {
     PlusOutlined, VideoCameraOutlined,
     DoubleRightOutlined, InfoCircleOutlined,
-    DollarOutlined, GoldOutlined
+    DollarOutlined, GoldOutlined, PercentageOutlined,
+    ShopOutlined, CheckCircleOutlined
 } from '@ant-design/icons';
 import { createProduct } from '../api/product';
 import client from '../api/client';
@@ -18,6 +19,12 @@ const { Text } = Typography;
 interface AddProductProps {
     initialValues?: any;
     onSuccess: () => void;
+}
+
+interface Integration {
+    id: string;
+    platform: string;
+    isActive: boolean;
 }
 
 const CATEGORIES = [
@@ -34,11 +41,13 @@ const MILYEM_OPTIONS = [
     { value: 999, label: '999 Milyem (24 Ayar / Has Altın)' },
 ];
 
-const MARKETPLACES = [
-    { label: 'Trendyol', value: 'trendyol' },
-    { label: 'Hepsiburada', value: 'hepsiburada' },
-    { label: 'Amazon', value: 'amazon' },
-    { label: 'Golden Marketplace', value: 'golden' }
+const ALL_PLATFORMS = [
+    { key: 'golden', name: 'Golden Marketplace', color: '#d4a017' },
+    { key: 'etsy', name: 'Etsy', color: '#F56400' },
+    { key: 'amazon', name: 'Amazon', color: '#FF9900' },
+    { key: 'trendyol', name: 'Trendyol', color: '#F27A1A' },
+    { key: 'hepsiburada', name: 'Hepsiburada', color: '#FF6000' },
+    { key: 'n11', name: 'N11', color: '#5333ED' },
 ];
 
 const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => {
@@ -49,9 +58,12 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [priceTRY, setPriceTRY] = useState<number>(0);
     const [priceUSD, setPriceUSD] = useState<number>(0);
     const [tags, setTags] = useState<string[]>([]);
+    const [integrations, setIntegrations] = useState<Integration[]>([]);
+    const [integrationsLoading, setIntegrationsLoading] = useState(true);
 
     useEffect(() => {
         fetchGoldPrice();
+        fetchIntegrations();
     }, []);
 
     const fetchGoldPrice = async () => {
@@ -64,12 +76,25 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         }
     };
 
-    const calculateLivePrice = useCallback((gramWeight?: number, milyem?: number) => {
+    const fetchIntegrations = async () => {
+        try {
+            const { data } = await client.get('/integrations');
+            setIntegrations(data);
+        } catch (error) {
+            console.error('Failed to fetch integrations', error);
+        } finally {
+            setIntegrationsLoading(false);
+        }
+    };
+
+    const calculateLivePrice = useCallback((gramWeight?: number, milyem?: number, profitMargin?: number) => {
         const gw = gramWeight || 0;
         const ml = milyem || 0;
+        const pm = profitMargin || 0;
 
         if (gw > 0 && ml > 0 && gold24KGramTRY > 0) {
-            const tl = gw * (ml / 1000) * gold24KGramTRY;
+            const materialCost = gw * (ml / 1000) * gold24KGramTRY;
+            const tl = materialCost * (1 + pm / 100);
             const usd = tl / usdTryRate;
             setPriceTRY(Math.round(tl * 100) / 100);
             setPriceUSD(Math.round(usd * 100) / 100);
@@ -120,19 +145,37 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         }
     };
 
+    // Build marketplace options from all platforms + mark connected ones
+    const marketplaceOptions = ALL_PLATFORMS.map(p => {
+        const isConnected = p.key === 'golden' || integrations.some(i => i.platform === p.key && i.isActive);
+        return {
+            label: (
+                <span>
+                    <ShopOutlined style={{ color: p.color, marginRight: 4 }} />
+                    {p.name}
+                    {isConnected && <CheckCircleOutlined style={{ color: '#52c41a', marginLeft: 4, fontSize: 11 }} />}
+                    {!isConnected && p.key !== 'golden' && <Tag color="default" style={{ marginLeft: 4, fontSize: 10 }}>Bağlı Değil</Tag>}
+                </span>
+            ),
+            value: p.key,
+            disabled: !isConnected && p.key !== 'golden'
+        };
+    });
+
     return (
         <Form
             form={form}
             layout="vertical"
             initialValues={{
                 milyem: 916,
+                profitMargin: 0,
                 marketplaces: ['golden'],
                 ...initialValues
             }}
             onFinish={onFinish}
             onValuesChange={(changed, allValues) => {
-                if (changed.gramWeight !== undefined || changed.milyem !== undefined) {
-                    calculateLivePrice(allValues.gramWeight, allValues.milyem);
+                if (changed.gramWeight !== undefined || changed.milyem !== undefined || changed.profitMargin !== undefined) {
+                    calculateLivePrice(allValues.gramWeight, allValues.milyem, allValues.profitMargin);
                 }
             }}
         >
@@ -178,22 +221,22 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 }
             >
                 <Row gutter={16}>
-                    <Col span={8}>
+                    <Col span={6}>
                         <Form.Item
                             name="gramWeight"
                             label="Gram Ağırlığı"
-                            rules={[{ required: true, message: 'Gram ağırlığı gerekli' }]}
+                            rules={[{ required: true, message: 'Gram gerekli' }]}
                         >
                             <InputNumber
                                 style={{ width: '100%' }}
                                 min={0.01}
                                 step={0.01}
-                                placeholder="Örn: 14.50"
+                                placeholder="14.50"
                                 addonAfter="gr"
                             />
                         </Form.Item>
                     </Col>
-                    <Col span={8}>
+                    <Col span={6}>
                         <Form.Item
                             name="milyem"
                             label="Milyem (Saflık)"
@@ -206,7 +249,23 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                             </Select>
                         </Form.Item>
                     </Col>
-                    <Col span={8}>
+                    <Col span={6}>
+                        <Form.Item
+                            name="profitMargin"
+                            label={<><PercentageOutlined /> Kâr Marjı (%)</>}
+                            rules={[{ required: true }]}
+                        >
+                            <InputNumber
+                                style={{ width: '100%' }}
+                                min={0}
+                                max={500}
+                                step={1}
+                                placeholder="15"
+                                addonAfter="%"
+                            />
+                        </Form.Item>
+                    </Col>
+                    <Col span={6}>
                         <Form.Item
                             name="quantity"
                             label="Stok Adedi"
@@ -223,7 +282,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                     <Col span={12}>
                         <Card size="small" style={{ background: '#fffbe6', border: '1px solid #ffe58f', textAlign: 'center' }}>
                             <Statistic
-                                title="Tahmini TL Fiyatı"
+                                title="Satış Fiyatı (TL)"
                                 value={priceTRY}
                                 precision={2}
                                 suffix="₺"
@@ -234,7 +293,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                     <Col span={12}>
                         <Card size="small" style={{ background: '#f0f5ff', border: '1px solid #adc6ff', textAlign: 'center' }}>
                             <Statistic
-                                title="Tahmini USD Fiyatı"
+                                title="Satış Fiyatı (USD)"
                                 value={priceUSD}
                                 precision={2}
                                 prefix={<DollarOutlined />}
@@ -246,8 +305,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
 
                 <div style={{ marginTop: 8, textAlign: 'center' }}>
                     <Text type="secondary" style={{ fontSize: '0.75em' }}>
-                        <InfoCircleOutlined /> Fiyatlar saatte 1 otomatik güncellenir.
-                        Formül: Gram × (Milyem ÷ 1000) × 24K Gram Kuru
+                        <InfoCircleOutlined /> Formül: Gram × (Milyem ÷ 1000) × 24K Kur × (1 + Kâr%). Fiyatlar saatte 1 güncellenir.
                     </Text>
                 </div>
             </Card>
@@ -274,14 +332,29 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 </Form.Item>
             </Card>
 
-            {/* PAZARYERI */}
-            <Card title="Pazaryeri Dağıtımı" style={{ marginBottom: 16 }}>
+            {/* PAZARYERI ENTEGRASYONLARI */}
+            <Card
+                title="Pazaryeri Dağıtımı"
+                style={{ marginBottom: 16 }}
+                extra={integrationsLoading ? <Spin size="small" /> : null}
+            >
                 <Form.Item name="marketplaces">
-                    <Checkbox.Group options={MARKETPLACES} />
+                    <Checkbox.Group style={{ width: '100%' }}>
+                        <Row gutter={[16, 12]}>
+                            {marketplaceOptions.map(opt => (
+                                <Col span={8} key={opt.value}>
+                                    <Checkbox value={opt.value} disabled={opt.disabled}>
+                                        {opt.label}
+                                    </Checkbox>
+                                </Col>
+                            ))}
+                        </Row>
+                    </Checkbox.Group>
                 </Form.Item>
                 <div style={{ marginTop: 8, padding: '8px 12px', background: '#f0f2f5', borderRadius: 4 }}>
                     <Text type="secondary" style={{ fontSize: '0.85em' }}>
-                        <DoubleRightOutlined /> Fiyatlar saatte 1 güncellenir ve seçilen pazaryerlerine otomatik senkronize edilir.
+                        <DoubleRightOutlined /> Fiyatlar saatte 1 güncellenir ve bağlı pazaryerlerine otomatik senkronize edilir.
+                        Bağlı olmayan platformları <a href="/integrations">Entegrasyonlar</a> sayfasından bağlayabilirsiniz.
                     </Text>
                 </div>
             </Card>
