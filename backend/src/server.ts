@@ -21,6 +21,9 @@ const logger = winston.createLogger({
 
 const app: Express = express();
 
+// Trust proxy for rate limiting behind Cloudflare/reverse proxy
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(helmet());
 app.use(cors({
@@ -36,7 +39,9 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: 500, // Increased for production stability
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use('/api/', limiter);
 
