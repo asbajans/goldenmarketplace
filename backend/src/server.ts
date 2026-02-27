@@ -57,7 +57,7 @@ app.use('/api/gold-price', require('./routes/goldPrice').default || require('./r
 app.use('/api/subscriptions', require('./routes/subscriptions').default || require('./routes/subscriptions'));
 app.use('/api/integrations', require('./routes/integrations').default || require('./routes/integrations'));
 app.use('/api/feed', require('./routes/feed').default || require('./routes/feed'));
-// app.use('/api/admin', require('./routes/admin'));
+app.use('/api/admin', require('./routes/admin').default || require('./routes/admin'));
 
 // Error handling middleware
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
