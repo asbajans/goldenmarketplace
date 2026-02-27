@@ -66,7 +66,8 @@ export const UsersPage: React.FC = () => {
             setIsModalVisible(false);
             fetchUsers();
         } catch (error: any) {
-            message.error(error.response?.data?.error || 'Operation failed');
+            const errMsg = error.response?.data?.error;
+            message.error(typeof errMsg === 'string' ? errMsg : 'Operation failed');
         }
     };
 

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:777/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.goldencrafters.com/api';
 
 const api = axios.create({
     baseURL: `${API_URL}/admin`,

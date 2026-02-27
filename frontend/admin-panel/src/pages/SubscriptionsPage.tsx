@@ -66,7 +66,8 @@ export const SubscriptionsPage: React.FC = () => {
             setIsModalVisible(false);
             fetchPlans();
         } catch (error: any) {
-            message.error(error.response?.data?.error || 'Operation failed');
+            const errMsg = error.response?.data?.error;
+            message.error(typeof errMsg === 'string' ? errMsg : 'Operation failed');
         }
     };
 
