@@ -17,12 +17,7 @@ if (process.env.DATABASE_URL) {
     dialect: 'postgres',
     logging: isProduction ? false : console.log,
     timezone: '+03:00',
-    dialectOptions: isProduction ? {
-      ssl: {
-        require: false, // Set to true if your prod DB requires SSL
-        rejectUnauthorized: false
-      }
-    } : {}
+    dialectOptions: {} // SSL disabled for internal docker network
   });
 } else {
   sequelize = new Sequelize({
