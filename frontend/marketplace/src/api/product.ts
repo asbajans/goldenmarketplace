@@ -4,14 +4,14 @@ export interface Product {
     id: string;
     title: string;
     description: string;
-    basePrice: number;
-    goldIndexPrice: number;
+    gramWeight: number;
+    milyem: number;
+    priceTRY: number;
+    priceUSD: number;
     quantity: number;
     category: string;
     images?: string[];
     isActive: boolean;
-    // seller info might be needed if we want to show who sold it
-    // backend product model has storeId.
     storeId: string;
 }
 

@@ -61,7 +61,9 @@ const ProductList: React.FC = () => {
         { title: 'Resim', dataIndex: 'images', key: 'images', render: (imgs: string[]) => imgs && imgs.length > 0 ? <img src={imgs[0]} alt="product" style={{ width: 50 }} /> : 'Yok' },
         { title: 'Ürün Adı', dataIndex: 'title', key: 'title' },
         { title: 'Kategori', dataIndex: 'category', key: 'category' },
-        { title: 'Fiyat', dataIndex: 'basePrice', key: 'basePrice', render: (val: number) => `${val} ₺` },
+        { title: 'Gram', dataIndex: 'gramWeight', key: 'gramWeight', render: (val: number) => `${val} gr` },
+        { title: 'Milyem', dataIndex: 'milyem', key: 'milyem' },
+        { title: 'Fiyat (TL)', dataIndex: 'priceTRY', key: 'priceTRY', render: (val: number) => `${Number(val).toLocaleString('tr-TR')} ₺` },
         { title: 'Miktar', dataIndex: 'quantity', key: 'quantity' },
         {
             title: 'İşlemler',

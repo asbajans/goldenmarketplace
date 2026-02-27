@@ -26,14 +26,15 @@ export const schemas = {
   }),
 
   createProduct: Joi.object({
-    storeId: Joi.string().uuid().required(),
     title: Joi.string().required(),
     description: Joi.string(),
     category: Joi.string().required(),
     sku: Joi.string().required(),
-    basePrice: Joi.number().positive().required(),
+    gramWeight: Joi.number().positive().required(),
+    milyem: Joi.number().valid(333, 585, 750, 916, 999).required(),
     quantity: Joi.number().integer().required(),
-    images: Joi.array().items(Joi.string().uri())
+    images: Joi.array().items(Joi.string().uri()),
+    marketplaces: Joi.array().items(Joi.string())
   }),
 
   createSubscription: Joi.object({

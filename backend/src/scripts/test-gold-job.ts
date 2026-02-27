@@ -15,16 +15,16 @@ const testJob = async () => {
             return;
         }
 
-        console.log(`Initial Price for ${product.title}: ${product.basePrice} TL`);
-        console.log(`Gold Index: ${product.goldIndexPrice} oz`);
+        console.log(`Initial: ${product.title} | ${product.gramWeight}gr × ${product.milyem}‰ = ${product.priceTRY} TL / ${product.priceUSD} USD`);
 
         // 2. Run update
         console.log('Running update...');
-        await goldPriceService.updateProductPrices();
+        const result = await goldPriceService.updateProductPrices();
+        console.log(`Updated ${result.updatedCount} products. 24K Gram: ${result.goldPrice.pricePerGramTRY} TRY`);
 
         // 3. Reload product
         await product.reload();
-        console.log(`Updated Price for ${product.title}: ${product.basePrice} TL`);
+        console.log(`Updated: ${product.title} | ${product.priceTRY} TL / ${product.priceUSD} USD`);
 
     } catch (error) {
         console.error('Test failed:', error);

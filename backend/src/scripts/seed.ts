@@ -69,15 +69,15 @@ const seed = async () => {
         });
         console.log('✅ Store created.');
 
-        // 3. Create Products
+        // 3. Create Products (gram + milyem based)
         console.log('🔄 Creating products...');
         const products = [
             {
                 title: '22 Ayar Altın Bilezik',
                 description: 'Geleneksel motifli 22 ayar altın bilezik. 15 gram.',
                 category: 'Bilezik',
-                basePrice: 25000,
-                goldIndexPrice: 10.5, // Approx grams or indexed value
+                gramWeight: 15.0,
+                milyem: 916,
                 quantity: 10,
                 images: [],
                 sku: 'BLZ-001'
@@ -86,18 +86,18 @@ const seed = async () => {
                 title: 'Çeyrek Altınlı Kolye',
                 description: 'Yeni tarihli çeyrek altınlı zarif kolye.',
                 category: 'Kolye',
-                basePrice: 5000,
-                goldIndexPrice: 2.1,
+                gramWeight: 1.75,
+                milyem: 999,
                 quantity: 50,
                 images: [],
                 sku: 'KLY-002'
             },
             {
                 title: 'Tektaş Pırlanta Yüzük',
-                description: '0.50 karat G renk tektaş yüzük.',
+                description: '0.50 karat G renk tektaş yüzük. 14 ayar.',
                 category: 'Yüzük',
-                basePrice: 45000,
-                goldIndexPrice: 18.2,
+                gramWeight: 3.5,
+                milyem: 585,
                 quantity: 5,
                 images: [],
                 sku: 'YZK-003'
@@ -105,14 +105,22 @@ const seed = async () => {
         ];
 
         for (const p of products) {
+            // Calculate initial prices (mock: ~2090 TRY per 24K gram)
+            const gold24KGramTRY = 2090;
+            const usdTryRate = 38.5;
+            const priceTRY = p.gramWeight * (p.milyem / 1000) * gold24KGramTRY;
+            const priceUSD = priceTRY / usdTryRate;
+
             await Product.create({
                 storeId: store.id,
                 title: p.title,
                 slug: p.title.toLowerCase().replace(/\s+/g, '-').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c'),
                 description: p.description,
                 category: p.category,
-                basePrice: p.basePrice,
-                goldIndexPrice: p.goldIndexPrice,
+                gramWeight: p.gramWeight,
+                milyem: p.milyem,
+                priceTRY: Math.round(priceTRY * 100) / 100,
+                priceUSD: Math.round(priceUSD * 100) / 100,
                 quantity: p.quantity,
                 images: p.images,
                 sku: p.sku,

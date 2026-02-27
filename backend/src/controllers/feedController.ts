@@ -10,7 +10,6 @@ export class FeedController {
     /**
      * Google Shopping XML Feed
      * Endpoint: GET /api/feed/google.xml
-     * https://support.google.com/merchants/answer/7052112
      */
     static async googleShoppingFeed(_req: Request, res: Response) {
         try {
@@ -41,7 +40,7 @@ export class FeedController {
     <g:description><![CDATA[${product.description || ''}]]></g:description>
     <g:link>${productUrl}</g:link>
     <g:image_link>${imageUrl}</g:image_link>
-    <g:price>${product.basePrice} TRY</g:price>
+    <g:price>${product.priceTRY} TRY</g:price>
     <g:availability>${product.quantity > 0 ? 'in_stock' : 'out_of_stock'}</g:availability>
     <g:condition>new</g:condition>
     <g:brand>Golden Marketplace</g:brand>
@@ -82,7 +81,7 @@ export class FeedController {
                 description: product.description || '',
                 availability: product.quantity > 0 ? 'in stock' : 'out of stock',
                 condition: 'new',
-                price: `${product.basePrice} TRY`,
+                price: `${product.priceTRY} TRY`,
                 link: `${siteUrl}/products/${product.slug}`,
                 image_link: product.images && product.images.length > 0
                     ? product.images[0]
@@ -100,7 +99,6 @@ export class FeedController {
 
     /**
      * Product Share Data (OG Tags)
-     * For social sharing previews
      */
     static async getProductShareData(req: Request, res: Response) {
         try {
@@ -121,7 +119,7 @@ export class FeedController {
                 description: product.description || `${product.title} - Golden Marketplace'te`,
                 url: `${siteUrl}/products/${product.slug}`,
                 image: imageUrl,
-                price: product.basePrice,
+                price: product.priceTRY,
                 currency: 'TRY',
                 og: {
                     'og:title': product.title,
@@ -129,7 +127,7 @@ export class FeedController {
                     'og:url': `${siteUrl}/products/${product.slug}`,
                     'og:image': imageUrl,
                     'og:type': 'product',
-                    'product:price:amount': product.basePrice,
+                    'product:price:amount': product.priceTRY,
                     'product:price:currency': 'TRY'
                 }
             });
