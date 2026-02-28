@@ -1,6 +1,16 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://api.goldencrafters.com/api';
+const getBaseURL = () => {
+    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+
+    // In development, use relative path to leverage Vite proxy
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return '/api';
+    }
+    return 'https://api.goldencrafters.com/api';
+};
+
+const API_URL = getBaseURL();
 
 const api = axios.create({
     baseURL: `${API_URL}/admin`,
@@ -14,6 +24,19 @@ api.interceptors.request.use((config) => {
     }
     return config;
 });
+
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            localStorage.removeItem('token');
+            // We don't have a login redirect yet, but clearing the token is a start
+            // and we could trigger a reload or show a global error
+            console.warn('Session expired or unauthorized. Clearing token.');
+        }
+        return Promise.reject(error);
+    }
+);
 
 export const AdminAPI = {
     // Users
