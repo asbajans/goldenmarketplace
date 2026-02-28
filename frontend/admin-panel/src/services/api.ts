@@ -1,17 +1,25 @@
 import axios from 'axios';
 
 const getBaseURL = () => {
-    // Priority 1: Explicit environment variables
-    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
-    if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL;
+    // 1. Check for local development hostnames first
+    const isLocalHostname =
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname.includes('local') ||
+        window.location.hostname.startsWith('192.168.');
 
-    // Priority 2: Development mode (use relative path for Vite proxy)
-    // This works for localhost, 127.0.0.1, and local network/tunnel hostnames
-    if (import.meta.env.DEV) {
+    // 2. Determine if we should use the local proxy
+    if (import.meta.env.DEV || isLocalHostname) {
+        console.log('[API] Using local development proxy (/api)');
         return '/api';
     }
 
-    // Priority 3: Production fallback
+    // 3. Environment variable override
+    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+    if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL;
+
+    // 4. Production fallback
+    console.warn('[API] Falling back to production URL');
     return 'https://api.goldencrafters.com/api';
 };
 
