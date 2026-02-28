@@ -81,7 +81,11 @@ export const SubscriptionsPage: React.FC = () => {
             key: 'features',
             render: (features: string[]) => (
                 <>
-                    {features?.map((f: string, i: number) => <Tag key={i} color="blue">{f}</Tag>)}
+                    {Array.isArray(features) && features.map((f: any, i: number) => (
+                        <Tag key={i} color="blue">
+                            {typeof f === 'string' ? f : JSON.stringify(f)}
+                        </Tag>
+                    ))}
                 </>
             )
         },

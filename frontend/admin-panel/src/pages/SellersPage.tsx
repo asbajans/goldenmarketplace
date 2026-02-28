@@ -26,10 +26,14 @@ export const SellersPage: React.FC = () => {
     const fetchUsers = async () => {
         try {
             const data = await AdminAPI.getUsers();
-            // Filters for sellers only or let admin select any? Usually better to only show userType=seller
-            setUsers(data.filter((u: any) => u.userType === 'seller' || u.userType === 'admin'));
+            if (Array.isArray(data)) {
+                setUsers(data.filter((u: any) => u.userType === 'seller' || u.userType === 'admin'));
+            } else {
+                setUsers([]);
+            }
         } catch (error) {
-            console.error(error);
+            console.error('Failed to fetch users:', error);
+            setUsers([]);
         }
     };
 
@@ -131,7 +135,7 @@ export const SellersPage: React.FC = () => {
                     {!editingStore && (
                         <Form.Item name="userId" label="Mağaza Sahibi (Kullanıcı)" rules={[{ required: true }]}>
                             <Select showSearch optionFilterProp="children">
-                                {users.map(u => (
+                                {Array.isArray(users) && users.map(u => (
                                     <Select.Option key={u.id} value={u.id}>
                                         {u.firstName} {u.lastName} ({u.email})
                                     </Select.Option>

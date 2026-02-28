@@ -14,9 +14,10 @@ export const CategoriesPage: React.FC = () => {
         setLoading(true);
         try {
             const data = await AdminAPI.getCategories();
-            setCategories(data);
+            setCategories(Array.isArray(data) ? data : []);
         } catch (error) {
             message.error('Failed to load categories');
+            setCategories([]);
         } finally {
             setLoading(false);
         }

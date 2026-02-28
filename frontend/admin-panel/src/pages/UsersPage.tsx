@@ -14,9 +14,10 @@ export const UsersPage: React.FC = () => {
         setLoading(true);
         try {
             const data = await AdminAPI.getUsers();
-            setUsers(data);
+            setUsers(Array.isArray(data) ? data : []);
         } catch (error) {
             message.error('Failed to load users');
+            setUsers([]);
         } finally {
             setLoading(false);
         }
