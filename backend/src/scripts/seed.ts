@@ -1,9 +1,7 @@
 
 // import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
-import User from '../models/User';
-import Store from '../models/Store';
-import Product from '../models/Product';
+import { User, Store, Product, Category, SubscriptionPlan, Subscription, Integration } from '../models';
 import PasswordService from '../utils/password';
 import sequelize from '../config/database';
 

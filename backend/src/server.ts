@@ -8,6 +8,9 @@ import winston from 'winston';
 // Load environment variables
 dotenv.config();
 
+// Initialize Models
+require('./models');
+
 // Initialize logger
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',

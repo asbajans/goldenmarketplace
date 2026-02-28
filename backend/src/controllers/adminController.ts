@@ -14,6 +14,7 @@ export class AdminController {
             const users = await User.findAll({ order: [['createdAt', 'DESC']] });
             return res.json(users);
         } catch (error) {
+            console.error('Admin Error [getUsers]:', error);
             return res.status(500).json({ error: 'Failed to fetch users' });
         }
     }
@@ -81,6 +82,7 @@ export class AdminController {
             });
             return res.json(stores);
         } catch (error) {
+            console.error('Admin Error [getStores]:', error);
             return res.status(500).json({ error: 'Failed to fetch stores' });
         }
     }
@@ -137,6 +139,7 @@ export class AdminController {
             const categories = await Category.findAll({ order: [['name', 'ASC']] });
             return res.json(categories);
         } catch (error) {
+            console.error('Admin Error [getCategories]:', error);
             return res.status(500).json({ error: 'Failed to fetch categories' });
         }
     }
@@ -185,6 +188,7 @@ export class AdminController {
             const plans = await SubscriptionPlan.findAll({ order: [['priceTRY', 'ASC']] });
             return res.json(plans);
         } catch (error) {
+            console.error('Admin Error [getSubscriptionPlans]:', error);
             return res.status(500).json({ error: 'Failed to fetch subscription plans' });
         }
     }
@@ -236,6 +240,7 @@ export class AdminController {
             });
             return res.json(integrations);
         } catch (error: any) {
+            console.error('Admin Error [getIntegrations]:', error);
             return res.status(500).json({ error: 'Failed to fetch integrations' });
         }
     }

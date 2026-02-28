@@ -52,6 +52,14 @@ api.interceptors.response.use(
 );
 
 export const AdminAPI = {
+    // Auth
+    login: (credentials: any) => axios.post(`${API_URL}/auth/login`, credentials).then((res) => res.data),
+    logout: () => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.reload();
+    },
+
     // Users
     getUsers: () => api.get('/users').then((res) => res.data),
     createUser: (data: any) => api.post('/users', data).then((res) => res.data),
@@ -63,8 +71,6 @@ export const AdminAPI = {
     createStore: (data: any) => api.post('/stores', data).then((res) => res.data),
     updateStore: (id: string, data: any) => api.put(`/stores/${id}`, data).then((res) => res.data),
     deleteStore: (id: string) => api.delete(`/stores/${id}`).then((res) => res.data),
-
-    // Categories
     getCategories: () => api.get('/categories').then((res) => res.data),
     createCategory: (data: any) => api.post('/categories', data).then((res) => res.data),
     updateCategory: (id: string, data: any) => api.put(`/categories/${id}`, data).then((res) => res.data),

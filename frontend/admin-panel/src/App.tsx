@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Layout, Menu, Card, Statistic, Row, Col, Button, type MenuProps } from 'antd';
+import { useState, useEffect } from 'react';
+import { Layout, Menu, Card, Statistic, Row, Col, Button, type MenuProps, message } from 'antd';
 import {
   DashboardOutlined,
   UserOutlined,
@@ -16,12 +16,46 @@ import SellersPage from './pages/SellersPage';
 import CategoriesPage from './pages/CategoriesPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import IntegrationsPage from './pages/IntegrationsPage';
+import LoginPage from './pages/LoginPage';
+import { AdminAPI } from './services/api';
 
 const { Header, Sider, Content } = Layout;
 
 function App() {
   const [collapsed, setCollapsed] = useState(false);
   const [selectedKey, setSelectedKey] = useState('dashboard');
+  const [user, setUser] = useState<any>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
+
+    if (savedUser && token) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (e) {
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+      }
+    }
+    setIsInitialized(true);
+  }, []);
+
+  const handleLoginSuccess = (userData: any) => {
+    setUser(userData);
+  };
+
+  const handleLogout = () => {
+    AdminAPI.logout();
+    setUser(null);
+  };
+
+  if (!isInitialized) return null;
+
+  if (!user) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
 
   const menuItems: MenuProps['items'] = [
     {
@@ -60,8 +94,6 @@ function App() {
       label: 'Sistem Ayarları'
     }
   ];
-
-
 
   const renderContent = () => {
     switch (selectedKey) {
@@ -159,8 +191,11 @@ function App() {
             alignItems: 'center'
           }}
         >
-          <h2 style={{ margin: 0 }}>Süper Admin Paneli</h2>
-          <Button icon={<LogoutOutlined />}>Çıkış Yap</Button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h2 style={{ margin: 0 }}>Süper Admin Paneli</h2>
+            <span style={{ color: '#8c8c8c' }}>({user.firstName} {user.lastName})</span>
+          </div>
+          <Button icon={<LogoutOutlined />} onClick={handleLogout}>Çıkış Yap</Button>
         </Header>
 
         <Content style={{ margin: '24px 16px', padding: 24, background: '#f0f2f5', borderRadius: 8 }}>
