@@ -47,9 +47,10 @@ const Subscription: React.FC = () => {
                     window.location.href = response.url;
                 }
             }
-        } catch (error) {
-            console.error(error);
-            message.error('Abonelik başlatılamadı.');
+        } catch (error: any) {
+            console.error('Subscription error:', error);
+            const backendError = error.response?.data?.error;
+            message.error(typeof backendError === 'string' ? backendError : 'Abonelik başlatılamadı. Lütfen tekrar deneyin.');
         } finally {
             setLoading(false);
         }
