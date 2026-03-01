@@ -75,8 +75,9 @@ export class ProductController {
       }
 
       // Find store for current user
-      const store = await Store.findOne({ where: { userId: req.user.id } });
+      const store = await Store.findOne({ where: { userId: (req as any).user.id } });
       if (!store) {
+        console.error('CreateProduct Error: Store not found for user', (req as any).user.id);
         return res.status(400).json({
           error: { message: 'You do not have a store created yet.', status: 400 }
         });

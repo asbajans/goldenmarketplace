@@ -1,10 +1,5 @@
-/**
- * JWT Authentication Middleware
- * Validate JWT tokens and extract user information
- */
-
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import JWTService from '../utils/jwt';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -31,12 +26,8 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
     return;
   }
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-    req.user = decoded;
-    req.token = token;
-    next();
-  } catch (error) {
+  const decoded = JWTService.verifyToken(token);
+  if (!decoded) {
     res.status(401).json({
       error: {
         message: 'Invalid or expired token',
@@ -45,6 +36,10 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
     });
     return;
   }
+
+  req.user = decoded;
+  req.token = token;
+  next();
 };
 
 export const adminMiddleware = (req: Request, res: Response, next: NextFunction): void => {

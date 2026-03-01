@@ -185,7 +185,7 @@ export class AdminController {
     // --- SUBSCRIPTION PLANS ---
     static async getSubscriptionPlans(_req: Request, res: Response): Promise<Response> {
         try {
-            const plans = await SubscriptionPlan.findAll({ order: [['priceTRY', 'ASC']] });
+            const plans = await SubscriptionPlan.findAll({ order: [['price', 'ASC']] });
             return res.json(plans);
         } catch (error) {
             console.error('Admin Error [getSubscriptionPlans]:', error);

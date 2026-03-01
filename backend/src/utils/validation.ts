@@ -27,15 +27,18 @@ export const schemas = {
 
   createProduct: Joi.object({
     title: Joi.string().required(),
-    description: Joi.string(),
+    description: Joi.string().allow('', null),
     category: Joi.string().required(),
     sku: Joi.string().required(),
     gramWeight: Joi.number().positive().required(),
     milyem: Joi.number().valid(333, 585, 750, 916, 999).required(),
-    quantity: Joi.number().integer().required(),
-    images: Joi.array().items(Joi.string()).allow(null),
-    marketplaces: Joi.array().items(Joi.string()).allow(null)
-  }),
+    quantity: Joi.number().integer().min(0).required(),
+    profitMargin: Joi.number().min(0).allow(null),
+    tags: Joi.array().items(Joi.string()).allow(null),
+    images: Joi.array().items(Joi.string()).allow(null, []),
+    videoUrl: Joi.string().allow('', null),
+    marketplaces: Joi.array().items(Joi.string()).allow(null, [])
+  }).unknown(),
 
   createSubscription: Joi.object({
     marketplace: Joi.string().required(),
@@ -49,6 +52,7 @@ export const validateRequest = (schema: Joi.Schema) => {
     const { error, value } = schema.validate(req.body);
 
     if (error) {
+      console.error('Validation Error:', error.details[0].message);
       return res.status(400).json({
         error: {
           message: error.details[0].message,

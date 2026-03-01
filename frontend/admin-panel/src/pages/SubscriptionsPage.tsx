@@ -29,7 +29,7 @@ export const SubscriptionsPage: React.FC = () => {
     const handleAdd = () => {
         setEditingPlan(null);
         form.resetFields();
-        form.setFieldsValue({ isActive: true, priceTRY: 0, productLimit: 50, features: [] });
+        form.setFieldsValue({ isActive: true, price: 0, productLimit: 50, features: [] });
         setIsModalVisible(true);
     };
 
@@ -73,7 +73,7 @@ export const SubscriptionsPage: React.FC = () => {
 
     const columns = [
         { title: 'Paket Adı', dataIndex: 'name', key: 'name' },
-        { title: 'Ücret (₺)', dataIndex: 'priceTRY', key: 'priceTRY', render: (val: any) => `${val} ₺` },
+        { title: 'Ücret (₺)', dataIndex: 'price', key: 'price', render: (val: any) => `${val} ₺` },
         { title: 'Ürün Limiti', dataIndex: 'productLimit', key: 'productLimit' },
         {
             title: 'Özellikler',
@@ -134,7 +134,7 @@ export const SubscriptionsPage: React.FC = () => {
                     </Form.Item>
 
                     <Space size="large">
-                        <Form.Item name="priceTRY" label="Aylık Ücret (₺)" rules={[{ required: true }]}>
+                        <Form.Item name="price" label="Aylık Ücret (₺)" rules={[{ required: true }]}>
                             <InputNumber min={0} step={10} style={{ width: '150px' }} />
                         </Form.Item>
 

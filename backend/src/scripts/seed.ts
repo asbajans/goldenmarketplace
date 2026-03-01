@@ -1,7 +1,7 @@
 
 // import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
-import { User, Store, Product } from '../models';
+import { User, Store, Product, SubscriptionPlan, Category } from '../models';
 import PasswordService from '../utils/password';
 import sequelize from '../config/database';
 
@@ -128,6 +128,54 @@ const seed = async () => {
         }
 
         console.log('✅ Products created.');
+
+        // 4. Create Subscription Plans
+        console.log('🔄 Creating subscription plans...');
+        await SubscriptionPlan.bulkCreate([
+            {
+                name: 'Bronz',
+                description: 'Yeni başlayanlar için ideal',
+                price: 99.00,
+                currency: 'TRY',
+                interval: 'month',
+                productLimit: 50,
+                features: ['50 Ürün Listeleme', 'Temel İstatistikler', 'Standart Destek'],
+                isActive: true
+            },
+            {
+                name: 'Gümüş',
+                description: 'Büyüyen işletmeler için',
+                price: 199.00,
+                currency: 'TRY',
+                interval: 'month',
+                productLimit: 200,
+                features: ['200 Ürün Listeleme', 'Gelişmiş İstatistikler', 'Öncelikli Destek', 'Reklam Kredisi'],
+                isActive: true
+            },
+            {
+                name: 'Altın',
+                description: 'Profesyonel satıcılar için',
+                price: 399.00,
+                currency: 'TRY',
+                interval: 'month',
+                productLimit: 1000,
+                features: ['Sınırsız Ürün', 'VIP Destek', 'Altın Endeksli Reklam', 'Tüm Hazır Entegrasyonlar'],
+                isActive: true
+            }
+        ]);
+        console.log('✅ Subscription plans created.');
+
+        // 5. Create Categories
+        console.log('🔄 Creating categories...');
+        await Category.bulkCreate([
+            { name: 'Yüzük', slug: 'yuzuk', isActive: true },
+            { name: 'Kolye', slug: 'kolye', isActive: true },
+            { name: 'Bilezik', slug: 'bilezik', isActive: true },
+            { name: 'Küpe', slug: 'kupe', isActive: true },
+            { name: 'Saat', slug: 'saat', isActive: true }
+        ]);
+        console.log('✅ Categories created.');
+
         console.log('🎉 Seeding completed successfully!');
         process.exit(0);
 
