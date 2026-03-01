@@ -33,8 +33,8 @@ export const schemas = {
     gramWeight: Joi.number().positive().required(),
     milyem: Joi.number().valid(333, 585, 750, 916, 999).required(),
     quantity: Joi.number().integer().required(),
-    images: Joi.array().items(Joi.string().uri()),
-    marketplaces: Joi.array().items(Joi.string())
+    images: Joi.array().items(Joi.string()).allow(null, []),
+    marketplaces: Joi.array().items(Joi.string()).allow(null, [])
   }),
 
   createSubscription: Joi.object({

@@ -2,16 +2,36 @@
 import { Request, Response } from 'express';
 import stripeService from '../services/stripeService';
 import User from '../models/User';
+import SubscriptionPlan from '../models/SubscriptionPlan';
 
 export class SubscriptionController {
+    /**
+     * Get all active subscription plans
+     */
+    static async getPlans(_req: Request, res: Response) {
+        try {
+            const plans = await SubscriptionPlan.findAll({
+                where: { isActive: true },
+                order: [['price', 'ASC']]
+            });
+            return res.status(200).json(plans);
+        } catch (error) {
+            console.error('Fetch plans error:', error);
+            return res.status(500).json({ error: 'Failed to fetch plans' });
+        }
+    }
+
     /**
      * Create Checkout Session
      */
     static async createCheckoutSession(req: Request, res: Response) {
         try {
             const { priceId } = req.body;
-            // @ts-ignore
-            const userId = req.user.id; // User added by auth middleware
+            const userId = (req as any).user?.id;
+
+            if (!userId) {
+                return res.status(401).json({ error: 'Unauthorized' });
+            }
 
             const user = await User.findByPk(userId);
             if (!user) {
@@ -21,7 +41,6 @@ export class SubscriptionController {
             // Create Stripe Customer if not exists
             let customerId = user.stripeCustomerId;
             if (!customerId) {
-                // Mock or Real
                 if (!process.env.STRIPE_SECRET_KEY) {
                     customerId = 'cus_mock_' + userId;
                 } else {
@@ -50,9 +69,12 @@ export class SubscriptionController {
      */
     static async mockActivate(req: Request, res: Response) {
         try {
-            // @ts-ignore
-            const userId = req.user.id;
+            const userId = (req as any).user?.id;
             const { plan } = req.body;
+
+            if (!userId) {
+                return res.status(401).json({ error: 'Unauthorized' });
+            }
 
             const user = await User.findByPk(userId);
             if (user) {

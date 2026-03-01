@@ -126,9 +126,11 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         try {
             await createProduct({
                 ...values,
+                profitMargin: values.profitMargin || 0,
+                quantity: Number(values.quantity || 0),
                 tags,
                 images: [],
-                marketplaces: values.marketplaces || []
+                marketplaces: values.marketplaces || ['golden']
             });
 
             message.success('Ürün başarıyla kaydedildi!');

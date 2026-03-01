@@ -10,7 +10,10 @@ interface SubscriptionPlanAttributes {
     id?: string;
     name: string;
     description?: string;
-    priceTRY: number;
+    price: number;
+    currency: string;
+    interval: string;
+    stripePriceId?: string;
     productLimit: number; // max products a seller can have
     features: string[];
     isActive: boolean;
@@ -22,7 +25,10 @@ class SubscriptionPlan extends Model<SubscriptionPlanAttributes> implements Subs
     public id!: string;
     public name!: string;
     public description?: string;
-    public priceTRY!: number;
+    public price!: number;
+    public currency!: string;
+    public interval!: string;
+    public stripePriceId?: string;
     public productLimit!: number;
     public features!: string[];
     public isActive!: boolean;
@@ -46,10 +52,24 @@ SubscriptionPlan.init(
             type: DataTypes.TEXT,
             allowNull: true
         },
-        priceTRY: {
+        price: { // Renamed from priceTRY to price to match interface
             type: DataTypes.DECIMAL(10, 2),
             allowNull: false,
             defaultValue: 0
+        },
+        currency: { // Added to match interface
+            type: DataTypes.STRING,
+            allowNull: false,
+            defaultValue: 'TRY'
+        },
+        interval: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            defaultValue: 'month'
+        },
+        stripePriceId: {
+            type: DataTypes.STRING,
+            allowNull: true
         },
         productLimit: {
             type: DataTypes.INTEGER,

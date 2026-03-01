@@ -98,10 +98,10 @@ export class ProductController {
         profitMargin: profitMargin || 0,
         priceTRY,
         priceUSD,
-        quantity,
-        images: images || [],
+        quantity: quantity || 0,
+        images: Array.isArray(images) ? images : [],
         videoUrl,
-        marketplaces: marketplaces || [],
+        marketplaces: (Array.isArray(marketplaces) && marketplaces.length > 0) ? marketplaces : ['golden'],
         tags,
         isActive: true
       });

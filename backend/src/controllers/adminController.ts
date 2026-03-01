@@ -195,24 +195,44 @@ export class AdminController {
 
     static async createSubscriptionPlan(req: Request, res: Response): Promise<Response> {
         try {
-            const { name, description, priceTRY, productLimit, features, isActive } = req.body;
-            const plan = await SubscriptionPlan.create({ name, description, priceTRY, productLimit, features, isActive });
+            const { name, description, price, currency, interval, productLimit, features, stripePriceId, isActive } = req.body;
+            const plan = await SubscriptionPlan.create({
+                name,
+                description,
+                price,
+                currency,
+                interval,
+                productLimit,
+                features,
+                stripePriceId,
+                isActive: isActive !== undefined ? isActive : true
+            });
             return res.status(201).json(plan);
         } catch (error: any) {
             return res.status(400).json({ error: error.message || 'Failed to create subscription plan' });
         }
     }
 
-    static async updateSubscriptionPlan(req: Request, res: Response): Promise<Response> {
+    static async updateSubscriptionPlan(req: Request, res: Response) {
         try {
             const { id } = req.params;
-            const { name, description, priceTRY, productLimit, features, isActive } = req.body;
-
+            const { name, description, price, currency, interval, productLimit, features, stripePriceId, isActive } = req.body;
             const plan = await SubscriptionPlan.findByPk(id);
-            if (!plan) return res.status(404).json({ error: 'Plan not found' });
-
-            await plan.update({ name, description, priceTRY, productLimit, features, isActive });
-            return res.json(plan);
+            if (!plan) {
+                return res.status(404).json({ error: 'Plan not found' });
+            }
+            await plan.update({
+                name,
+                description,
+                price,
+                currency,
+                interval,
+                productLimit,
+                features,
+                stripePriceId,
+                isActive
+            });
+            return res.status(200).json(plan);
         } catch (error: any) {
             return res.status(400).json({ error: error.message || 'Failed to update subscription plan' });
         }

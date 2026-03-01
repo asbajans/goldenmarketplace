@@ -5,10 +5,13 @@ import { authMiddleware } from '../middleware/authMiddleware';
 
 const router = Router();
 
-// Protect all routes
+// Public/Seller-facing: Get all active plans
+router.get('/plans', SubscriptionController.getPlans.bind(SubscriptionController));
+
+// Protected routes
 router.use(authMiddleware);
 
-router.post('/create-checkout-session', SubscriptionController.createCheckoutSession);
-router.post('/mock-activate', SubscriptionController.mockActivate); // Helper for demo
+router.post('/create-checkout-session', SubscriptionController.createCheckoutSession.bind(SubscriptionController));
+router.post('/mock-activate', SubscriptionController.mockActivate.bind(SubscriptionController)); // Helper for demo
 
 export default router;
