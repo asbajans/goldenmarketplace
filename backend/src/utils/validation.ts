@@ -35,9 +35,9 @@ export const schemas = {
     quantity: Joi.number().integer().min(0).required(),
     profitMargin: Joi.number().min(0).allow(null),
     tags: Joi.array().items(Joi.string()).allow(null),
-    images: Joi.array().items(Joi.string()).allow(null, []),
+    images: Joi.array().items(Joi.string()).allow(null),
     videoUrl: Joi.string().allow('', null),
-    marketplaces: Joi.array().items(Joi.string()).allow(null, [])
+    marketplaces: Joi.array().items(Joi.string()).allow(null)
   }).unknown(),
 
   createSubscription: Joi.object({
