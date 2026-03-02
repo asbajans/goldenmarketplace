@@ -70,6 +70,10 @@ services:
       # Gold Price API (opsiyonel)
       GOLD_PRICE_API_KEY: ${GOLD_PRICE_API_KEY:-}
 
+      # Etsy API
+      ETSY_KEY: ${ETSY_KEY:-}
+      ETSY_SECRET: ${ETSY_SECRET:-}
+
       # App Config
       NODE_ENV: production
       PORT: 777

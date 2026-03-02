@@ -14,5 +14,6 @@ router.get('/', IntegrationController.getIntegrations);
 router.get('/etsy/auth-url', IntegrationController.getEtsyAuthUrl);
 router.post('/connect', IntegrationController.connect);
 router.delete('/:platform', IntegrationController.disconnect);
+router.get('/test/:platform', IntegrationController.testConnection);
 
 export default router;

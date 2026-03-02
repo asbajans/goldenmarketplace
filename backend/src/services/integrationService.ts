@@ -1,5 +1,5 @@
-
 import MarketplaceIntegration from '../models/MarketplaceIntegration';
+import EtsyClient from '../integrations/etsy/etsyClient';
 
 class IntegrationService {
     /**
@@ -42,21 +42,44 @@ class IntegrationService {
     }
 
     /**
-     * Handle Etsy OAuth Callback
-     * Exchanges code for token
+     * Test connection for a given platform
      */
-    async handleEtsyCallback(userId: string, code: string, codeVerifier: string) {
-        // Mock Implementation for now
-        // In real life: POST to https://api.etsy.com/v3/public/oauth/token
+    async testConnection(userId: string, platform: string) {
+        // @ts-ignore
+        const integration = await MarketplaceIntegration.findOne({ where: { userId, platform } });
+        if (!integration) throw new Error('Integration not found');
 
-        console.log(`Exchanging Etsy code ${code} for user ${userId} with verifier ${codeVerifier}`);
+        if (platform === 'etsy') {
+            if (!integration.accessToken) throw new Error('Etsy access token not found');
+            const data = await EtsyClient.verifyConnection(integration.accessToken);
+            return {
+                status: 'success',
+                message: 'Etsy connection works!',
+                shopId: data.shop_id || integration.shopId
+            };
+        }
 
-        // Simulate token response
-        const mockTokenResponse = {
-            access_token: 'mock_etsy_access_token_' + Date.now(),
-            refresh_token: 'mock_etsy_refresh_token_' + Date.now(),
-            shop_id: 'mock_shop_123'
+        // Future platforms
+        return {
+            status: 'info',
+            message: `Test connection not implemented for ${platform} yet.`
         };
+    }
+
+    /**
+     * Handle Etsy OAuth Callback
+     * Exchanges code for token using real EtsyClient
+     */
+    async handleEtsyCallback(userId: string, code: string, codeVerifier: string, redirectUri: string) {
+        console.log(`Exchanging Etsy code for user ${userId}`);
+
+        // 1. Get tokens
+        const tokenResponse = await EtsyClient.exchangeCodeForToken(code, codeVerifier, redirectUri);
+        const { access_token, refresh_token } = tokenResponse;
+
+        // 2. Fetch the shop ID using the access token
+        const me = await EtsyClient.getMe(access_token);
+        const shopId = String(me.shopId);
 
         // Find or Create Integration
         // @ts-ignore
@@ -64,9 +87,9 @@ class IntegrationService {
 
         if (integration) {
             await integration.update({
-                accessToken: mockTokenResponse.access_token,
-                refreshToken: mockTokenResponse.refresh_token,
-                shopId: mockTokenResponse.shop_id,
+                accessToken: access_token,
+                refreshToken: refresh_token,
+                shopId: shopId,
                 isActive: true,
                 lastSyncAt: new Date()
             });
@@ -74,9 +97,9 @@ class IntegrationService {
             integration = await MarketplaceIntegration.create({
                 userId,
                 platform: 'etsy',
-                accessToken: mockTokenResponse.access_token,
-                refreshToken: mockTokenResponse.refresh_token,
-                shopId: mockTokenResponse.shop_id,
+                accessToken: access_token,
+                refreshToken: refresh_token,
+                shopId: shopId,
                 isActive: true,
                 lastSyncAt: new Date()
             });
