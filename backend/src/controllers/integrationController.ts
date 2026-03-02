@@ -91,31 +91,46 @@ export class IntegrationController {
      */
     static async getEtsyAuthUrl(req: Request, res: Response) {
         try {
+            console.log('Generating Etsy Auth URL...');
+
             // @ts-ignore
-            const userId = req.user.id;
+            const userId = req.user?.id;
+
+            if (!userId) {
+                console.error('Etsy Auth URL Error: Missing user ID in request context');
+                return res.status(401).json({ error: 'Unauthorized: User ID missing' });
+            }
 
             // Generate PKCE
+            console.log('Generating PKCE challenges...');
             const codeVerifier = crypto.randomBytes(32).toString('base64url');
             const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
             const state = crypto.randomBytes(16).toString('hex');
 
             // Store state -> verifier mapping in cache
+            console.log('Storing PKCE inside node-cache...');
             pkceCache.set(state, { userId, codeVerifier });
 
             const clientId = process.env.ETSY_KEY || '';
-            const redirectUri = `${process.env.API_URL || 'http://localhost:777/api'}/integrations/etsy/callback`;
+            const apiBaseUrl = process.env.API_URL || 'https://api.goldencrafters.com/api';
+            const redirectUri = `${apiBaseUrl}/integrations/etsy/callback`;
             const scopes = 'listings_r listings_w listings_d profile_r email_r transactions_r transactions_w';
 
             if (!clientId) {
+                console.error('Etsy Auth URL Error: ETSY_KEY is empty');
                 return res.status(500).json({ error: 'Etsy is not configured on the server (Missing ETSY_KEY)' });
             }
 
+            console.log('Redirect URI configured as:', redirectUri);
+
             const url = `https://www.etsy.com/oauth/connect?response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&client_id=${clientId}&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
+            console.log('Returning Etsy Auth URL to frontend:', url);
             return res.json({ url });
-        } catch (error) {
-            console.error('Etsy Auth URL Generation Error:', error);
-            return res.status(500).json({ error: 'Failed to generate auth url' });
+        } catch (error: any) {
+            console.error('Etsy Auth URL Generation Exception:', error?.message || error);
+            console.error(error.stack);
+            return res.status(500).json({ error: 'Failed to generate auth url: ' + (error?.message || 'Unknown server error') });
         }
     }
 }

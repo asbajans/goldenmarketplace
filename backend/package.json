@@ -22,7 +22,7 @@
     "joi": "*",
     "jsonwebtoken": "*",
     "mongoose": "*",
-    "node-cache": "*",
+    "node-cache": "^5.1.2",
     "pg": "*",
     "redis": "*",
     "sequelize": "*",
