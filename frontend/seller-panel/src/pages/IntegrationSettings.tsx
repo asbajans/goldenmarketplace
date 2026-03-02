@@ -17,11 +17,41 @@ interface Integration {
 
 const platforms = [
     { key: 'etsy', name: 'Etsy', color: '#F56400', icon: <ShopOutlined /> },
-    { key: 'amazon', name: 'Amazon', color: '#FF9900', icon: <ShopOutlined /> },
     { key: 'trendyol', name: 'Trendyol', color: '#F27A1A', icon: <ShopOutlined /> },
     { key: 'hepsiburada', name: 'Hepsiburada', color: '#FF6000', icon: <ShopOutlined /> },
     { key: 'n11', name: 'N11', color: '#5333ED', icon: <ShopOutlined /> },
+    { key: 'amazon', name: 'Amazon', color: '#FF9900', icon: <ShopOutlined /> },
 ];
+
+// Platform-specific field labels and help links 
+const platformConfig: Record<string, { apiKeyLabel: string; apiSecretLabel: string; shopIdLabel?: string; shopIdRequired?: boolean; helpUrl: string }> = {
+    trendyol: {
+        apiKeyLabel: 'API Key (Trendyol Entegrasyon Paneli)',
+        apiSecretLabel: 'API Secret',
+        shopIdLabel: 'Satıcı ID (Supplier ID)',
+        shopIdRequired: true,
+        helpUrl: 'https://entegrasyon.trendyol.com'
+    },
+    hepsiburada: {
+        apiKeyLabel: 'Kullanıcı Adı (Username)',
+        apiSecretLabel: 'Şifre (Password)',
+        shopIdLabel: 'Merchant ID',
+        shopIdRequired: true,
+        helpUrl: 'https://merchant.hepsiburada.com'
+    },
+    n11: {
+        apiKeyLabel: 'App Key',
+        apiSecretLabel: 'App Secret',
+        helpUrl: 'https://apiportal.n11.com'
+    },
+    amazon: {
+        apiKeyLabel: 'LWA Client ID',
+        apiSecretLabel: 'LWA Client Secret',
+        shopIdLabel: 'Seller ID',
+        shopIdRequired: false,
+        helpUrl: 'https://sellercentral.amazon.com.tr'
+    }
+};
 
 const IntegrationSettings: React.FC = () => {
     const [integrations, setIntegrations] = useState<Integration[]>([]);
@@ -194,45 +224,57 @@ const IntegrationSettings: React.FC = () => {
             )}
 
             <Modal
-                title={`${platforms.find(p => p.key === selectedPlatform)?.name} API Bilgileri`}
+                title={`${platforms.find(p => p.key === selectedPlatform)?.name} Entegrasyonu`}
                 open={isModalVisible}
                 onCancel={() => setIsModalVisible(false)}
                 footer={null}
             >
-                <Form
-                    form={form}
-                    layout="vertical"
-                    onFinish={handleSaveApiKeys}
-                >
-                    <Form.Item
-                        name="apiKey"
-                        label="API Key (veya Client ID)"
-                        rules={[{ required: true, message: 'Lütfen API Key girin' }]}
-                    >
-                        <Input placeholder="API Anahtarı" />
-                    </Form.Item>
+                {selectedPlatform && platformConfig[selectedPlatform] && (
+                    <>
+                        <p style={{ marginBottom: 16, color: '#888' }}>
+                            API bilgilerinizi{' '}
+                            <a href={platformConfig[selectedPlatform].helpUrl} target="_blank" rel="noreferrer">
+                                {platforms.find(p => p.key === selectedPlatform)?.name} Satıcı Paneli
+                            </a>'nden alabilirsiniz.
+                        </p>
+                        <Form form={form} layout="vertical" onFinish={handleSaveApiKeys}>
+                            <Form.Item
+                                name="apiKey"
+                                label={platformConfig[selectedPlatform].apiKeyLabel}
+                                rules={[{ required: true, message: 'Zorunlu alan' }]}
+                            >
+                                <Input />
+                            </Form.Item>
 
-                    <Form.Item
-                        name="apiSecret"
-                        label="API Secret (veya Password)"
-                        rules={[{ required: true, message: 'Lütfen API Secret girin' }]}
-                    >
-                        <Input.Password placeholder="API Şifresi" />
-                    </Form.Item>
+                            <Form.Item
+                                name="apiSecret"
+                                label={platformConfig[selectedPlatform].apiSecretLabel}
+                                rules={[{ required: true, message: 'Zorunlu alan' }]}
+                            >
+                                <Input.Password />
+                            </Form.Item>
 
-                    <Form.Item
-                        name="shopId"
-                        label="Satıcı/Mağaza ID (Opsiyonel)"
-                    >
-                        <Input placeholder="Eğer platform gerektiriyorsa (örn: Trendyol Satıcı ID)" />
-                    </Form.Item>
+                            {platformConfig[selectedPlatform].shopIdLabel && (
+                                <Form.Item
+                                    name="shopId"
+                                    label={platformConfig[selectedPlatform].shopIdLabel}
+                                    rules={platformConfig[selectedPlatform].shopIdRequired
+                                        ? [{ required: true, message: 'Zorunlu alan' }]
+                                        : []
+                                    }
+                                >
+                                    <Input />
+                                </Form.Item>
+                            )}
 
-                    <Form.Item>
-                        <Button type="primary" htmlType="submit" loading={connecting === selectedPlatform} block>
-                            Bağla ve Kaydet
-                        </Button>
-                    </Form.Item>
-                </Form>
+                            <Form.Item>
+                                <Button type="primary" htmlType="submit" loading={connecting === selectedPlatform} block>
+                                    Bağla ve Kaydet
+                                </Button>
+                            </Form.Item>
+                        </Form>
+                    </>
+                )}
             </Modal>
         </div>
     );

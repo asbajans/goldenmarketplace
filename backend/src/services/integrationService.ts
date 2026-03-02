@@ -1,5 +1,8 @@
 import MarketplaceIntegration from '../models/MarketplaceIntegration';
 import EtsyClient from '../integrations/etsy/etsyClient';
+import TrendyolClient from '../integrations/trendyol/trendyolClient';
+import HepsiburadaClient from '../integrations/hepsiburada/hepsiburadaClient';
+import N11Client from '../integrations/n11/n11Client';
 
 class IntegrationService {
     /**
@@ -52,18 +55,35 @@ class IntegrationService {
         if (platform === 'etsy') {
             if (!integration.accessToken) throw new Error('Etsy access token not found');
             const data = await EtsyClient.verifyConnection(integration.accessToken);
-            return {
-                status: 'success',
-                message: 'Etsy connection works!',
-                shopId: data.shop_id || integration.shopId
-            };
+            return { status: 'success', message: 'Etsy bağlantısı çalışıyor!', shopId: data.shop_id };
         }
 
-        // Future platforms
-        return {
-            status: 'info',
-            message: `Test connection not implemented for ${platform} yet.`
-        };
+        if (platform === 'trendyol') {
+            if (!integration.apiKey || !integration.shopId) throw new Error('Trendyol API Key veya Satıcı ID eksik');
+            const client = new TrendyolClient(integration.apiKey, integration.apiSecret, integration.shopId);
+            const result = await client.verifyConnection(integration.shopId);
+            return { status: 'success', message: `Trendyol bağlantısı çalışıyor! Satıcı: ${result.sellerName}` };
+        }
+
+        if (platform === 'hepsiburada') {
+            if (!integration.apiKey || !integration.shopId) throw new Error('Hepsiburada kullanıcı adı veya Merchant ID eksik');
+            const client = new HepsiburadaClient(integration.apiKey, integration.apiSecret, integration.shopId);
+            const result = await client.verifyConnection();
+            return { status: 'success', message: `Hepsiburada bağlantısı çalışıyor! Merchant: ${result.merchantId}` };
+        }
+
+        if (platform === 'n11') {
+            if (!integration.apiKey) throw new Error('N11 API Key eksik');
+            const client = new N11Client(integration.apiKey, integration.apiSecret);
+            await client.verifyConnection();
+            return { status: 'success', message: `N11 bağlantısı çalışıyor!` };
+        }
+
+        if (platform === 'amazon') {
+            return { status: 'info', message: 'Amazon SP-API entegrasyonu henüz tamamlanmadı.' };
+        }
+
+        return { status: 'info', message: `${platform} için test bağlantısı henüz eklenmedi.` };
     }
 
     /**

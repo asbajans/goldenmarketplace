@@ -1,6 +1,7 @@
 
 import Queue from 'bull';
 import goldPriceService from '../services/goldPriceService';
+import marketplacePriceSyncService from '../services/marketplacePriceSyncService';
 
 // Create a queue for gold price updates
 export const goldPriceQueue = process.env.REDIS_URL
@@ -19,6 +20,14 @@ goldPriceQueue.process(async (_job) => {
     try {
         const result = await goldPriceService.updateProductPrices();
         console.log(`[GoldPriceJob] Done. Updated ${result.updatedCount} products. 24K Gram: ${result.goldPrice.pricePerGramTRY} TRY`);
+
+        // Trigger marketplace price sync right after gold price update
+        console.log('[GoldPriceJob] Triggering marketplace price sync...');
+        const syncResult = await marketplacePriceSyncService.syncAll();
+        console.log(`[GoldPriceJob] Marketplace sync done. Synced: ${syncResult.synced}, Failed: ${syncResult.failed}`);
+        if (syncResult.errors.length > 0) {
+            console.warn('[GoldPriceJob] Sync errors:', syncResult.errors);
+        }
     } catch (error) {
         console.error('[GoldPriceJob] Failed:', error);
         throw error;
