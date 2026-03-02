@@ -146,3 +146,6 @@ Yeni versiyon deploy etmek için:
 | API 502/504 | Container healthy mi? Port 777 açık mı? |
 | CORS hatası | `FRONTEND_URL` doğru ayarlandı mı? |
 | Altın fiyatı gelmiyor | `GOLD_PRICE_API_KEY` geçerli mi? |
+
+
+npx ts-node --transpile-only src/scripts/seed.ts
