@@ -9,7 +9,6 @@ export interface HepsiburadaProduct {
 
 export class HepsiburadaClient {
     private listingBaseUrl = 'https://listing-external.hepsiburada.com';
-    private merchantBaseUrl = 'https://mpop-sit.hepsiburada.com';
     private client: AxiosInstance;
     private merchantId: string;
 

@@ -18,15 +18,14 @@ export interface AmazonProduct {
 }
 
 export class AmazonClient {
-    private marketplaceId: string;
 
     constructor(
+        // These will be used when SP-API full implementation is added
         _accessKeyId: string,
         _secretAccessKey: string,
         _refreshToken: string,
-        marketplaceId: string = 'A33AVAJ2PDY3EV' // TR marketplace ID
+        _marketplaceId: string = 'A33AVAJ2PDY3EV' // TR marketplace ID
     ) {
-        this.marketplaceId = marketplaceId;
         console.log('[Amazon] AmazonClient initialized (skeleton mode)');
     }
 

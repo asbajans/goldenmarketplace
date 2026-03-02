@@ -29,7 +29,7 @@ export class TrendyolClient {
      */
     async verifyConnection(sellerId: string): Promise<{ success: boolean; sellerName?: string }> {
         try {
-            const response = await this.client.get(`/addresses`);
+            await this.client.get(`/addresses`);
             return { success: true, sellerName: `Trendyol Satıcısı (${sellerId})` };
         } catch (error: any) {
             console.error('[Trendyol] verifyConnection error:', error.response?.data || error.message);
