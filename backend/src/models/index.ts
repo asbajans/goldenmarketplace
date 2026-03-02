@@ -6,6 +6,7 @@ import SubscriptionPlan from './SubscriptionPlan';
 import Subscription from './Subscription';
 import Integration from './Integration';
 import MarketplaceIntegration from './MarketplaceIntegration';
+import GlobalSetting from './GlobalSetting';
 
 // User <-> Store (One-to-One)
 User.hasOne(Store, { foreignKey: 'userId', as: 'store' });
@@ -32,5 +33,6 @@ export {
     SubscriptionPlan,
     Subscription,
     Integration,
-    MarketplaceIntegration
+    MarketplaceIntegration,
+    GlobalSetting
 };

@@ -16,6 +16,7 @@ import SellersPage from './pages/SellersPage';
 import CategoriesPage from './pages/CategoriesPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import IntegrationsPage from './pages/IntegrationsPage';
+import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import { AdminAPI } from './services/api';
 
@@ -142,12 +143,7 @@ function App() {
         return <IntegrationsPage />;
 
       case 'settings':
-        return (
-          <Card>
-            <h2>Sistem Ayarları</h2>
-            <p>Sistem konfigürasyonu burada yapılır...</p>
-          </Card>
-        );
+        return <SettingsPage />;
 
       default:
         return null;

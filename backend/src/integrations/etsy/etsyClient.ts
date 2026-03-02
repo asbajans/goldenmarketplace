@@ -1,24 +1,29 @@
 import axios from 'axios';
+import { GlobalSetting } from '../../models/GlobalSetting';
 
 export class EtsyClient {
-    private apiKey: string;
     private baseUrl = 'https://api.etsy.com/v3';
 
-    constructor() {
-        this.apiKey = process.env.ETSY_KEY || '';
+    /**
+     * Helper to get the Etsy API Key directly from database
+     */
+    private async getApiKey(): Promise<string> {
+        const setting = await GlobalSetting.findOne({ where: { key: 'etsy_api_key' } });
+        if (!setting || !setting.value) {
+            throw new Error('Etsy API Key is not configured in Admin Settings.');
+        }
+        return setting.value;
     }
 
     /**
      * Exchanges an OAuth authorization code for an access token
      */
     async exchangeCodeForToken(code: string, codeVerifier: string, redirectUri: string) {
-        if (!this.apiKey) {
-            throw new Error('ETSY_KEY is not defined in environment variables');
-        }
+        const apiKey = await this.getApiKey();
 
         const data = {
             grant_type: 'authorization_code',
-            client_id: this.apiKey,
+            client_id: apiKey,
             redirect_uri: redirectUri,
             code: code,
             code_verifier: codeVerifier
@@ -41,14 +46,12 @@ export class EtsyClient {
      * Gets the current user (shop) details using the access token
      */
     async getMe(accessToken: string) {
-        if (!this.apiKey) {
-            throw new Error('ETSY_KEY is not defined in environment variables');
-        }
+        const apiKey = await this.getApiKey();
 
         try {
             const response = await axios.get(`${this.baseUrl}/application/users/me`, {
                 headers: {
-                    'x-api-key': this.apiKey,
+                    'x-api-key': apiKey,
                     'Authorization': `Bearer ${accessToken}`
                 }
             });
@@ -59,7 +62,7 @@ export class EtsyClient {
 
             const shopResponse = await axios.get(`${this.baseUrl}/application/users/${userId}/shops`, {
                 headers: {
-                    'x-api-key': this.apiKey,
+                    'x-api-key': apiKey,
                     'Authorization': `Bearer ${accessToken}`
                 }
             });
@@ -78,14 +81,12 @@ export class EtsyClient {
      * Verify connection using the existing token
      */
     async verifyConnection(accessToken: string) {
-        if (!this.apiKey) {
-            throw new Error('ETSY_KEY is not defined in environment variables');
-        }
+        const apiKey = await this.getApiKey();
 
         try {
             const response = await axios.get(`${this.baseUrl}/application/users/me`, {
                 headers: {
-                    'x-api-key': this.apiKey,
+                    'x-api-key': apiKey,
                     'Authorization': `Bearer ${accessToken}`
                 }
             });

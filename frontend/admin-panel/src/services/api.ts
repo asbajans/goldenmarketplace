@@ -84,6 +84,9 @@ export const AdminAPI = {
     // Integrations
     getIntegrations: () => api.get('/integrations').then((res) => res.data),
 
+    // Settings
+    getSettings: () => api.get('/settings').then((res) => res.data),
+    updateSettings: (data: any) => api.post('/settings', data).then((res) => res.data),
 };
 
 export default api;

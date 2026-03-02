@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import integrationService from '../services/integrationService';
 import crypto from 'crypto';
 import NodeCache from 'node-cache';
+import { GlobalSetting } from '../models/GlobalSetting';
 
 // Cache for short-lived state/verifier lookup (5 minutes TTL)
 const pkceCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
@@ -111,14 +112,16 @@ export class IntegrationController {
             console.log('Storing PKCE inside node-cache...');
             pkceCache.set(state, { userId, codeVerifier });
 
-            const clientId = process.env.ETSY_KEY || '';
+            const setting = await GlobalSetting.findOne({ where: { key: 'etsy_api_key' } });
+            const clientId = setting?.value || '';
+
             const apiBaseUrl = process.env.API_URL || 'https://api.goldencrafters.com/api';
             const redirectUri = `${apiBaseUrl}/integrations/etsy/callback`;
             const scopes = 'listings_r listings_w listings_d profile_r email_r transactions_r transactions_w';
 
             if (!clientId) {
-                console.error('Etsy Auth URL Error: ETSY_KEY is empty');
-                return res.status(500).json({ error: 'Etsy is not configured on the server (Missing ETSY_KEY)' });
+                console.error('Etsy Auth URL Error: ETSY_KEY is empty in Database');
+                return res.status(500).json({ error: 'Etsy is not configured on the server (Missing etsy_api_key in Settings)' });
             }
 
             console.log('Redirect URI configured as:', redirectUri);

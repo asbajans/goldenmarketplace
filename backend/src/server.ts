@@ -8,8 +8,35 @@ import winston from 'winston';
 // Load environment variables
 dotenv.config();
 
+// Load environment variables
+dotenv.config();
+
 // Initialize Models
 require('./models');
+import { GlobalSetting } from './models/GlobalSetting';
+import sequelize from './config/database';
+
+async function syncAndSeedSettings() {
+  try {
+    await sequelize.sync({ alter: true }); // Sync new models
+
+    // Seed initial GlobalSettings for Etsy keys
+    const settingsToSeed = [
+      { key: 'etsy_api_key', value: '', description: 'Etsy Master Application Key (Client ID)', isPublic: false },
+      { key: 'etsy_api_secret', value: '', description: 'Etsy Master Application Shared Secret', isPublic: false }
+    ];
+
+    for (const setting of settingsToSeed) {
+      const exists = await GlobalSetting.findOne({ where: { key: setting.key } });
+      if (!exists) {
+        await GlobalSetting.create(setting);
+      }
+    }
+    console.log('[DB] GlobalSettings synchronized successfully.');
+  } catch (error) {
+    console.error('[DB] Failed to synchronize GlobalSettings:', error);
+  }
+}
 
 // Initialize logger
 const logger = winston.createLogger({
@@ -92,6 +119,8 @@ app.listen(PORT, async () => {
 
   // Initialize background jobs
   try {
+    await syncAndSeedSettings();
+
     const { initGoldPriceJob } = require('./jobs/goldPriceJob');
     await initGoldPriceJob();
 

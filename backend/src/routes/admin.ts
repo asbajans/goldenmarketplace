@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware, adminMiddleware } from '../middleware/authMiddleware';
 import { AdminController } from '../controllers/adminController';
+import { SettingsController } from '../controllers/settingsController';
 
 const router = Router();
 
@@ -34,5 +35,9 @@ router.delete('/subscription-plans/:id', AdminController.deleteSubscriptionPlan)
 
 // --- INTEGRATIONS ---
 router.get('/integrations', AdminController.getIntegrations);
+
+// --- GLOBAL SETTINGS ---
+router.get('/settings', SettingsController.getSettings);
+router.post('/settings', SettingsController.updateSettings);
 
 export default router;
