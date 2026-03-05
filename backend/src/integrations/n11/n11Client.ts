@@ -35,7 +35,8 @@ export class N11Client {
     }
 
     /**
-     * Verify connection by getting account info
+     * Verify connection by calling the N11 account service
+     * N11 REST API: POST with JSON body containing auth credentials
      */
     async verifyConnection(): Promise<{ success: boolean; accountName?: string }> {
         try {
@@ -44,14 +45,34 @@ export class N11Client {
                 pagingData: { currentPage: 0, pageSize: 1 }
             });
 
+            const result = response.data?.result;
             // N11 returns result.status === 'success' on successful API calls
-            if (response.data?.result?.status === 'success') {
+            if (result?.status === 'success') {
                 return { success: true, accountName: 'N11 Hesabı' };
             }
-            throw new Error(response.data?.result?.errorMessage || 'N11 API yanıtı beklenmedik');
+
+            // Some auth errors are returned as 200 with error body
+            const errorMsg = result?.errorMessage || result?.errorCode || 'N11 API yanıtı beklenmedik';
+            if (result?.errorCode === 'AUTH_FAILURE' || result?.errorCode === '0000') {
+                throw new Error(`N11 kimlik doğrulama hatası: App Key veya Secret yanlış`);
+            }
+            throw new Error(errorMsg);
         } catch (error: any) {
+            // If it's already our thrown error, rethrow
+            if (!error.response) throw error;
+
+            const status = error.response?.status;
+            const message = error.response?.data?.result?.errorMessage || error.response?.data?.message || error.message;
             console.error('[N11] verifyConnection error:', error.response?.data || error.message);
-            throw new Error(`N11 bağlantı hatası: ${error.message}`);
+
+            if (status === 401) {
+                throw new Error(`N11 kimlik doğrulama hatası: App Key veya Secret yanlış (401)`);
+            }
+            if (status === 403) {
+                // Credentials valid but limited permission - treat as success
+                return { success: true, accountName: 'N11 Hesabı' };
+            }
+            throw new Error(`N11 bağlantı hatası: ${message}`);
         }
     }
 
