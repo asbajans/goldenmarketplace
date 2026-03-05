@@ -2,13 +2,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     Form, Input, Button, InputNumber, message, Upload,
-    Select, Checkbox, Space, Card, Tag, Typography, Statistic, Row, Col, Divider, Spin
+    Select, Checkbox, Space, Card, Tag, Typography, Statistic, Row, Col, Divider, Spin, Tooltip
 } from 'antd';
 import {
     PlusOutlined, VideoCameraOutlined,
     DoubleRightOutlined, InfoCircleOutlined,
     DollarOutlined, GoldOutlined, PercentageOutlined,
-    ShopOutlined, CheckCircleOutlined
+    ShopOutlined, CheckCircleOutlined, ThunderboltOutlined
 } from '@ant-design/icons';
 import { createProduct } from '../api/product';
 import client from '../api/client';
@@ -196,8 +196,33 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                         </Form.Item>
                     </Col>
                     <Col span={12}>
-                        <Form.Item name="sku" label="SKU (Stok Kodu)" rules={[{ required: true }]}>
-                            <Input placeholder="Örn: ALT-BLZ-001" />
+                        <Form.Item
+                            name="sku"
+                            label={
+                                <span>
+                                    SKU (Stok Kodu){' '}
+                                    <Tooltip title="Her ürün için benzersiz olmalıdır. Şirket adı yerine ürüne özel bir kod kullanın (Örn: BLZ-001).">
+                                        <InfoCircleOutlined style={{ color: '#888', fontSize: 12 }} />
+                                    </Tooltip>
+                                </span>
+                            }
+                            rules={[{ required: true, message: 'SKU gerekli' }]}
+                        >
+                            <Input
+                                placeholder="Örn: BLZ-14K-001 (benzersiz olmalı)"
+                                addonAfter={
+                                    <Tooltip title="Otomatik SKU oluştur">
+                                        <ThunderboltOutlined
+                                            style={{ cursor: 'pointer', color: '#d4a017' }}
+                                            onClick={() => {
+                                                const cat = (form.getFieldValue('category') || 'PRD').substring(0, 3).toUpperCase();
+                                                const ts = Date.now().toString().slice(-5);
+                                                form.setFieldValue('sku', `${cat}-${ts}`);
+                                            }}
+                                        />
+                                    </Tooltip>
+                                }
+                            />
                         </Form.Item>
                     </Col>
                 </Row>

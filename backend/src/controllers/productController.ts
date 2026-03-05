@@ -123,8 +123,18 @@ export class ProductController {
         message: 'Product created successfully',
         product
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Create product error:', error);
+
+      // Unique constraint violation (duplicate SKU or slug)
+      if (error.name === 'SequelizeUniqueConstraintError' || error.original?.code === '23505') {
+        const field = error.fields ? Object.keys(error.fields)[0] : 'alan';
+        const fieldLabel = field === 'sku' ? 'SKU (Stok Kodu)' : field;
+        return res.status(400).json({
+          error: { message: `Bu ${fieldLabel} zaten kullanımda. Lütfen benzersiz bir değer giriniz.`, status: 400 }
+        });
+      }
+
       return res.status(500).json({
         error: { message: 'Internal server error', status: 500 }
       });
