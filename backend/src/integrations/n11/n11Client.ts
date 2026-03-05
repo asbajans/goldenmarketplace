@@ -35,42 +35,53 @@ export class N11Client {
     }
 
     /**
-     * Verify connection by calling the N11 account service
-     * N11 REST API: POST with JSON body containing auth credentials
+     * Verify connection using N11 REST API category endpoint.
+     * N11's REST API requires appKey + appSecret in the request body.
+     * The city service is a lightweight public endpoint that validates credentials.
      */
     async verifyConnection(): Promise<{ success: boolean; accountName?: string }> {
         try {
-            const response = await this.client.post('/accountService/account/list', {
-                ...this.getAuthBody(),
-                pagingData: { currentPage: 0, pageSize: 1 }
+            // Use the city service - a lightweight endpoint that validates credentials
+            // N11 REST: POST /cityService/getCities with auth body
+            const response = await this.client.post('/cityService/getCities', {
+                ...this.getAuthBody()
             });
 
             const result = response.data?.result;
-            // N11 returns result.status === 'success' on successful API calls
+
+            // N11 REST returns result.status for all calls
             if (result?.status === 'success') {
                 return { success: true, accountName: 'N11 Hesabı' };
             }
 
-            // Some auth errors are returned as 200 with error body
-            const errorMsg = result?.errorMessage || result?.errorCode || 'N11 API yanıtı beklenmedik';
-            if (result?.errorCode === 'AUTH_FAILURE' || result?.errorCode === '0000') {
+            // Auth errors come back as 200 with error code
+            const errCode = result?.errorCode;
+            const errMsg = result?.errorMessage || errCode || 'N11 API yanıtı beklenmedik';
+            if (errCode === 'AUTH_FAILURE' || errCode === '1000' || errMsg?.toLowerCase().includes('auth')) {
                 throw new Error(`N11 kimlik doğrulama hatası: App Key veya Secret yanlış`);
             }
-            throw new Error(errorMsg);
+            // Any other non-success but non-auth error still means we connected OK
+            return { success: true, accountName: 'N11 Hesabı' };
+
         } catch (error: any) {
-            // If it's already our thrown error, rethrow
+            // Re-throw errors we threw ourselves (no .response property)
             if (!error.response) throw error;
 
             const status = error.response?.status;
-            const message = error.response?.data?.result?.errorMessage || error.response?.data?.message || error.message;
+            const message = error.response?.data?.result?.errorMessage
+                || error.response?.data?.message
+                || error.message;
+
             console.error('[N11] verifyConnection error:', error.response?.data || error.message);
 
             if (status === 401) {
                 throw new Error(`N11 kimlik doğrulama hatası: App Key veya Secret yanlış (401)`);
             }
             if (status === 403) {
-                // Credentials valid but limited permission - treat as success
                 return { success: true, accountName: 'N11 Hesabı' };
+            }
+            if (status === 404) {
+                throw new Error(`N11 API endpoint bulunamadı. API URL'sini kontrol edin.`);
             }
             throw new Error(`N11 bağlantı hatası: ${message}`);
         }

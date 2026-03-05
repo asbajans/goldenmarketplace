@@ -107,13 +107,17 @@ export class ProductController {
         isActive: true
       });
 
-      // Trigger marketplace sync
-      // @ts-ignore
-      productSyncQueue.add({
-        productId: product.id,
-        userId: req.user.id,
-        trigger: 'create'
-      });
+      // Trigger marketplace sync (non-blocking - don't fail product creation if queue is down)
+      try {
+        // @ts-ignore
+        productSyncQueue.add({
+          productId: product.id,
+          userId: (req as any).user.id,
+          trigger: 'create'
+        });
+      } catch (queueErr) {
+        console.warn('[ProductController] Could not enqueue sync job (Redis down?):', queueErr);
+      }
 
       return res.status(201).json({
         message: 'Product created successfully',
@@ -174,13 +178,17 @@ export class ProductController {
         tags
       });
 
-      // Trigger marketplace sync
-      // @ts-ignore
-      productSyncQueue.add({
-        productId: product.id,
-        userId: req.user.id,
-        trigger: 'update'
-      });
+      // Trigger marketplace sync (non-blocking)
+      try {
+        // @ts-ignore
+        productSyncQueue.add({
+          productId: product.id,
+          userId: (req as any).user.id,
+          trigger: 'update'
+        });
+      } catch (queueErr) {
+        console.warn('[ProductController] Could not enqueue sync job (Redis down?):', queueErr);
+      }
 
       return res.status(200).json({
         message: 'Product updated successfully',
