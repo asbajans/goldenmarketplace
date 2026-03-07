@@ -3,6 +3,9 @@ import Queue from 'bull';
 import dotenv from 'dotenv';
 import MarketplaceIntegration from '../models/MarketplaceIntegration';
 import Product from '../models/Product';
+import TrendyolClient from '../integrations/trendyol/trendyolClient';
+import N11Client from '../integrations/n11/n11Client';
+import HepsiburadaClient from '../integrations/hepsiburada/hepsiburadaClient';
 
 dotenv.config();
 
@@ -59,6 +62,15 @@ productSyncQueue.process(async (job) => {
                     case 'etsy':
                         await syncToEtsy(integration, product);
                         break;
+                    case 'trendyol':
+                        await syncToTrendyol(integration, product);
+                        break;
+                    case 'hepsiburada':
+                        await syncToHepsiburada(integration, product);
+                        break;
+                    case 'n11':
+                        await syncToN11(integration, product);
+                        break;
                     case 'amazon':
                         // await syncToAmazon(integration, product);
                         break;
@@ -85,5 +97,48 @@ async function syncToEtsy(integration: any, product: any) {
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Update integration lastSync
+    await integration.update({ lastSyncAt: new Date() });
+}
+
+// Trendyol Sync
+async function syncToTrendyol(integration: any, product: any) {
+    const { apiKey, apiSecret, shopId } = integration;
+    if (!apiKey || !apiSecret || !shopId) return;
+
+    const client = new TrendyolClient(apiKey, apiSecret, shopId);
+    await client.updatePrices([{
+        barcode: product.sku,
+        listPrice: Number(product.priceTRY) * 1.1,
+        salePrice: Number(product.priceTRY),
+        quantity: product.quantity
+    }]);
+    await integration.update({ lastSyncAt: new Date() });
+}
+
+// Hepsiburada Sync
+async function syncToHepsiburada(integration: any, product: any) {
+    const { apiKey, apiSecret, shopId } = integration;
+    if (!apiKey || !apiSecret || !shopId) return;
+
+    const client = new HepsiburadaClient(apiKey, apiSecret, shopId);
+    await client.updatePrices([{
+        sku: product.sku,
+        price: Number(product.priceTRY),
+        stock: product.quantity
+    }]);
+    await integration.update({ lastSyncAt: new Date() });
+}
+
+// N11 Sync
+async function syncToN11(integration: any, product: any) {
+    const { apiKey, apiSecret } = integration;
+    if (!apiKey || !apiSecret) return;
+
+    const client = new N11Client(apiKey, apiSecret);
+    await client.updatePrices([{
+        productId: product.sku,
+        price: Number(product.priceTRY),
+        stock: product.quantity
+    }]);
     await integration.update({ lastSyncAt: new Date() });
 }
