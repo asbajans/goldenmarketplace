@@ -34,7 +34,7 @@ function App() {
           getProducts(),
           getGoldPrice()
         ]);
-        setProducts(prodData || []);
+        setProducts(prodData?.data || []);
         setGoldPrice(goldData);
       } catch (error) {
         console.error('Failed to fetch data', error);
@@ -55,6 +55,22 @@ function App() {
         return (
           <div>
             <h2>Tüm Ürünler ({products.length})</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '20px', marginTop: '20px' }}>
+              {products.map(product => (
+                <div key={product.id} style={{ background: '#fff', padding: '16px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                  <h3 style={{ margin: '0 0 10px 0' }}>{product.title}</h3>
+                  <div style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '18px', marginBottom: '10px' }}>
+                    {product.priceTRY} ₺
+                  </div>
+                  <div style={{ color: '#888', fontSize: '12px' }}>
+                    Stok: {product.quantity} | Kategori: {product.category}
+                  </div>
+                  <Button type="primary" block style={{ marginTop: '15px' }} icon={<ShoppingCartOutlined />}>
+                    Sepete Ekle
+                  </Button>
+                </div>
+              ))}
+            </div>
           </div>
         );
       case 'sellers':

@@ -97,7 +97,7 @@ export class N11Client {
                 await this.client.post('/productService/updateProductBasic', {
                     ...this.getAuthBody(),
                     product: {
-                        productId: item.productId,
+                        productSellerCode: item.productId,
                         price: item.price,
                         stockItems: {
                             stockItem: {
