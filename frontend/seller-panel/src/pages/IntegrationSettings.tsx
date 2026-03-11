@@ -12,6 +12,8 @@ interface Integration {
     platform: string;
     isActive: boolean;
     lastSyncAt: string;
+    lastSyncStatus?: 'success' | 'error';
+    lastSyncMessage?: string;
     shopId?: string;
 }
 
@@ -207,7 +209,19 @@ const IntegrationSettings: React.FC = () => {
                                         </div>
                                     }
                                     description={isConnected
-                                        ? `Son senkronizasyon: ${new Date(integration.lastSyncAt).toLocaleDateString()}`
+                                        ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                <Text type="secondary" style={{ fontSize: '12px' }}>
+                                                    Son senkronizasyon: {integration.lastSyncAt ? new Date(integration.lastSyncAt).toLocaleString('tr-TR') : 'Hiç çalışmadı'}
+                                                    {integration.lastSyncStatus === 'success' && <CheckCircleOutlined style={{ color: '#52c41a', marginLeft: 6 }} />}
+                                                </Text>
+                                                {integration.lastSyncStatus === 'error' && (
+                                                    <Text type="danger" style={{ fontSize: '12px', whiteSpace: 'pre-wrap', maxHeight: '100px', overflowY: 'auto', backgroundColor: '#fff1f0', padding: '4px 8px', borderRadius: 4, border: '1px solid #ffccc7' }}>
+                                                        <strong>Hata:</strong> {integration.lastSyncMessage || 'Bilinmeyen bir hata oluştu.'}
+                                                    </Text>
+                                                )}
+                                            </div>
+                                        )
                                         : "Bağlantı yok"
                                     }
                                 />

@@ -64,13 +64,22 @@ class MarketplacePriceSyncService {
                             await this.syncForPlatform(integration, products);
                             stats.synced++;
 
-                            // Update lastSyncAt
-                            await integration.update({ lastSyncAt: new Date() });
+                            // Update lastSyncAt and status
+                            await integration.update({
+                                lastSyncAt: new Date(),
+                                lastSyncStatus: 'success',
+                                lastSyncMessage: null
+                            });
                         } catch (err: any) {
                             stats.failed++;
                             const errMsg = `[${integration.platform}] userId=${userId}: ${err.message}`;
                             stats.errors.push(errMsg);
                             console.error('[MarketplaceSync]', errMsg);
+                            await integration.update({
+                                lastSyncAt: new Date(),
+                                lastSyncStatus: 'error',
+                                lastSyncMessage: err.message
+                            });
                         }
                     }
                 } catch (err: any) {

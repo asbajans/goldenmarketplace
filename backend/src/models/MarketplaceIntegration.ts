@@ -12,6 +12,8 @@ export class MarketplaceIntegration extends Model {
     public refreshToken?: string;
     public shopId?: string; // Platform specific shop ID
     public isActive!: boolean;
+    public lastSyncStatus?: 'success' | 'error';
+    public lastSyncMessage?: string;
     public lastSyncAt?: Date;
 
     public readonly createdAt!: Date;
@@ -56,6 +58,14 @@ MarketplaceIntegration.init(
         isActive: {
             type: DataTypes.BOOLEAN,
             defaultValue: true
+        },
+        lastSyncStatus: {
+            type: DataTypes.ENUM('success', 'error'),
+            allowNull: true
+        },
+        lastSyncMessage: {
+            type: DataTypes.TEXT,
+            allowNull: true
         },
         lastSyncAt: {
             type: DataTypes.DATE,
