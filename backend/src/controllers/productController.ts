@@ -260,7 +260,6 @@ export class ProductController {
         milyem,
         profitMargin: profitMargin || 0,
         gold24KGramTRY: gold.pricePerGramTRY,
-        usdTryRate: gold.usdTryRate,
         priceTRY,
         priceUSD
       });
