@@ -1,145 +1,128 @@
 /**
  * MarketplacePriceSyncService
- * 
- * Triggered after each hourly gold price update.
- * Reads all active marketplace integrations and pushes updated prices to each platform.
+ *
+ * Called when gold price changes (manual admin update).
+ * ONLY updates prices for products that are ALREADY LISTED on the marketplace
+ * (i.e., have a ProductMarketplaceListing record with status='active').
+ *
+ * Product CREATION is handled by productSyncJob.ts when a product is first added.
  */
 
 import MarketplaceIntegration from '../models/MarketplaceIntegration';
+import ProductMarketplaceListing from '../models/ProductMarketplaceListing';
 import Product from '../models/Product';
 import Store from '../models/Store';
-import TrendyolClient, { TrendyolProduct } from '../integrations/trendyol/trendyolClient';
+import TrendyolClient from '../integrations/trendyol/trendyolClient';
 import HepsiburadaClient, { HepsiburadaProduct } from '../integrations/hepsiburada/hepsiburadaClient';
-import N11Client, { N11Product } from '../integrations/n11/n11Client';
+import N11Client from '../integrations/n11/n11Client';
 
 class MarketplacePriceSyncService {
 
-    /**
-     * Sync ALL active marketplace integrations for all users.
-     * Called after gold price update completes.
-     */
     async syncAll(): Promise<{ synced: number; failed: number; errors: string[] }> {
         const stats = { synced: 0, failed: 0, errors: [] as string[] };
-        console.log('[MarketplaceSync] Starting price sync for all active intergrations...');
+        console.log('[MarketplaceSync] Starting price sync...');
 
         try {
-            // Find all active integrations
-            const integrations = await MarketplaceIntegration.findAll({
-                // @ts-ignore
-                where: { isActive: true }
-            });
-
+            const integrations = await MarketplaceIntegration.findAll({ where: { isActive: true } });
             if (!integrations.length) {
-                console.log('[MarketplaceSync] No active integrations found, skipping.');
+                console.log('[MarketplaceSync] No active integrations. Skipping.');
                 return stats;
             }
 
-            console.log(`[MarketplaceSync] Found ${integrations.length} active integrations to sync.`);
-
-            // Group by userId so we only fetch each user's products once
             const byUser: Record<string, typeof integrations> = {};
             for (const integration of integrations) {
                 if (!byUser[integration.userId]) byUser[integration.userId] = [];
                 byUser[integration.userId].push(integration);
             }
 
-            // Process each user
             for (const [userId, userIntegrations] of Object.entries(byUser)) {
-                try {
-                    // Find user's store
-                    const store = await Store.findOne({ where: { userId } });
-                    if (!store) continue;
+                const store = await Store.findOne({ where: { userId } });
+                if (!store) continue;
 
-                    // Get the user's active products with current prices
-                    const products = await Product.findAll({
-                        // @ts-ignore
-                        where: { storeId: store.id, isActive: true }
-                    });
+                const products = await Product.findAll({ where: { storeId: store.id, isActive: true } });
+                if (!products.length) continue;
 
-                    if (!products.length) continue;
-
-                    // Sync each integration
-                    for (const integration of userIntegrations) {
-                        try {
-                            await this.syncForPlatform(integration, products);
-                            stats.synced++;
-
-                            // Update lastSyncAt and status
-                            await integration.update({
-                                lastSyncAt: new Date(),
-                                lastSyncStatus: 'success',
-                                lastSyncMessage: null
-                            });
-                        } catch (err: any) {
-                            stats.failed++;
-                            const errMsg = `[${integration.platform}] userId=${userId}: ${err.message}`;
-                            stats.errors.push(errMsg);
-                            console.error('[MarketplaceSync]', errMsg);
-                            await integration.update({
-                                lastSyncAt: new Date(),
-                                lastSyncStatus: 'error',
-                                lastSyncMessage: err.message
-                            });
-                        }
+                for (const integration of userIntegrations) {
+                    try {
+                        await this.syncForPlatform(integration, products);
+                        stats.synced++;
+                        await integration.update({ lastSyncAt: new Date(), lastSyncStatus: 'success', lastSyncMessage: null });
+                    } catch (err: any) {
+                        stats.failed++;
+                        const errMsg = `[${integration.platform}] uid=${userId}: ${err.message}`;
+                        stats.errors.push(errMsg);
+                        console.error('[MarketplaceSync]', errMsg);
+                        await integration.update({ lastSyncAt: new Date(), lastSyncStatus: 'error', lastSyncMessage: err.message });
                     }
-                } catch (err: any) {
-                    console.error(`[MarketplaceSync] Error processing userId=${userId}:`, err.message);
                 }
             }
         } catch (err: any) {
-            console.error('[MarketplaceSync] Fatal error in syncAll:', err.message);
+            console.error('[MarketplaceSync] Fatal error:', err.message);
         }
 
         console.log(`[MarketplaceSync] Done. Synced: ${stats.synced}, Failed: ${stats.failed}`);
         return stats;
     }
 
-    /**
-     * Sync a single integration (one platform for one user)
-     */
     async syncForPlatform(integration: MarketplaceIntegration, products: Product[]): Promise<void> {
         const { platform, apiKey, apiSecret, shopId } = integration;
 
         switch (platform) {
             case 'trendyol':
-                await this.syncTrendyol(apiKey, apiSecret, shopId!, products);
+                await this.syncTrendyol(integration, products);
                 break;
-
             case 'hepsiburada':
                 await this.syncHepsiburada(apiKey, apiSecret, shopId!, products);
                 break;
-
             case 'n11':
-                await this.syncN11(apiKey, apiSecret, products);
+                await this.syncN11(integration, products);
                 break;
-
-            case 'amazon':
-                console.log('[Amazon] Price sync skipped — SP-API not yet implemented');
-                break;
-
             case 'etsy':
-                console.log('[Etsy] Price sync skipped — OAuth token based, handled separately');
+            case 'amazon':
+                console.log(`[${platform}] Price sync skipped (handled separately)`);
                 break;
-
             default:
                 console.warn(`[MarketplaceSync] Unknown platform: ${platform}`);
         }
     }
 
-    private async syncTrendyol(apiKey: string, apiSecret: string, sellerId: string, products: Product[]): Promise<void> {
-        const client = new TrendyolClient(apiKey, apiSecret, sellerId);
-        const items: TrendyolProduct[] = products.map(p => ({
-            barcode: p.sku,
-            listPrice: Number(p.priceTRY) * 1.1, // List price slightly above sale
-            salePrice: Number(p.priceTRY),
-            quantity: p.quantity
-        }));
+    /**
+     * Trendyol: only update products with active listings (known barcode)
+     */
+    private async syncTrendyol(integration: MarketplaceIntegration, products: Product[]): Promise<void> {
+        const { apiKey, apiSecret, shopId } = integration;
+        if (!apiKey || !apiSecret || !shopId) return;
+
+        const client = new TrendyolClient(apiKey, apiSecret, shopId);
+        const items = [];
+
+        for (const product of products) {
+            const listing = await ProductMarketplaceListing.findOne({
+                where: { productId: product.id, platform: 'trendyol', status: 'active' }
+            });
+            if (!listing) {
+                // Product not yet listed — skip price update (productSyncJob handles create)
+                continue;
+            }
+            items.push({
+                barcode: listing.externalCode,
+                listPrice: Math.round(Number(product.priceTRY) * 1.1 * 100) / 100,
+                salePrice: Number(product.priceTRY),
+                quantity: product.quantity
+            });
+        }
 
         if (items.length > 0) {
             await client.updatePrices(items);
+            console.log(`[Trendyol] Price sync: updated ${items.length} products.`);
+        } else {
+            console.log(`[Trendyol] No active listings to update. Create products via seller panel first.`);
         }
     }
 
+    /**
+     * Hepsiburada: update prices for all active products (uses SKU directly)
+     */
     private async syncHepsiburada(username: string, password: string, merchantId: string, products: Product[]): Promise<void> {
         const client = new HepsiburadaClient(username, password, merchantId);
         const items: HepsiburadaProduct[] = products.map(p => ({
@@ -147,22 +130,40 @@ class MarketplacePriceSyncService {
             price: Number(p.priceTRY),
             stock: p.quantity
         }));
-
         if (items.length > 0) {
             await client.updatePrices(items);
         }
     }
 
-    private async syncN11(appKey: string, appSecret: string, products: Product[]): Promise<void> {
-        const client = new N11Client(appKey, appSecret);
-        const items: N11Product[] = products.map(p => ({
-            productId: p.sku,
-            price: Number(p.priceTRY),
-            stock: p.quantity
-        }));
+    /**
+     * N11: only update products with active listings (known N11 product ID)
+     */
+    private async syncN11(integration: MarketplaceIntegration, products: Product[]): Promise<void> {
+        const { apiKey, apiSecret } = integration;
+        if (!apiKey || !apiSecret) return;
+
+        const client = new N11Client(apiKey, apiSecret);
+        const items = [];
+
+        for (const product of products) {
+            const listing = await ProductMarketplaceListing.findOne({
+                where: { productId: product.id, platform: 'n11', status: 'active' }
+            });
+            if (!listing) {
+                continue;
+            }
+            items.push({
+                productId: listing.externalId || listing.externalCode,
+                price: Number(product.priceTRY),
+                stock: product.quantity
+            });
+        }
 
         if (items.length > 0) {
             await client.updatePrices(items);
+            console.log(`[N11] Price sync: updated ${items.length} products.`);
+        } else {
+            console.log(`[N11] No active listings to update.`);
         }
     }
 }

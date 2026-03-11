@@ -10,12 +10,18 @@ export class MarketplaceIntegration extends Model {
     public apiSecret!: string;
     public accessToken?: string;
     public refreshToken?: string;
-    public shopId?: string; // Platform specific shop ID
+    public shopId?: string;
     public isActive!: boolean;
     public lastSyncStatus?: 'success' | 'error';
     public lastSyncMessage?: string;
     public lastSyncAt?: Date;
-
+    // Trendyol product creation config
+    public trendyolCategoryId?: number;
+    public trendyolBrandId?: number;
+    // N11 product creation config
+    public n11CategoryId?: string;
+    // Default VAT rate for product creation (10 or 20)
+    public defaultVatRate?: number;
     public readonly createdAt!: Date;
     public readonly updatedAt!: Date;
 }
@@ -70,6 +76,27 @@ MarketplaceIntegration.init(
         lastSyncAt: {
             type: DataTypes.DATE,
             allowNull: true
+        },
+        trendyolCategoryId: {
+            type: DataTypes.INTEGER,
+            allowNull: true,
+            comment: 'Trendyol category ID required for product creation'
+        },
+        trendyolBrandId: {
+            type: DataTypes.INTEGER,
+            allowNull: true,
+            comment: 'Trendyol brand ID required for product creation'
+        },
+        n11CategoryId: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            comment: 'N11 category ID for product creation'
+        },
+        defaultVatRate: {
+            type: DataTypes.INTEGER,
+            allowNull: true,
+            defaultValue: 10,
+            comment: 'KDV rate for product creation (10 or 20)'
         }
     },
     {

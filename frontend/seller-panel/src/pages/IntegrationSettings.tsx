@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from 'react';
-import { Card, Button, Tag, message, Typography, Row, Col, Spin, Modal, Form, Input } from 'antd';
-import { ShopOutlined, CheckCircleOutlined, SyncOutlined, DisconnectOutlined } from '@ant-design/icons';
+import { Card, Button, Tag, message, Typography, Row, Col, Spin, Modal, Form, Input, InputNumber, Divider, Tooltip } from 'antd';
+import { ShopOutlined, CheckCircleOutlined, SyncOutlined, DisconnectOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import client from '../api/client';
 import { useSearchParams } from 'react-router-dom';
 
@@ -25,14 +25,21 @@ const platforms = [
     { key: 'amazon', name: 'Amazon', color: '#FF9900', icon: <ShopOutlined /> },
 ];
 
-// Platform-specific field labels and help links 
-const platformConfig: Record<string, { apiKeyLabel: string; apiSecretLabel: string; shopIdLabel?: string; shopIdRequired?: boolean; helpUrl: string }> = {
+const platformConfig: Record<string, {
+    apiKeyLabel: string;
+    apiSecretLabel: string;
+    shopIdLabel?: string;
+    shopIdRequired?: boolean;
+    helpUrl: string;
+    extraFields?: 'trendyol' | 'n11';
+}> = {
     trendyol: {
         apiKeyLabel: 'API Key (Trendyol Entegrasyon Paneli)',
         apiSecretLabel: 'API Secret',
         shopIdLabel: 'Satıcı ID (Supplier ID)',
         shopIdRequired: true,
-        helpUrl: 'https://entegrasyon.trendyol.com'
+        helpUrl: 'https://entegrasyon.trendyol.com',
+        extraFields: 'trendyol'
     },
     hepsiburada: {
         apiKeyLabel: 'Kullanıcı Adı (Username)',
@@ -44,7 +51,8 @@ const platformConfig: Record<string, { apiKeyLabel: string; apiSecretLabel: stri
     n11: {
         apiKeyLabel: 'App Key',
         apiSecretLabel: 'App Secret',
-        helpUrl: 'https://apiportal.n11.com'
+        helpUrl: 'https://apiportal.n11.com',
+        extraFields: 'n11'
     },
     amazon: {
         apiKeyLabel: 'LWA Client ID',
@@ -279,6 +287,76 @@ const IntegrationSettings: React.FC = () => {
                                 >
                                     <Input />
                                 </Form.Item>
+                            )}
+
+                            {/* Trendyol product creation config */}
+                            {platformConfig[selectedPlatform].extraFields === 'trendyol' && (
+                                <>
+                                    <Divider orientation="left" style={{ fontSize: 13 }}>
+                                        Ürün Oluşturma Ayarları
+                                    </Divider>
+                                    <p style={{ color: '#888', fontSize: 12, marginBottom: 12 }}>
+                                        Trendyol'da yeni ürün oluşturmak için kategori ve marka ID gereklidir.
+                                        Bu bilgileri Trendyol Satıcı Paneli &gt; Katalog &gt; Markalar/Kategoriler bölümünden bulabilirsiniz.
+                                    </p>
+                                    <Row gutter={12}>
+                                        <Col span={12}>
+                                            <Form.Item
+                                                name="trendyolCategoryId"
+                                                label={
+                                                    <span>Kategori ID{' '}
+                                                        <Tooltip title="Trendyol kategori ID (sayısal). Örn: 411 (Takı)">
+                                                            <InfoCircleOutlined style={{ color: '#888' }} />
+                                                        </Tooltip>
+                                                    </span>
+                                                }
+                                            >
+                                                <InputNumber style={{ width: '100%' }} placeholder="örn: 411" />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col span={12}>
+                                            <Form.Item
+                                                name="trendyolBrandId"
+                                                label={
+                                                    <span>Marka ID{' '}
+                                                        <Tooltip title="Trendyol marka ID (sayısal). Örn: 102 (Markasız)">
+                                                            <InfoCircleOutlined style={{ color: '#888' }} />
+                                                        </Tooltip>
+                                                    </span>
+                                                }
+                                            >
+                                                <InputNumber style={{ width: '100%' }} placeholder="örn: 102" />
+                                            </Form.Item>
+                                        </Col>
+                                    </Row>
+                                    <Form.Item name="defaultVatRate" label="KDV Oranı (%)">
+                                        <InputNumber min={1} max={20} defaultValue={10} style={{ width: 100 }} addonAfter="%" />
+                                    </Form.Item>
+                                </>
+                            )}
+
+                            {/* N11 product creation config */}
+                            {platformConfig[selectedPlatform].extraFields === 'n11' && (
+                                <>
+                                    <Divider orientation="left" style={{ fontSize: 13 }}>
+                                        Ürün Oluşturma Ayarları
+                                    </Divider>
+                                    <Form.Item
+                                        name="n11CategoryId"
+                                        label={
+                                            <span>N11 Kategori ID{' '}
+                                                <Tooltip title="N11 kategori kodu. N11 Satıcı Paneli &gt; Ürünler &gt; Kategori seçiminden bulabilirsiniz.">
+                                                    <InfoCircleOutlined style={{ color: '#888' }} />
+                                                </Tooltip>
+                                            </span>
+                                        }
+                                    >
+                                        <Input placeholder="örn: 1006890" />
+                                    </Form.Item>
+                                    <Form.Item name="defaultVatRate" label="KDV Oranı (%)">
+                                        <InputNumber min={1} max={20} defaultValue={10} style={{ width: 100 }} addonAfter="%" />
+                                    </Form.Item>
+                                </>
                             )}
 
                             <Form.Item>

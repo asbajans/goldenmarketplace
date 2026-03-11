@@ -7,6 +7,7 @@ import Subscription from './Subscription';
 import Integration from './Integration';
 import MarketplaceIntegration from './MarketplaceIntegration';
 import GlobalSetting from './GlobalSetting';
+import ProductMarketplaceListing from './ProductMarketplaceListing';
 
 // User <-> Store (One-to-One)
 User.hasOne(Store, { foreignKey: 'userId', as: 'store' });
@@ -24,6 +25,10 @@ Integration.belongsTo(Store, { foreignKey: 'storeId', as: 'store' });
 User.hasMany(Subscription, { foreignKey: 'userId', as: 'subscriptions' });
 Subscription.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
+// Product <-> ProductMarketplaceListing (One-to-Many)
+Product.hasMany(ProductMarketplaceListing, { foreignKey: 'productId', as: 'marketplaceListings' });
+ProductMarketplaceListing.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+
 // Export all models
 export {
     User,
@@ -34,5 +39,6 @@ export {
     Subscription,
     Integration,
     MarketplaceIntegration,
-    GlobalSetting
+    GlobalSetting,
+    ProductMarketplaceListing
 };
