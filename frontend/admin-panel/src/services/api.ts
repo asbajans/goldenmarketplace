@@ -87,6 +87,14 @@ export const AdminAPI = {
     // Settings
     getSettings: () => api.get('/settings').then((res) => res.data),
     updateSettings: (data: any) => api.post('/settings', data).then((res) => res.data),
+
+    // Gold Price (manual admin control)
+    getGoldPrice: () => axios.get(`${API_URL}/gold-price/current`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    }).then((res) => res.data),
+    setGoldPrice: (pricePerGramTRY: number, usdTryRate?: number) => axios.post(`${API_URL}/gold-price/set`, { pricePerGramTRY, usdTryRate }, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' }
+    }).then((res) => res.data),
 };
 
 export default api;

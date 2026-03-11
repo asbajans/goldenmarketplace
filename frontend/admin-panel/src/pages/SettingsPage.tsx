@@ -5,6 +5,7 @@ import { AdminAPI } from '../services/api';
 
 interface GoldPriceInfo {
     pricePerGramTRY: number;
+    usdTryRate?: number;
     source: string;
     timestamp: string;
 }
@@ -41,35 +42,29 @@ export default function SettingsPage() {
 
     const fetchGoldPrice = async () => {
         try {
-            const res = await fetch('/api/gold-price/current');
-            if (res.ok) {
-                const data = await res.json();
-                setGoldPrice(data);
+            const data = await AdminAPI.getGoldPrice();
+            setGoldPrice(data);
+            if (data.pricePerGramTRY) {
+                goldForm.setFieldsValue({
+                    pricePerGramTRY: data.pricePerGramTRY,
+                    usdTryRate: data.usdTryRate || 38.5
+                });
             }
         } catch (err) {
             // no-op
         }
     };
 
-    const handleSaveGoldPrice = async (values: { pricePerGramTRY: number }) => {
+    const handleSaveGoldPrice = async (values: { pricePerGramTRY: number; usdTryRate: number }) => {
         try {
             setSavingGold(true);
             setSyncResult(null);
-            const res = await fetch('/api/gold-price/set', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: JSON.stringify({ pricePerGramTRY: values.pricePerGramTRY })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Hata oluştu');
+            const data = await AdminAPI.setGoldPrice(values.pricePerGramTRY, values.usdTryRate);
             message.success(data.message);
             setSyncResult(data.message);
-            fetchGoldPrice(); // Refresh displayed price
+            fetchGoldPrice();
         } catch (error: any) {
-            message.error(error.message || 'Altın fiyatı kaydedilemedi.');
+            message.error(error.response?.data?.error || error.message || 'Altın fiyatı kaydedilemedi.');
         } finally {
             setSavingGold(false);
         }
@@ -148,6 +143,24 @@ export default function SettingsPage() {
                             placeholder="örn: 3150.00"
                             style={{ width: 200 }}
                             addonAfter="₺/gram"
+                        />
+                    </Form.Item>
+                    <Form.Item
+                        name="usdTryRate"
+                        label="USD/TRY Kuru"
+                        rules={[
+                            { required: true, message: 'Dolar kuru zorunludur' },
+                            { type: 'number', min: 1, message: 'Geçerli bir kur girin' }
+                        ]}
+                    >
+                        <InputNumber
+                            min={1}
+                            max={9999}
+                            step={0.1}
+                            precision={2}
+                            placeholder="örn: 38.50"
+                            style={{ width: 150 }}
+                            addonAfter="₺/$"
                         />
                     </Form.Item>
                     <Form.Item>
