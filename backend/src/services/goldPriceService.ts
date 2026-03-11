@@ -1,226 +1,171 @@
 /**
  * Gold Price Service
- * Fetches REAL gold prices from goldprice.org and exchange rates from exchangerate-api.com
- * Both APIs are free and require no API key.
+ *
+ * Manual Mode: Admin sets the gold price (24K TRY/gram) via admin panel.
+ * It is stored in GlobalSettings with key "gold_price_try_per_gram".
+ * When the price changes, all product prices are recalculated and
+ * marketplace sync is triggered automatically.
  *
  * Core formula: gramWeight × (milyem/1000) × gold24KGramPriceTRY × (1 + profitMargin/100)
  */
 
-import axios from 'axios';
 import NodeCache from 'node-cache';
-import dotenv from 'dotenv';
 
-dotenv.config();
-
-const goldCache = new NodeCache({ stdTTL: 3600 }); // Cache for 1 hour
+const goldCache = new NodeCache({ stdTTL: 3600 });
 
 interface GoldPrice {
-  pricePerGramTRY: number;  // 24K gram price in TRY
-  pricePerOzTRY: number;    // Price per troy ounce in TRY
-  usdTryRate: number;       // USD/TRY exchange rate
+  pricePerGramTRY: number;
   timestamp: Date;
-  source: string;           // Which API provided the data
+  source: string;
 }
-
-const TROY_OUNCE_IN_GRAMS = 31.1035;
 
 export class GoldPriceService {
 
   /**
-   * Fetch current 24K gold price per gram in TRY
-   * Primary source: goldprice.org (free, no key)
-   * Exchange rate: exchangerate-api.com (free, no key)
+   * Get current 24K gold price per gram in TRY from GlobalSettings.
+   * Returns fallback if not set.
    */
   async getCurrentGoldPrice(): Promise<GoldPrice> {
-    try {
-      const cached = goldCache.get<GoldPrice>('gold_price');
-      if (cached) return cached;
+    const cached = goldCache.get<GoldPrice>('gold_price');
+    if (cached) return cached;
 
-      // Fetch gold price and exchange rate in parallel
-      const [goldData, usdTryRate] = await Promise.all([
-        this.fetchGoldPriceFromGoldPriceOrg(),
-        this.fetchUsdTryRate()
-      ]);
+    return this.loadFromDB();
+  }
+
+  /**
+   * Load price from GlobalSettings DB
+   */
+  private async loadFromDB(): Promise<GoldPrice> {
+    try {
+      const { GlobalSetting } = require('../models/GlobalSetting');
+      const setting = await GlobalSetting.findOne({ where: { key: 'gold_price_try_per_gram' } });
+      const price = setting?.value ? parseFloat(setting.value) : 0;
+
+      if (!price || price <= 0) {
+        console.warn('[GoldPrice] No manual price set in admin panel. Using fallback 3100 TRY/gram.');
+        return this.getFallback();
+      }
 
       const result: GoldPrice = {
-        pricePerGramTRY: Math.round(goldData.pricePerGramTRY * 100) / 100,
-        pricePerOzTRY: Math.round(goldData.pricePerOzTRY * 100) / 100,
-        usdTryRate: Math.round(usdTryRate * 100) / 100,
+        pricePerGramTRY: price,
         timestamp: new Date(),
-        source: goldData.source
+        source: 'manual-admin'
       };
 
-      goldCache.set('gold_price', result);
-      console.log(`[GoldPrice] Fetched: 24K Gram = ${result.pricePerGramTRY} TRY | USD/TRY = ${result.usdTryRate} | Source: ${result.source}`);
+      goldCache.set('gold_price', result, 60 * 60 * 24); // Cache 24h
+      console.log(`[GoldPrice] Loaded manual price: ${price} TRY/gram`);
       return result;
     } catch (error) {
-      console.error('[GoldPrice] All sources failed:', error);
-      // Last resort fallback - should rarely happen
-      return this.getHardcodedFallback();
+      console.error('[GoldPrice] Failed to load from DB:', error);
+      return this.getFallback();
     }
   }
 
+  private getFallback(): GoldPrice {
+    return { pricePerGramTRY: 3100, timestamp: new Date(), source: 'hardcoded-fallback' };
+  }
+
   /**
-   * Primary: goldprice.org - Free, no API key, reliable
-   * Returns XAU price in TRY per troy ounce
+   * Called when admin sets a new gold price.
+   * Clears cache and re-calculates all product prices, then triggers marketplace sync.
    */
-  private async fetchGoldPriceFromGoldPriceOrg(): Promise<{ pricePerGramTRY: number; pricePerOzTRY: number; source: string }> {
-    try {
-      const response = await axios.get('https://data-asg.goldprice.org/dbXRates/TRY', {
-        timeout: 10000,
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'GoldenMarketplace/1.0'
-        }
-      });
-
-      const xauPriceTRY = response.data?.items?.[0]?.xauPrice;
-      if (!xauPriceTRY || xauPriceTRY <= 0) {
-        throw new Error('Invalid gold price from goldprice.org');
-      }
-
-      return {
-        pricePerOzTRY: xauPriceTRY,
-        pricePerGramTRY: xauPriceTRY / TROY_OUNCE_IN_GRAMS,
-        source: 'goldprice.org'
-      };
-    } catch (error) {
-      console.error('[GoldPrice] goldprice.org failed:', error);
-      // Fallback: try with USD and convert
-      return this.fetchGoldPriceFromGoldPriceOrgUSD();
+  async setManualGoldPrice(priceTRYPerGram: number): Promise<{ updatedCount: number; goldPrice: GoldPrice }> {
+    if (!priceTRYPerGram || priceTRYPerGram <= 0) {
+      throw new Error('Geçersiz altın fiyatı. Pozitif bir sayı girin.');
     }
-  }
 
-  /**
-   * Fallback: goldprice.org with USD, then convert using exchange rate
-   */
-  private async fetchGoldPriceFromGoldPriceOrgUSD(): Promise<{ pricePerGramTRY: number; pricePerOzTRY: number; source: string }> {
-    try {
-      const [goldResponse, usdTryRate] = await Promise.all([
-        axios.get('https://data-asg.goldprice.org/dbXRates/USD', { timeout: 10000 }),
-        this.fetchUsdTryRate()
-      ]);
-
-      const xauPriceUSD = goldResponse.data?.items?.[0]?.xauPrice;
-      if (!xauPriceUSD || xauPriceUSD <= 0) {
-        throw new Error('Invalid USD gold price');
-      }
-
-      const pricePerOzTRY = xauPriceUSD * usdTryRate;
-      return {
-        pricePerOzTRY,
-        pricePerGramTRY: pricePerOzTRY / TROY_OUNCE_IN_GRAMS,
-        source: 'goldprice.org (USD→TRY)'
-      };
-    } catch (error) {
-      console.error('[GoldPrice] USD fallback also failed:', error);
-      throw error;
+    // 1. Save to GlobalSettings
+    const { GlobalSetting } = require('../models/GlobalSetting');
+    const existing = await GlobalSetting.findOne({ where: { key: 'gold_price_try_per_gram' } });
+    if (existing) {
+      await existing.update({ value: String(priceTRYPerGram) });
+    } else {
+      await GlobalSetting.create({ key: 'gold_price_try_per_gram', value: String(priceTRYPerGram), isPublic: true });
     }
-  }
 
-  /**
-   * Fetch USD/TRY exchange rate from exchangerate-api.com (free, no key)
-   */
-  private async fetchUsdTryRate(): Promise<number> {
-    const cachedRate = goldCache.get<number>('usd_try_rate');
-    if (cachedRate) return cachedRate;
-
-    try {
-      const response = await axios.get('https://api.exchangerate-api.com/v4/latest/USD', {
-        timeout: 10000
-      });
-
-      const rate = response.data?.rates?.TRY;
-      if (!rate || rate <= 0) {
-        throw new Error('Invalid TRY rate');
-      }
-
-      goldCache.set('usd_try_rate', rate, 3600);
-      return rate;
-    } catch (error) {
-      console.error('[GoldPrice] Exchange rate API failed:', error);
-      // Fallback: try alternative
-      try {
-        const response = await axios.get('https://open.er-api.com/v6/latest/USD', { timeout: 10000 });
-        const rate = response.data?.rates?.TRY;
-        if (rate && rate > 0) {
-          goldCache.set('usd_try_rate', rate, 3600);
-          return rate;
-        }
-      } catch (e) {
-        console.error('[GoldPrice] Fallback exchange rate also failed:', e);
-      }
-      throw new Error('All exchange rate sources failed');
-    }
-  }
-
-  /**
-   * Hard-coded fallback - used only when ALL APIs fail
-   */
-  private getHardcodedFallback(): GoldPrice {
-    console.warn('[GoldPrice] Using hardcoded fallback! Check API connectivity.');
-    return {
-      pricePerGramTRY: 3100,
-      pricePerOzTRY: 96421,
-      usdTryRate: 36.5,
-      timestamp: new Date(),
-      source: 'hardcoded-fallback'
-    };
-  }
-
-  /**
-   * Force refresh cache (useful for manual trigger)
-   */
-  async forceRefresh(): Promise<GoldPrice> {
+    // 2. Clear cache to force fresh load
     goldCache.del('gold_price');
-    goldCache.del('usd_try_rate');
-    return this.getCurrentGoldPrice();
+    const gold = await this.loadFromDB();
+
+    // 3. Recalculate all product prices
+    const updatedCount = await this.updateProductPricesInternal(gold);
+    console.log(`[GoldPrice] Manual price set to ${priceTRYPerGram} TRY/gram. Updated ${updatedCount} products.`);
+
+    // 4. Trigger marketplace sync in background (don't await to respond fast)
+    this.triggerMarketplaceSync();
+
+    return { updatedCount, goldPrice: gold };
   }
 
   /**
-   * Calculate product price from gram weight, milyem, and profit margin
-   * Formula: gramWeight × (milyem / 1000) × 24K gram TRY × (1 + profitMargin/100)
+   * Trigger marketplace price sync in background
    */
-  async calculateProductPrice(gramWeight: number, milyem: number, profitMargin: number = 0): Promise<{ priceTRY: number; priceUSD: number }> {
-    const gold = await this.getCurrentGoldPrice();
-    const materialCost = gramWeight * (milyem / 1000) * gold.pricePerGramTRY;
-    const priceTRY = materialCost * (1 + profitMargin / 100);
-    const priceUSD = priceTRY / gold.usdTryRate;
-    return {
-      priceTRY: Math.round(priceTRY * 100) / 100,
-      priceUSD: Math.round(priceUSD * 100) / 100
-    };
+  private triggerMarketplaceSync() {
+    try {
+      const marketplacePriceSyncService = require('./marketplacePriceSyncService').default;
+      marketplacePriceSyncService.syncAll()
+        .then((result: any) => console.log(`[GoldPrice] Marketplace sync done. Synced: ${result.synced}, Failed: ${result.failed}`, result.errors?.length ? result.errors : ''))
+        .catch((err: any) => console.error('[GoldPrice] Marketplace sync error:', err.message));
+    } catch (err: any) {
+      console.error('[GoldPrice] Could not trigger marketplace sync:', err.message);
+    }
   }
 
   /**
-   * Update ALL active product prices based on current gold rate
-   * Called hourly by goldPriceJob
+   * Internal: update all product prices based on a given gold price
    */
-  async updateProductPrices(): Promise<{ updatedCount: number; goldPrice: GoldPrice }> {
-    console.log('[GoldPrice] Starting hourly price update...');
-
-    // Force fresh data for the hourly update
-    const gold = await this.forceRefresh();
-    console.log(`[GoldPrice] 24K Gram: ${gold.pricePerGramTRY} TRY | USD/TRY: ${gold.usdTryRate} | Source: ${gold.source}`);
-
+  private async updateProductPricesInternal(gold: GoldPrice): Promise<number> {
     const Product = require('../models/Product').default;
     const products = await Product.findAll({ where: { isActive: true } });
     let updatedCount = 0;
 
     for (const product of products) {
-      const { priceTRY, priceUSD } = await this.calculateProductPrice(
+      const { priceTRY } = this.calculatePrice(
         Number(product.gramWeight),
         Number(product.milyem),
-        Number(product.profitMargin || 0)
+        Number(product.profitMargin || 0),
+        gold.pricePerGramTRY
       );
-
-      // Always update to keep prices current
-      await product.update({ priceTRY, priceUSD });
+      await product.update({ priceTRY });
       updatedCount++;
     }
 
-    console.log(`[GoldPrice] Updated ${updatedCount} product prices.`);
+    return updatedCount;
+  }
+
+  /**
+   * Calculate product price from gram weight, milyem, and profit margin
+   */
+  calculatePrice(gramWeight: number, milyem: number, profitMargin: number = 0, goldPricePerGram: number): { priceTRY: number } {
+    const materialCost = gramWeight * (milyem / 1000) * goldPricePerGram;
+    const priceTRY = materialCost * (1 + profitMargin / 100);
+    return { priceTRY: Math.round(priceTRY * 100) / 100 };
+  }
+
+  /**
+   * Calculate product price using current gold price from DB
+   */
+  async calculateProductPrice(gramWeight: number, milyem: number, profitMargin: number = 0): Promise<{ priceTRY: number; priceUSD: number }> {
+    const gold = await this.getCurrentGoldPrice();
+    const { priceTRY } = this.calculatePrice(gramWeight, milyem, profitMargin, gold.pricePerGramTRY);
+    return { priceTRY, priceUSD: Math.round((priceTRY / 36.5) * 100) / 100 };
+  }
+
+  /**
+   * @deprecated Not needed in manual mode. Kept for backwards compatibility.
+   */
+  async updateProductPrices(): Promise<{ updatedCount: number; goldPrice: GoldPrice }> {
+    const gold = await this.getCurrentGoldPrice();
+    const updatedCount = await this.updateProductPricesInternal(gold);
     return { updatedCount, goldPrice: gold };
+  }
+
+  /**
+   * @deprecated Not needed in manual mode - no cache to bust from API.
+   */
+  async forceRefresh(): Promise<GoldPrice> {
+    goldCache.del('gold_price');
+    return this.loadFromDB();
   }
 }
 

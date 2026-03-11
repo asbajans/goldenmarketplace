@@ -1,9 +1,15 @@
 
 import Queue from 'bull';
-import goldPriceService from '../services/goldPriceService';
-import marketplacePriceSyncService from '../services/marketplacePriceSyncService';
 
-// Create a queue for gold price updates
+/**
+ * GoldPriceJob — DISABLED (Manual Mode)
+ *
+ * Gold price is now set manually by the admin via the admin panel.
+ * When the admin saves the gold price, product prices are updated immediately
+ * and marketplace sync is triggered automatically.
+ *
+ * The hourly cron is no longer needed.
+ */
 export const goldPriceQueue = process.env.REDIS_URL
     ? new Queue('gold-price-updates', process.env.REDIS_URL)
     : new Queue('gold-price-updates', {
@@ -14,42 +20,13 @@ export const goldPriceQueue = process.env.REDIS_URL
         }
     });
 
-// Process the job
-goldPriceQueue.process(async (_job) => {
-    console.log('[GoldPriceJob] Processing hourly price update...');
-    try {
-        const result = await goldPriceService.updateProductPrices();
-        console.log(`[GoldPriceJob] Done. Updated ${result.updatedCount} products. 24K Gram: ${result.goldPrice.pricePerGramTRY} TRY`);
-
-        // Trigger marketplace price sync right after gold price update
-        console.log('[GoldPriceJob] Triggering marketplace price sync...');
-        const syncResult = await marketplacePriceSyncService.syncAll();
-        console.log(`[GoldPriceJob] Marketplace sync done. Synced: ${syncResult.synced}, Failed: ${syncResult.failed}`);
-        if (syncResult.errors.length > 0) {
-            console.warn('[GoldPriceJob] Sync errors:', syncResult.errors);
-        }
-    } catch (error) {
-        console.error('[GoldPriceJob] Failed:', error);
-        throw error;
-    }
-});
-
-// Function to initialize the cron job
 export const initGoldPriceJob = async () => {
-    // Remove existing repeatable jobs to avoid duplicates on restart
+    // Remove any previously scheduled repeatable jobs
     const jobs = await goldPriceQueue.getRepeatableJobs();
     for (const job of jobs) {
         await goldPriceQueue.removeRepeatableByKey(job.key);
     }
-
-    // Every hour at minute 0
-    await goldPriceQueue.add({}, {
-        repeat: {
-            cron: '0 * * * *' // Every hour
-        }
-    });
-
-    console.log('[GoldPriceJob] Scheduled: Every hour (0 * * * *)');
+    console.log('[GoldPriceJob] Hourly cron disabled — gold price is now set manually via admin panel.');
 };
 
 export default goldPriceQueue;

@@ -4,7 +4,7 @@ import goldPriceService from '../services/goldPriceService';
 
 export class GoldPriceController {
     /**
-     * Get current 24K gold price per gram in TRY + USD/TRY rate
+     * Get current 24K gold price per gram in TRY
      */
     static async getCurrentPrice(_req: Request, res: Response) {
         try {
@@ -12,6 +12,27 @@ export class GoldPriceController {
             return res.status(200).json(price);
         } catch (error) {
             return res.status(500).json({ error: 'Failed to fetch gold price' });
+        }
+    }
+
+    /**
+     * Set manual gold price (admin only)
+     * Body: { pricePerGramTRY: number }
+     */
+    static async setGoldPrice(req: Request, res: Response) {
+        try {
+            const { pricePerGramTRY } = req.body;
+            if (!pricePerGramTRY || isNaN(Number(pricePerGramTRY)) || Number(pricePerGramTRY) <= 0) {
+                return res.status(400).json({ error: 'Geçersiz fiyat. Pozitif bir sayı girin.' });
+            }
+            const result = await goldPriceService.setManualGoldPrice(Number(pricePerGramTRY));
+            return res.status(200).json({
+                message: `Altın fiyatı güncellendi: ${pricePerGramTRY} TRY/gram. ${result.updatedCount} ürün fiyatı güncellendi. Pazaryeri senkronizasyonu başlatıldı.`,
+                updatedCount: result.updatedCount,
+                goldPrice: result.goldPrice
+            });
+        } catch (error: any) {
+            return res.status(400).json({ error: error.message || 'Altın fiyatı kaydedilemedi' });
         }
     }
 
@@ -34,7 +55,6 @@ export class GoldPriceController {
                 gramWeight: Number(gramWeight),
                 milyem: Number(milyem),
                 gold24KGramTRY: gold.pricePerGramTRY,
-                usdTryRate: gold.usdTryRate,
                 priceTRY,
                 priceUSD
             });
@@ -44,12 +64,12 @@ export class GoldPriceController {
     }
 
     /**
-     * Force refresh gold price cache and return fresh data
+     * Force refresh — reads latest manual price from DB
      */
     static async forceRefresh(_req: Request, res: Response) {
         try {
             const price = await goldPriceService.forceRefresh();
-            return res.status(200).json({ message: 'Cache refreshed', ...price });
+            return res.status(200).json({ message: 'Price refreshed from DB', ...price });
         } catch (error) {
             return res.status(500).json({ error: 'Failed to refresh gold price' });
         }
