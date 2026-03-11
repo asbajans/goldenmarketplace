@@ -45,17 +45,17 @@ export class TrendyolClient {
     /**
      * Verify connection — 401 = bad credentials, 403 = auth OK but no permission (treat as success)
      */
-    async verifyConnection(sellerId: string): Promise<{ success: boolean; sellerName?: string }> {
+    async verifyConnection(_sellerId: string): Promise<{ success: boolean; sellerName?: string }> {
         try {
             await this.client.get(`/addresses`);
-            return { success: true, sellerName: `Trendyol Satici (${sellerId})` };
+            return { success: true, sellerName: `Trendyol Satici (${this.sellerId})` };
         } catch (error: any) {
             const status = error.response?.status;
             if (status === 401) {
                 throw new Error(`Trendyol kimlik dogrulama hatasi: API Key veya Secret yanlis (401)`);
             }
             if (status === 403) {
-                return { success: true, sellerName: `Trendyol Satici (${sellerId})` };
+                return { success: true, sellerName: `Trendyol Satici (${this.sellerId})` };
             }
             throw new Error(`Trendyol baglanti hatasi: ${error.response?.data?.message || error.message}`);
         }
