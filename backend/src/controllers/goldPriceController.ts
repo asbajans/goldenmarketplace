@@ -21,11 +21,14 @@ export class GoldPriceController {
      */
     static async setGoldPrice(req: Request, res: Response) {
         try {
-            const { pricePerGramTRY } = req.body;
+            const { pricePerGramTRY, usdTryRate } = req.body;
             if (!pricePerGramTRY || isNaN(Number(pricePerGramTRY)) || Number(pricePerGramTRY) <= 0) {
                 return res.status(400).json({ error: 'Geçersiz fiyat. Pozitif bir sayı girin.' });
             }
-            const result = await goldPriceService.setManualGoldPrice(Number(pricePerGramTRY));
+            const result = await goldPriceService.setManualGoldPrice(
+                Number(pricePerGramTRY),
+                usdTryRate ? Number(usdTryRate) : undefined
+            );
             return res.status(200).json({
                 message: `Altın fiyatı güncellendi: ${pricePerGramTRY} TRY/gram. ${result.updatedCount} ürün fiyatı güncellendi. Pazaryeri senkronizasyonu başlatıldı.`,
                 updatedCount: result.updatedCount,

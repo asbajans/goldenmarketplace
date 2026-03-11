@@ -70,7 +70,9 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         try {
             const res = await client.get('/gold-price/current');
             setGold24KGramTRY(res.data.pricePerGramTRY);
-            setUsdTryRate(res.data.usdTryRate);
+            if (res.data.usdTryRate && res.data.usdTryRate > 0) {
+                setUsdTryRate(res.data.usdTryRate);
+            }
         } catch (error) {
             console.error('Gold price fetch error', error);
         }
@@ -332,7 +334,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
 
                 <div style={{ marginTop: 8, textAlign: 'center' }}>
                     <Text type="secondary" style={{ fontSize: '0.75em' }}>
-                        <InfoCircleOutlined /> Formül: Gram × (Milyem ÷ 1000) × 24K Kur × (1 + Kâr%). Fiyatlar saatte 1 güncellenir.
+                        <InfoCircleOutlined /> Formül: Gram × (Milyem ÷ 1000) × 24K Kur × (1 + Kâr%). Altın fiyatı admin tarafından güncellenir.
                     </Text>
                 </div>
             </Card>
@@ -380,7 +382,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 </Form.Item>
                 <div style={{ marginTop: 8, padding: '8px 12px', background: '#f0f2f5', borderRadius: 4 }}>
                     <Text type="secondary" style={{ fontSize: '0.85em' }}>
-                        <DoubleRightOutlined /> Fiyatlar saatte 1 güncellenir ve bağlı pazaryerlerine otomatik senkronize edilir.
+                        <DoubleRightOutlined /> Altın fiyatı güncellendiğinde bağlı pazaryerlerine otomatik senkronize edilir.
                         Bağlı olmayan platformları <a href="/integrations">Entegrasyonlar</a> sayfasından bağlayabilirsiniz.
                     </Text>
                 </div>
