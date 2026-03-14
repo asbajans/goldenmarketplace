@@ -59,15 +59,15 @@ export class PazaramaClient {
         }
 
         try {
-            const credentials = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString('base64');
             const data = qs.stringify({
                 grant_type: 'client_credentials',
+                client_id: this.clientId,
+                client_secret: this.clientSecret,
                 scope: 'merchantgatewayapi.fullaccess'
             });
 
             const response = await axios.post(this.authUrl, data, {
                 headers: {
-                    'Authorization': `Basic ${credentials}`,
                     'Content-Type': 'application/x-www-form-urlencoded'
                 }
             });
@@ -89,7 +89,7 @@ export class PazaramaClient {
      */
     async verifyConnection(): Promise<{ success: boolean; accountName?: string }> {
         try {
-            await this.client.get('/product/brandlist?page=1&size=1');
+            await this.client.get('/api/Product/GetBrandList?page=1&size=1');
             return { success: true, accountName: 'Pazarama Hesabı' };
         } catch (error: any) {
             if (error.response?.status === 401 || error.message.includes('Token')) {
@@ -105,7 +105,7 @@ export class PazaramaClient {
     async updatePrices(items: PazaramaPriceUpdateItem[]): Promise<void> {
         if (!items || items.length === 0) return;
         try {
-            const response = await this.client.post('/product/updatePrice-v2', items);
+            const response = await this.client.post('/api/Product/UpdatePrice-v2', items);
             const batchId = response.data?.batchId || response.data?.batchRequestId || '';
             console.log(`[Pazarama] PRICE UPDATE submitted for ${items.length} item(s). Batch: ${batchId}`);
         } catch (error: any) {
@@ -121,7 +121,7 @@ export class PazaramaClient {
     async updateStock(items: PazaramaStockUpdateItem[]): Promise<void> {
         if (!items || items.length === 0) return;
         try {
-            const response = await this.client.post('/product/updateStock-v2', items);
+            const response = await this.client.post('/api/Product/UpdateStock-v2', items);
             const batchId = response.data?.batchId || response.data?.batchRequestId || '';
             console.log(`[Pazarama] STOCK UPDATE submitted for ${items.length} item(s). Batch: ${batchId}`);
         } catch (error: any) {
