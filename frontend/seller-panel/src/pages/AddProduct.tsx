@@ -48,6 +48,7 @@ const ALL_PLATFORMS = [
     { key: 'trendyol', name: 'Trendyol', color: '#F27A1A' },
     { key: 'hepsiburada', name: 'Hepsiburada', color: '#FF6000' },
     { key: 'n11', name: 'N11', color: '#5333ED' },
+    { key: 'pazarama', name: 'Pazarama', color: '#E4002B' },
 ];
 
 const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => {

@@ -15,6 +15,7 @@ import Store from '../models/Store';
 import TrendyolClient from '../integrations/trendyol/trendyolClient';
 import HepsiburadaClient, { HepsiburadaProduct } from '../integrations/hepsiburada/hepsiburadaClient';
 import N11Client from '../integrations/n11/n11Client';
+import PazaramaClient from '../integrations/pazarama/pazaramaClient';
 
 class MarketplacePriceSyncService {
 
@@ -76,6 +77,9 @@ class MarketplacePriceSyncService {
                 break;
             case 'n11':
                 await this.syncN11(integration, products);
+                break;
+            case 'pazarama':
+                await this.syncPazarama(integration, products);
                 break;
             case 'etsy':
             case 'amazon':
@@ -164,6 +168,38 @@ class MarketplacePriceSyncService {
             console.log(`[N11] Price sync: updated ${items.length} products.`);
         } else {
             console.log(`[N11] No active listings to update.`);
+        }
+    }
+
+    /**
+     * Pazarama: update prices for all active products (uses external code / barcode)
+     */
+    private async syncPazarama(integration: MarketplaceIntegration, products: Product[]): Promise<void> {
+        const { apiKey, apiSecret } = integration;
+        if (!apiKey || !apiSecret) return;
+
+        const client = new PazaramaClient(apiKey, apiSecret);
+        const items = [];
+
+        for (const product of products) {
+            const listing = await ProductMarketplaceListing.findOne({
+                where: { productId: product.id, platform: 'pazarama', status: 'active' }
+            });
+            if (!listing) {
+                continue;
+            }
+            items.push({
+                code: listing.externalCode || product.sku,
+                listPrice: Math.round(Number(product.priceTRY) * 1.1 * 100) / 100,
+                salePrice: Number(product.priceTRY)
+            });
+        }
+
+        if (items.length > 0) {
+            await client.updatePrices(items);
+            console.log(`[Pazarama] Price sync: updated ${items.length} products.`);
+        } else {
+            console.log(`[Pazarama] No active listings to update.`);
         }
     }
 }

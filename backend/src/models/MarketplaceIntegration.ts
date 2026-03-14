@@ -5,7 +5,7 @@ import sequelize from '../config/database';
 export class MarketplaceIntegration extends Model {
     public id!: string;
     public userId!: string;
-    public platform!: 'etsy' | 'amazon' | 'trendyol' | 'hepsiburada' | 'n11';
+    public platform!: 'etsy' | 'amazon' | 'trendyol' | 'hepsiburada' | 'n11' | 'pazarama';
     public apiKey!: string;
     public apiSecret!: string;
     public accessToken?: string;
@@ -20,6 +20,9 @@ export class MarketplaceIntegration extends Model {
     public trendyolBrandId?: number;
     // N11 product creation config
     public n11CategoryId?: string;
+    // Pazarama product creation config
+    public pazaramaCategoryId?: string;
+    public pazaramaBrandId?: string;
     // Default VAT rate for product creation (10 or 20)
     public defaultVatRate?: number;
     public readonly createdAt!: Date;
@@ -38,7 +41,7 @@ MarketplaceIntegration.init(
             allowNull: false
         },
         platform: {
-            type: DataTypes.ENUM('etsy', 'amazon', 'trendyol', 'hepsiburada', 'n11'),
+            type: DataTypes.ENUM('etsy', 'amazon', 'trendyol', 'hepsiburada', 'n11', 'pazarama'),
             allowNull: false
         },
         apiKey: {
@@ -91,6 +94,16 @@ MarketplaceIntegration.init(
             type: DataTypes.STRING,
             allowNull: true,
             comment: 'N11 category ID for product creation'
+        },
+        pazaramaCategoryId: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            comment: 'Pazarama category ID for product creation'
+        },
+        pazaramaBrandId: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            comment: 'Pazarama brand ID for product creation'
         },
         defaultVatRate: {
             type: DataTypes.INTEGER,

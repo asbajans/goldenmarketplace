@@ -3,6 +3,7 @@ import EtsyClient from '../integrations/etsy/etsyClient';
 import TrendyolClient from '../integrations/trendyol/trendyolClient';
 import HepsiburadaClient from '../integrations/hepsiburada/hepsiburadaClient';
 import N11Client from '../integrations/n11/n11Client';
+import PazaramaClient from '../integrations/pazarama/pazaramaClient';
 
 class IntegrationService {
     /**
@@ -77,6 +78,13 @@ class IntegrationService {
             const client = new N11Client(integration.apiKey, integration.apiSecret);
             await client.verifyConnection();
             return { status: 'success', message: `N11 bağlantısı çalışıyor!` };
+        }
+
+        if (platform === 'pazarama') {
+            if (!integration.apiKey || !integration.apiSecret) throw new Error('Pazarama Client ID veya API Secret eksik');
+            const client = new PazaramaClient(integration.apiKey, integration.apiSecret);
+            const result = await client.verifyConnection();
+            return { status: 'success', message: `Pazarama bağlantısı çalışıyor! Hesap: ${result.accountName}` };
         }
 
         if (platform === 'amazon') {

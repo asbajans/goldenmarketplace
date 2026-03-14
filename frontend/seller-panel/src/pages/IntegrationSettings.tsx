@@ -22,6 +22,7 @@ const platforms = [
     { key: 'trendyol', name: 'Trendyol', color: '#F27A1A', icon: <ShopOutlined /> },
     { key: 'hepsiburada', name: 'Hepsiburada', color: '#FF6000', icon: <ShopOutlined /> },
     { key: 'n11', name: 'N11', color: '#5333ED', icon: <ShopOutlined /> },
+    { key: 'pazarama', name: 'Pazarama', color: '#E4002B', icon: <ShopOutlined /> },
     { key: 'amazon', name: 'Amazon', color: '#FF9900', icon: <ShopOutlined /> },
 ];
 
@@ -31,7 +32,7 @@ const platformConfig: Record<string, {
     shopIdLabel?: string;
     shopIdRequired?: boolean;
     helpUrl: string;
-    extraFields?: 'trendyol' | 'n11';
+    extraFields?: 'trendyol' | 'n11' | 'pazarama';
 }> = {
     trendyol: {
         apiKeyLabel: 'API Key (Trendyol Entegrasyon Paneli)',
@@ -53,6 +54,12 @@ const platformConfig: Record<string, {
         apiSecretLabel: 'App Secret',
         helpUrl: 'https://apiportal.n11.com',
         extraFields: 'n11'
+    },
+    pazarama: {
+        apiKeyLabel: 'Client ID',
+        apiSecretLabel: 'Client Secret',
+        helpUrl: 'https://isortagim.pazarama.com/auth/integration',
+        extraFields: 'pazarama'
     },
     amazon: {
         apiKeyLabel: 'LWA Client ID',
@@ -353,6 +360,51 @@ const IntegrationSettings: React.FC = () => {
                                     >
                                         <Input placeholder="örn: 1006890" />
                                     </Form.Item>
+                                    <Form.Item name="defaultVatRate" label="KDV Oranı (%)">
+                                        <InputNumber min={1} max={20} defaultValue={10} style={{ width: 100 }} addonAfter="%" />
+                                    </Form.Item>
+                                </>
+                            )}
+
+                            {/* Pazarama product creation config */}
+                            {platformConfig[selectedPlatform].extraFields === 'pazarama' && (
+                                <>
+                                    <Divider orientation="left" style={{ fontSize: 13 }}>
+                                        Ürün Oluşturma Ayarları
+                                    </Divider>
+                                    <p style={{ color: '#888', fontSize: 12, marginBottom: 12 }}>
+                                        Pazarama'da yeni ürün oluşturmak için kategori ve marka ID gereklidir (Alfasayısal veya Sayısal).
+                                    </p>
+                                    <Row gutter={12}>
+                                        <Col span={12}>
+                                            <Form.Item
+                                                name="pazaramaCategoryId"
+                                                label={
+                                                    <span>Kategori ID{' '}
+                                                        <Tooltip title="Pazarama kategori ID. Entegre paneli / Kategori listesinden bulabilirsiniz.">
+                                                            <InfoCircleOutlined style={{ color: '#888' }} />
+                                                        </Tooltip>
+                                                    </span>
+                                                }
+                                            >
+                                                <Input style={{ width: '100%' }} placeholder="örn: CATEGORY-1" />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col span={12}>
+                                            <Form.Item
+                                                name="pazaramaBrandId"
+                                                label={
+                                                    <span>Marka ID{' '}
+                                                        <Tooltip title="Pazarama marka ID. Entegre paneli / Marka listesinden bulabilirsiniz.">
+                                                            <InfoCircleOutlined style={{ color: '#888' }} />
+                                                        </Tooltip>
+                                                    </span>
+                                                }
+                                            >
+                                                <Input style={{ width: '100%' }} placeholder="örn: BRAND-1" />
+                                            </Form.Item>
+                                        </Col>
+                                    </Row>
                                     <Form.Item name="defaultVatRate" label="KDV Oranı (%)">
                                         <InputNumber min={1} max={20} defaultValue={10} style={{ width: 100 }} addonAfter="%" />
                                     </Form.Item>

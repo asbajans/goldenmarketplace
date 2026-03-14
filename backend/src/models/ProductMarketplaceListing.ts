@@ -16,7 +16,7 @@ import sequelize from '../config/database';
 export class ProductMarketplaceListing extends Model {
     public id!: string;
     public productId!: string;
-    public platform!: 'trendyol' | 'n11' | 'hepsiburada';
+    public platform!: 'trendyol' | 'n11' | 'hepsiburada' | 'pazarama';
     public externalId?: string;      // Marketplace-assigned product ID
     public externalCode!: string;    // Barcode / stock code used for updates
     public batchRequestId?: string;  // Trendyol batch request ID
@@ -39,7 +39,7 @@ ProductMarketplaceListing.init(
             allowNull: false
         },
         platform: {
-            type: DataTypes.ENUM('trendyol', 'n11', 'hepsiburada'),
+            type: DataTypes.ENUM('trendyol', 'n11', 'hepsiburada', 'pazarama'),
             allowNull: false
         },
         externalId: {

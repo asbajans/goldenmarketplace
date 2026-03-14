@@ -54,6 +54,8 @@ export class MarketplaceIntegrationFactory {
         return new TrendyolIntegration(config);
       case 'n11':
         return new N11Integration(config);
+      case 'pazarama':
+        return new PazaramaIntegration(config);
       default:
         throw new Error(`Unknown marketplace: ${name}`);
     }
@@ -241,6 +243,49 @@ class TrendyolIntegration extends BaseMarketplaceIntegration {
 
 class N11Integration extends BaseMarketplaceIntegration {
   name = 'N11';
+
+  async authenticate(): Promise<boolean> {
+    return true;
+  }
+
+  async listProducts(): Promise<MarketplaceProduct[]> {
+    return [];
+  }
+
+  async createProduct(product: MarketplaceProduct): Promise<string> {
+    void product;
+    return '';
+  }
+
+  async updateProduct(productId: string, product: Partial<MarketplaceProduct>): Promise<boolean> {
+    void productId; void product;
+    return true;
+  }
+
+  async deleteProduct(productId: string): Promise<boolean> {
+    void productId;
+    return true;
+  }
+
+  async updatePrice(productId: string, price: number): Promise<boolean> {
+    void productId; void price;
+    return true;
+  }
+
+  async syncInventory(productId: string, quantity: number): Promise<boolean> {
+    void productId; void quantity;
+    return true;
+  }
+
+  async getOrders(): Promise<any[]> {
+    return [];
+  }
+
+  async handleWebhook(payload: any): Promise<void> { void payload; }
+}
+
+class PazaramaIntegration extends BaseMarketplaceIntegration {
+  name = 'Pazarama';
 
   async authenticate(): Promise<boolean> {
     return true;
