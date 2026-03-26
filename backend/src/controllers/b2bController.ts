@@ -21,7 +21,7 @@ export class B2BController {
       const products = await Product.findAll({
         where: { isB2BEnabled: true, isActive: true },
         include: [
-          { model: Store, as: 'store', attributes: ['id', 'name'] }
+          { model: Store, as: 'store', attributes: ['id', ['storeName', 'name']] }
         ],
         order: [['createdAt', 'DESC']]
       });
@@ -63,7 +63,7 @@ export class B2BController {
       if (!productId) return res.status(400).json({ error: 'productId gerekli' });
 
       const product = await Product.findByPk(productId, {
-        include: [{ model: Store, as: 'store', attributes: ['id', 'name'] }]
+        include: [{ model: Store, as: 'store', attributes: ['id', ['storeName', 'name']] }]
       });
       if (!product || !product.isB2BEnabled) {
         return res.status(404).json({ error: 'B2B ürün bulunamadı' });
@@ -120,7 +120,7 @@ export class B2BController {
           {
             model: Store,
             as: 'requesterStore',
-            attributes: ['id', 'name']
+            attributes: ['id', ['storeName', 'name']]
           }
         ],
         order: [['createdAt', 'DESC']]
@@ -153,7 +153,7 @@ export class B2BController {
           {
             model: Store,
             as: 'ownerStore',
-            attributes: ['id', 'name']
+            attributes: ['id', ['storeName', 'name']]
           }
         ],
         order: [['createdAt', 'DESC']]
