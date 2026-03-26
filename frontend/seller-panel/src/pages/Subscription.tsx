@@ -18,7 +18,7 @@ const Subscription: React.FC = () => {
     const fetchPlans = async () => {
         try {
             const data = await getSubscriptionPlans();
-            setPlans(data);
+            setPlans(Array.isArray(data) ? data : ((data as any)?.data || []));
         } catch (error) {
             console.error('Failed to fetch plans', error);
             message.error('Planlar yüklenemedi.');
