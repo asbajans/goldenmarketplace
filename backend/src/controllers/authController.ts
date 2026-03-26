@@ -7,6 +7,7 @@ import { Request, Response } from 'express';
 import User from '../models/User';
 import JWTService from '../utils/jwt';
 import PasswordService from '../utils/password';
+import Store from '../models/Store';
 
 export class AuthController {
   /**
@@ -78,7 +79,10 @@ export class AuthController {
       const { email, password } = req.body;
 
       // Find user
-      const user = await User.findOne({ where: { email } });
+      const user = await User.findOne({ 
+        where: { email },
+        include: [{ model: Store, as: 'store' }]
+      });
       if (!user) {
         return res.status(401).json({
           error: {
@@ -114,7 +118,8 @@ export class AuthController {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          userType: user.userType
+          userType: user.userType,
+          store: (user as any).store
         }
       });
     } catch (error) {
@@ -179,7 +184,9 @@ export class AuthController {
    */
   static async getCurrentUser(req: Request, res: Response) {
     try {
-      const user = await User.findByPk(req.user?.id);
+      const user = await User.findByPk(req.user?.id, {
+        include: [{ model: Store, as: 'store' }]
+      });
 
       if (!user) {
         return res.status(404).json({
@@ -197,7 +204,8 @@ export class AuthController {
           firstName: user.firstName,
           lastName: user.lastName,
           userType: user.userType,
-          isActive: user.isActive
+          isActive: user.isActive,
+          store: (user as any).store
         }
       });
     } catch (error) {

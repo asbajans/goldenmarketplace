@@ -170,11 +170,19 @@ export class ProductController {
         isB2BEnabled, b2bDiscount
       } = req.body;
 
+      const user = (req as any).user;
       const product = await Product.findByPk(id);
       if (!product) {
         return res.status(404).json({
           error: { message: 'Product not found', status: 404 }
         });
+      }
+
+      if (user.role !== 'admin') {
+        const store = await Store.findOne({ where: { userId: user.id } });
+        if (!store || store.id !== product.storeId) {
+          return res.status(403).json({ error: { message: 'Unauthorized: You can only edit your own products', status: 403 } });
+        }
       }
 
       // Recalculate prices if gram/milyem changed
@@ -244,11 +252,19 @@ export class ProductController {
     try {
       const { id } = req.params;
 
+      const user = (req as any).user;
       const product = await Product.findByPk(id);
       if (!product) {
         return res.status(404).json({
           error: { message: 'Product not found', status: 404 }
         });
+      }
+
+      if (user.role !== 'admin') {
+        const store = await Store.findOne({ where: { userId: user.id } });
+        if (!store || store.id !== product.storeId) {
+          return res.status(403).json({ error: { message: 'Unauthorized: You can only delete your own products', status: 403 } });
+        }
       }
 
       await product.destroy();

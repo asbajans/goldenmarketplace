@@ -9,8 +9,8 @@ import { validateRequest, schemas } from '../utils/validation';
 
 const router = express.Router();
 
-// Public routes
-router.get('/', ProductController.getProducts);
+// Use authMiddleware so we always know the user. If they are seller, productController restricts fetch.
+router.get('/', authMiddleware, ProductController.getProducts);
 
 // Protected routes
 router.post('/', authMiddleware, sellerMiddleware, validateRequest(schemas.createProduct), ProductController.createProduct);
