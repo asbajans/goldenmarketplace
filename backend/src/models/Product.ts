@@ -20,6 +20,9 @@ interface ProductAttributes {
   profitMargin: number;
   priceTRY: number;
   priceUSD: number;
+  isB2BEnabled: boolean;
+  b2bDiscount: number;
+  b2bPrice: number;
   quantity: number;
   images: string[];
   videoUrl?: string;
@@ -43,6 +46,9 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public profitMargin!: number;
   public priceTRY!: number;
   public priceUSD!: number;
+  public isB2BEnabled!: boolean;
+  public b2bDiscount!: number;
+  public b2bPrice!: number;
   public quantity!: number;
   public images!: string[];
   public videoUrl?: string;
@@ -116,6 +122,23 @@ Product.init(
       allowNull: false,
       defaultValue: 0,
       comment: 'Calculated: priceTRY / USD-TRY rate'
+    },
+    isB2BEnabled: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      comment: 'When true, product is visible in B2B marketplace discovery'
+    },
+    b2bDiscount: {
+      type: DataTypes.DECIMAL(5, 2),
+      allowNull: false,
+      defaultValue: 0,
+      comment: 'B2B discount percentage off priceTRY'
+    },
+    b2bPrice: {
+      type: DataTypes.DECIMAL(15, 2),
+      allowNull: false,
+      defaultValue: 0,
+      comment: 'Calculated: priceTRY × (1 - b2bDiscount/100)'
     },
     quantity: {
       type: DataTypes.INTEGER,

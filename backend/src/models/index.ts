@@ -8,6 +8,7 @@ import Integration from './Integration';
 import MarketplaceIntegration from './MarketplaceIntegration';
 import GlobalSetting from './GlobalSetting';
 import ProductMarketplaceListing from './ProductMarketplaceListing';
+import B2BRequest from './B2BRequest';
 
 // User <-> Store (One-to-One)
 User.hasOne(Store, { foreignKey: 'userId', as: 'store' });
@@ -29,6 +30,14 @@ Subscription.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 Product.hasMany(ProductMarketplaceListing, { foreignKey: 'productId', as: 'marketplaceListings' });
 ProductMarketplaceListing.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 
+// B2BRequest associations
+Product.hasMany(B2BRequest, { foreignKey: 'productId', as: 'b2bRequests' });
+B2BRequest.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+Store.hasMany(B2BRequest, { foreignKey: 'requesterStoreId', as: 'outgoingB2BRequests' });
+B2BRequest.belongsTo(Store, { foreignKey: 'requesterStoreId', as: 'requesterStore' });
+Store.hasMany(B2BRequest, { foreignKey: 'ownerStoreId', as: 'incomingB2BRequests' });
+B2BRequest.belongsTo(Store, { foreignKey: 'ownerStoreId', as: 'ownerStore' });
+
 // Export all models
 export {
     User,
@@ -40,5 +49,6 @@ export {
     Integration,
     MarketplaceIntegration,
     GlobalSetting,
-    ProductMarketplaceListing
+    ProductMarketplaceListing,
+    B2BRequest
 };

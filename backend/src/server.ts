@@ -58,7 +58,8 @@ app.set('trust proxy', 1);
 app.use(helmet());
 app.use(cors({
   origin: [
-    'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175',
+    'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176',
+    'https://asb.web.tr', 'https://seller.asb.web.tr', 'https://admin.asb.web.tr',
     'https://app.goldencrafters.com', 'https://seller.goldencrafters.com', 'https://admin.goldencrafters.com'
   ],
   credentials: true
@@ -88,6 +89,7 @@ app.use('/api/subscriptions', require('./routes/subscriptions').default || requi
 app.use('/api/integrations', require('./routes/integrations').default || require('./routes/integrations'));
 app.use('/api/feed', require('./routes/feed').default || require('./routes/feed'));
 app.use('/api/admin', require('./routes/admin').default || require('./routes/admin'));
+app.use('/api/b2b', require('./routes/b2b').default || require('./routes/b2b'));
 
 // Error handling middleware
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

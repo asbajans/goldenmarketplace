@@ -9,7 +9,9 @@ import {
   PlusCircleOutlined,
   LogoutOutlined,
   CreditCardOutlined,
-  SyncOutlined
+  SyncOutlined,
+  CompassOutlined,
+  FileTextOutlined
 } from '@ant-design/icons';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
@@ -20,6 +22,8 @@ import AddProduct from './pages/AddProduct';
 import Subscription from './pages/Subscription';
 import SubscriptionSuccess from './pages/SubscriptionSuccess';
 import IntegrationSettings from './pages/IntegrationSettings';
+import B2BMarket from './pages/B2BMarket';
+import B2BRequests from './pages/B2BRequests';
 import { getCurrentUser, logout } from './api/auth';
 
 const { Header, Sider, Content } = Layout;
@@ -74,6 +78,18 @@ const App: React.FC = () => {
       icon: <PlusCircleOutlined />,
       label: 'Ürün Ekle',
       onClick: () => navigate('/products/add')
+    },
+    {
+      key: '/b2b/market',
+      icon: <CompassOutlined />,
+      label: 'B2B Ürün Keşfet',
+      onClick: () => navigate('/b2b/market')
+    },
+    {
+      key: '/b2b/requests',
+      icon: <FileTextOutlined />,
+      label: 'B2B Talepleri',
+      onClick: () => navigate('/b2b/requests')
     },
     {
       key: '/integrations',
@@ -147,6 +163,8 @@ const App: React.FC = () => {
             <Route path="/products" element={<ProductList />} />
             <Route path="/products/add" element={<AddProduct onSuccess={() => navigate('/products')} />} />
             <Route path="/products/edit/:id" element={<AddProduct onSuccess={() => navigate('/products')} />} />
+            <Route path="/b2b/market" element={<B2BMarket />} />
+            <Route path="/b2b/requests" element={<B2BRequests />} />
             <Route path="/integrations" element={<IntegrationSettings />} />
             <Route path="/subscription" element={<Subscription />} />
             <Route path="/subscription/success" element={<SubscriptionSuccess />} />

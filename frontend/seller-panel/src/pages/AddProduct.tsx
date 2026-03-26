@@ -58,6 +58,8 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [usdTryRate, setUsdTryRate] = useState<number>(38.5);
     const [priceTRY, setPriceTRY] = useState<number>(0);
     const [priceUSD, setPriceUSD] = useState<number>(0);
+    const [b2bPrice, setB2bPrice] = useState<number>(0);
+    const [isB2BEnabled, setIsB2BEnabled] = useState(false);
     const [tags, setTags] = useState<string[]>([]);
     const [integrations, setIntegrations] = useState<Integration[]>([]);
     const [integrationsLoading, setIntegrationsLoading] = useState(true);
@@ -90,20 +92,24 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         }
     };
 
-    const calculateLivePrice = useCallback((gramWeight?: number, milyem?: number, profitMargin?: number) => {
+    const calculateLivePrice = useCallback((gramWeight?: number, milyem?: number, profitMargin?: number, b2bDiscount?: number) => {
         const gw = gramWeight || 0;
         const ml = milyem || 0;
         const pm = profitMargin || 0;
+        const bd = b2bDiscount || 0;
 
         if (gw > 0 && ml > 0 && gold24KGramTRY > 0) {
             const materialCost = gw * (ml / 1000) * gold24KGramTRY;
             const tl = materialCost * (1 + pm / 100);
             const usd = tl / usdTryRate;
+            const b2b = tl * (1 - bd / 100);
             setPriceTRY(Math.round(tl * 100) / 100);
             setPriceUSD(Math.round(usd * 100) / 100);
+            setB2bPrice(Math.round(b2b * 100) / 100);
         } else {
             setPriceTRY(0);
             setPriceUSD(0);
+            setB2bPrice(0);
         }
     }, [gold24KGramTRY, usdTryRate]);
 
@@ -127,19 +133,29 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const onFinish = async (values: any) => {
         setLoading(true);
         try {
+            const b2bDiscount = values.b2bDiscount || 0;
+            const computedB2bPrice = isB2BEnabled && b2bDiscount > 0
+                ? Math.round(priceTRY * (1 - b2bDiscount / 100) * 100) / 100
+                : priceTRY;
+
             await createProduct({
                 ...values,
                 profitMargin: values.profitMargin || 0,
                 quantity: Number(values.quantity || 0),
                 tags,
                 images: [],
-                marketplaces: values.marketplaces || ['golden']
+                marketplaces: values.marketplaces || ['golden'],
+                isB2BEnabled,
+                b2bDiscount: isB2BEnabled ? b2bDiscount : 0,
+                b2bPrice: computedB2bPrice
             });
 
             message.success('Ürün başarıyla kaydedildi!');
             form.resetFields();
             setPriceTRY(0);
             setPriceUSD(0);
+            setB2bPrice(0);
+            setIsB2BEnabled(false);
             setTags([]);
             onSuccess();
         } catch (error: any) {
@@ -179,8 +195,8 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             }}
             onFinish={onFinish}
             onValuesChange={(changed, allValues) => {
-                if (changed.gramWeight !== undefined || changed.milyem !== undefined || changed.profitMargin !== undefined) {
-                    calculateLivePrice(allValues.gramWeight, allValues.milyem, allValues.profitMargin);
+                if (changed.gramWeight !== undefined || changed.milyem !== undefined || changed.profitMargin !== undefined || changed.b2bDiscount !== undefined) {
+                    calculateLivePrice(allValues.gramWeight, allValues.milyem, allValues.profitMargin, allValues.b2bDiscount);
                 }
             }}
         >
@@ -307,6 +323,48 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 </Row>
 
                 <Divider style={{ margin: '12px 0' }} />
+
+                {/* B2B Section */}
+                <div style={{ background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
+                    <Checkbox
+                        checked={isB2BEnabled}
+                        onChange={e => setIsB2BEnabled(e.target.checked)}
+                        style={{ fontWeight: 600, color: '#389e0d' }}
+                    >
+                        🤝 B2B'ye Açık — Diğer satıcılar bu ürünü kendi mağazalarına ekleyebilsin
+                    </Checkbox>
+                    {isB2BEnabled && (
+                        <Row gutter={16} style={{ marginTop: 12 }}>
+                            <Col span={12}>
+                                <Form.Item
+                                    name="b2bDiscount"
+                                    label={<><PercentageOutlined /> B2B İskonto (%)</>}
+                                    rules={[{ required: true, message: 'B2B iskontosu gerekli' }]}
+                                >
+                                    <InputNumber
+                                        style={{ width: '100%' }}
+                                        min={0}
+                                        max={99}
+                                        step={1}
+                                        placeholder="20"
+                                        addonAfter="%"
+                                    />
+                                </Form.Item>
+                            </Col>
+                            <Col span={12}>
+                                <Card size="small" style={{ background: '#d9f7be', border: '1px solid #73d13d', textAlign: 'center' }}>
+                                    <Statistic
+                                        title="B2B Satış Fiyatı (TL)"
+                                        value={b2bPrice}
+                                        precision={2}
+                                        suffix="₺"
+                                        valueStyle={{ color: '#389e0d', fontWeight: 'bold' }}
+                                    />
+                                </Card>
+                            </Col>
+                        </Row>
+                    )}
+                </div>
 
                 <Row gutter={16}>
                     <Col span={12}>
