@@ -18,7 +18,7 @@ export class FeedController {
                 limit: 500
             });
 
-            const siteUrl = process.env.SITE_URL || 'https://app.goldencrafters.com';
+            const siteUrl = process.env.SITE_URL || 'https://asb.web.tr';
 
             let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">
@@ -73,7 +73,7 @@ export class FeedController {
                 limit: 500
             });
 
-            const siteUrl = process.env.SITE_URL || 'https://app.goldencrafters.com';
+            const siteUrl = process.env.SITE_URL || 'https://asb.web.tr';
 
             const catalog = products.map(product => ({
                 id: product.id,

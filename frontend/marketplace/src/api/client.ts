@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-const isProd = typeof window !== 'undefined' && window.location.hostname.includes('goldencrafters.com');
-const API_URL = import.meta.env.VITE_API_BASE_URL || (isProd ? 'https://api.goldencrafters.com/api' : 'http://localhost:777/api');
+const isProd = typeof window !== 'undefined' && window.location.hostname.includes('asb.web.tr');
+const API_URL = import.meta.env.VITE_API_BASE_URL || (isProd ? 'https://api.asb.web.tr/api' : 'http://localhost:777/api');
 
 const client = axios.create({
     baseURL: API_URL,

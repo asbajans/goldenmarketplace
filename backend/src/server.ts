@@ -60,7 +60,7 @@ app.use(cors({
   origin: [
     'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176',
     'https://asb.web.tr', 'https://seller.asb.web.tr', 'https://admin.asb.web.tr',
-    'https://app.goldencrafters.com', 'https://seller.goldencrafters.com', 'https://admin.goldencrafters.com'
+    'https://asb.web.tr', 'https://seller.asb.web.tr', 'https://admin.asb.web.tr'
   ],
   credentials: true
 }));

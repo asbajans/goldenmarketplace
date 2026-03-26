@@ -126,7 +126,7 @@ async function syncToTrendyol(integration: any, product: any, _trigger: string) 
 
         const images = Array.isArray(product.images) && product.images.length > 0
             ? product.images.map((url: string) => ({ url }))
-            : [{ url: 'https://placeholder.goldencrafters.com/product.jpg' }];
+            : [{ url: 'https://asb.web.tr/product.jpg' }];
 
         const item: TrendyolCreateProductItem = {
             barcode: product.sku,

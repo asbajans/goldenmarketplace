@@ -115,7 +115,7 @@ export class IntegrationController {
             const setting = await GlobalSetting.findOne({ where: { key: 'etsy_api_key' } });
             const clientId = setting?.value || '';
 
-            const apiBaseUrl = process.env.API_URL || 'https://api.goldencrafters.com/api';
+            const apiBaseUrl = process.env.API_URL || 'https://api.asb.web.tr/api';
             const redirectUri = `${apiBaseUrl}/integrations/etsy/callback`;
             const scopes = 'listings_r listings_w listings_d profile_r email_r transactions_r transactions_w';
 

@@ -20,7 +20,7 @@ const getBaseURL = () => {
 
     // 4. Production fallback
     console.warn('[API] Falling back to production URL');
-    return 'https://api.goldencrafters.com/api';
+    return 'https://api.asb.web.tr/api';
 };
 
 const API_URL = getBaseURL();
