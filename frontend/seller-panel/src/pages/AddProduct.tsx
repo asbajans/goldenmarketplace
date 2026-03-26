@@ -168,7 +168,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
 
     // Build marketplace options from all platforms + mark connected ones
     const marketplaceOptions = ALL_PLATFORMS.map(p => {
-        const isConnected = p.key === 'golden' || integrations.some(i => i.platform === p.key && i.isActive);
+        const isConnected = p.key === 'golden' || (integrations || []).some((i: any) => i.platform === p.key && i.isActive);
         return {
             label: (
                 <span>
