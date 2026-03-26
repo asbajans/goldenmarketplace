@@ -47,8 +47,9 @@ const B2BMarket: React.FC = () => {
   const fetchProducts = async () => {
     try {
       const { data } = await getB2BProducts();
-      setProducts(data);
-      setFiltered(data);
+      const productsData = Array.isArray(data) ? data : ((data as any)?.data || []);
+      setProducts(productsData);
+      setFiltered(productsData);
     } catch {
       message.error('B2B ürünler yüklenemedi');
     } finally {

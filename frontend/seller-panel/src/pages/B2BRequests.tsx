@@ -39,7 +39,7 @@ const B2BRequests: React.FC = () => {
   const fetchIncoming = async () => {
     try {
       const { data } = await getIncomingRequests();
-      setIncoming(data);
+      setIncoming(Array.isArray(data) ? data : ((data as any)?.data || []));
     } catch {
       message.error('Gelen talepler yüklenemedi');
     } finally {
@@ -50,7 +50,7 @@ const B2BRequests: React.FC = () => {
   const fetchOutgoing = async () => {
     try {
       const { data } = await getOutgoingRequests();
-      setOutgoing(data);
+      setOutgoing(Array.isArray(data) ? data : ((data as any)?.data || []));
     } catch {
       message.error('Gönderilen talepler yüklenemedi');
     } finally {
