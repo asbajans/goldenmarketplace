@@ -33,13 +33,7 @@ const CATEGORIES = [
     'Tam Altın', 'Pırlanta', 'Gümüş', 'Diğer'
 ];
 
-const MILYEM_OPTIONS = [
-    { value: 333, label: '333 Milyem (8 Ayar)' },
-    { value: 585, label: '585 Milyem (14 Ayar)' },
-    { value: 750, label: '750 Milyem (18 Ayar)' },
-    { value: 916, label: '916 Milyem (22 Ayar)' },
-    { value: 999, label: '999 Milyem (24 Ayar / Has Altın)' },
-];
+
 
 const ALL_PLATFORMS = [
     { key: 'golden', name: 'Golden Marketplace', color: '#d4a017' },
@@ -100,7 +94,16 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         const pm = profitMargin || 0;
         const bd = b2bDiscount || 0;
 
-        if (gw > 0 && ml > 0 && gold24KGramTRY > 0) {
+        if (isCloned) {
+            const initialMargin = initialValues?.profitMargin || 0;
+            const initialPriceTRY = initialValues?.priceTRY || 0;
+            const b2bCost = initialPriceTRY / (1 + initialMargin / 100);
+            const tl = b2bCost * (1 + pm / 100);
+            const usd = tl / usdTryRate;
+            setPriceTRY(Math.round(tl * 100) / 100);
+            setPriceUSD(Math.round(usd * 100) / 100);
+            setB2bPrice(0);
+        } else if (gw > 0 && ml > 0 && gold24KGramTRY > 0) {
             const materialCost = gw * (ml / 1000) * gold24KGramTRY;
             const tl = materialCost * (1 + pm / 100);
             const usd = tl / usdTryRate;
@@ -113,7 +116,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             setPriceUSD(0);
             setB2bPrice(0);
         }
-    }, [gold24KGramTRY, usdTryRate]);
+    }, [gold24KGramTRY, usdTryRate, isCloned, initialValues]);
 
     const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const title = e.target.value;
@@ -296,13 +299,16 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                         <Form.Item
                             name="milyem"
                             label="Milyem (Saflık)"
-                            rules={[{ required: true, message: 'Milyem seçiniz' }]}
+                            rules={[{ required: true, message: 'Milyem giriniz' }]}
                         >
-                            <Select placeholder="Milyem Seçin" disabled={isCloned}>
-                                {MILYEM_OPTIONS.map(m => (
-                                    <Option key={m.value} value={m.value}>{m.label}</Option>
-                                ))}
-                            </Select>
+                            <InputNumber 
+                                placeholder="Örn: 916" 
+                                disabled={isCloned} 
+                                style={{ width: '100%' }}
+                                min={1}
+                                max={1000}
+                                step={1}
+                            />
                         </Form.Item>
                     </Col>
                     <Col span={6}>

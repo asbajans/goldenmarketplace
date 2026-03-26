@@ -242,12 +242,12 @@ export class B2BController {
       });
       if (!originalProduct) return res.status(404).json({ error: 'Orijinal ürün bulunamadı' });
 
-      const { profitMargin, marketplaces, quantity = 1 } = req.body;
+      const { profitMargin, marketplaces } = req.body;
       if (profitMargin === undefined) return res.status(400).json({ error: 'Kâr oranı gerekli' });
 
-      const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(
-        originalProduct.gramWeight, originalProduct.milyem, profitMargin
-      );
+      const priceTRY = Math.round(originalProduct.b2bPrice * (1 + profitMargin / 100) * 100) / 100;
+      const currentGold = await goldPriceService.getCurrentGoldPrice();
+      const priceUSD = Math.round((priceTRY / currentGold.usdTryRate) * 100) / 100;
 
       const ownerName = (originalProduct as any).store?.dataValues?.name || 'B2B Tedarikçisi';
       const b2bDescription = originalProduct.description + `\n\n---\nBu ürün B2B tedarik ağından (${ownerName}) listelenmektedir.`;
@@ -269,12 +269,13 @@ export class B2BController {
         isB2BEnabled: false,
         b2bDiscount: 0,
         b2bPrice: 0,
-        quantity,
+        quantity: originalProduct.quantity,
         images: originalProduct.images,
         videoUrl: originalProduct.videoUrl,
         marketplaces: marketplaces || [],
         tags: [...(originalProduct.tags || []), 'B2B'],
         originalStoreName: ownerName,
+        originalProductId: originalProduct.id,
         isActive: true
       });
 

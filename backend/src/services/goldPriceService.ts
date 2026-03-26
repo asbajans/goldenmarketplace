@@ -136,15 +136,38 @@ export class GoldPriceService {
     const products = await Product.findAll({ where: { isActive: true } });
     let updatedCount = 0;
 
-    for (const product of products) {
+    const nonClones = products.filter((p: any) => !p.originalProductId);
+    const clones = products.filter((p: any) => !!p.originalProductId);
+
+    // Update original products first
+    for (const product of nonClones) {
       const { priceTRY } = this.calculatePrice(
         Number(product.gramWeight),
         Number(product.milyem),
         Number(product.profitMargin || 0),
         gold.pricePerGramTRY
       );
-      await product.update({ priceTRY });
+      const b2bPrice = product.isB2BEnabled ? Math.round(priceTRY * (1 - (product.b2bDiscount || 0) / 100) * 100) / 100 : 0;
+      const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
+      await product.update({ priceTRY, b2bPrice, priceUSD });
       updatedCount++;
+    }
+
+    // Now update clones using the new B2B prices of their parents
+    for (const clone of clones) {
+      const parent = nonClones.find((p: any) => p.id === clone.originalProductId);
+      if (parent && parent.b2bPrice > 0) {
+        const priceTRY = Math.round(parent.b2bPrice * (1 + (clone.profitMargin || 0) / 100) * 100) / 100;
+        const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
+        await clone.update({ priceTRY, priceUSD });
+        updatedCount++;
+      } else if (parent && parent.priceTRY > 0) {
+        // Fallback if parent has no b2bPrice (e.g. b2b disabled later)
+        const priceTRY = Math.round(parent.priceTRY * (1 + (clone.profitMargin || 0) / 100) * 100) / 100;
+        const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
+        await clone.update({ priceTRY, priceUSD });
+        updatedCount++;
+      }
     }
 
     return updatedCount;

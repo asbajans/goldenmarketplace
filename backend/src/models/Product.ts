@@ -29,6 +29,7 @@ interface ProductAttributes {
   marketplaces?: string[];
   tags?: string[];
   originalStoreName?: string;
+  originalProductId?: string;
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -56,6 +57,7 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public marketplaces?: string[];
   public tags?: string[];
   public originalStoreName?: string;
+  public originalProductId?: string;
   public isActive!: boolean;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -170,6 +172,11 @@ Product.init(
       type: DataTypes.STRING,
       allowNull: true,
       comment: 'If cloned from B2B, tracks original stock owner name'
+    },
+    originalProductId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      comment: 'Reference to the B2B supplier product for automatic pricing & stock sync'
     },
     isActive: {
       type: DataTypes.BOOLEAN,

@@ -187,13 +187,47 @@ export class ProductController {
 
       const isCloned = !!product.originalStoreName;
 
-      // Recalculate prices if gram/milyem changed
+      let finalQuantity = product.quantity;
+      if (isCloned) {
+        finalQuantity = product.quantity; // Lock clone quantity
+      } else if (quantity !== undefined) {
+        finalQuantity = quantity;
+        if (finalQuantity !== product.quantity) {
+           await Product.update({ quantity: finalQuantity }, { where: { originalProductId: id } });
+        }
+      }
+
+      let finalPriceTRY, finalPriceUSD, finalB2bPrice;
+      const finalProfitMargin = profitMargin !== undefined ? profitMargin : product.profitMargin;
       const finalGramWeight = isCloned ? product.gramWeight : (gramWeight || product.gramWeight);
       const finalMilyem = isCloned ? product.milyem : (milyem || product.milyem);
-      const finalProfitMargin = profitMargin !== undefined ? profitMargin : product.profitMargin;
-      const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(
-        Number(finalGramWeight), Number(finalMilyem), Number(finalProfitMargin)
-      );
+      
+      if (isCloned && product.originalProductId) {
+         const parent = await Product.findByPk(product.originalProductId);
+         if (parent && parent.b2bPrice > 0) {
+            finalPriceTRY = Math.round(parent.b2bPrice * (1 + finalProfitMargin / 100) * 100) / 100;
+         } else if (parent && parent.priceTRY > 0) {
+            finalPriceTRY = Math.round(parent.priceTRY * (1 + finalProfitMargin / 100) * 100) / 100;
+         } else {
+            const { priceTRY } = await goldPriceService.calculateProductPrice(
+              Number(finalGramWeight), Number(finalMilyem), Number(finalProfitMargin)
+            );
+            finalPriceTRY = priceTRY;
+         }
+         const currentGold = await goldPriceService.getCurrentGoldPrice();
+         finalPriceUSD = Math.round((finalPriceTRY / currentGold.usdTryRate) * 100) / 100;
+         finalB2bPrice = 0;
+      } else {
+        const calcRes = await goldPriceService.calculateProductPrice(
+          Number(finalGramWeight), Number(finalMilyem), Number(finalProfitMargin)
+        );
+        finalPriceTRY = calcRes.priceTRY;
+        finalPriceUSD = calcRes.priceUSD;
+        
+        const finalIsB2BEnabled = isB2BEnabled !== undefined ? !!isB2BEnabled : product.isB2BEnabled;
+        const finalB2bDiscount = b2bDiscount !== undefined ? b2bDiscount : product.b2bDiscount;
+        finalB2bPrice = Math.round(finalPriceTRY * (1 - (finalIsB2BEnabled ? finalB2bDiscount : 0) / 100) * 100) / 100;
+      }
 
       const tags = ProductController.generateTags(
         isCloned ? product.title : (title || product.title),
@@ -202,7 +236,6 @@ export class ProductController {
 
       const finalIsB2BEnabled = isCloned ? false : (isB2BEnabled !== undefined ? !!isB2BEnabled : product.isB2BEnabled);
       const finalB2bDiscount = isCloned ? 0 : (b2bDiscount !== undefined ? b2bDiscount : product.b2bDiscount);
-      const finalB2bPrice = isCloned ? 0 : Math.round(priceTRY * (1 - (finalIsB2BEnabled ? finalB2bDiscount : 0) / 100) * 100) / 100;
 
       await product.update({
         title: isCloned ? product.title : (title || product.title),
@@ -211,12 +244,12 @@ export class ProductController {
         gramWeight: finalGramWeight,
         milyem: finalMilyem,
         profitMargin: finalProfitMargin,
-        priceTRY,
-        priceUSD,
+        priceTRY: finalPriceTRY,
+        priceUSD: finalPriceUSD,
         isB2BEnabled: finalIsB2BEnabled,
-        b2bDiscount: finalIsB2BEnabled ? finalB2bDiscount : 0,
+        b2bDiscount: finalB2bDiscount,
         b2bPrice: finalB2bPrice,
-        quantity: quantity !== undefined ? quantity : product.quantity,
+        quantity: finalQuantity,
         images: isCloned ? product.images : (images || product.images),
         videoUrl: isCloned ? product.videoUrl : (videoUrl !== undefined ? videoUrl : product.videoUrl),
         marketplaces: marketplaces || product.marketplaces,

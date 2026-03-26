@@ -17,6 +17,7 @@ export interface Product {
     marketplaces?: string[];
     tags?: string[];
     originalStoreName?: string;
+    originalProductId?: string;
     isActive: boolean;
 }
 

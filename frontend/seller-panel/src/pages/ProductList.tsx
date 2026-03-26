@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Space, message, Modal } from 'antd';
+import { Table, Button, Space, message, Modal, Tabs, Tag } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { getProducts, deleteProduct, Product } from '../api/product';
 import AddProduct from './AddProduct'; // We will create this next
@@ -99,6 +99,35 @@ const ProductList: React.FC = () => {
         }
     ];
 
+    const myProducts = products.filter(p => !p.originalProductId && !p.originalStoreName);
+    const b2bProducts = products.filter(p => p.originalProductId || p.originalStoreName);
+
+    const tableProps = (data: Product[]) => ({
+        dataSource: data,
+        columns: columns,
+        rowKey: "id",
+        loading: loading,
+        pagination: { pageSize: 15 }
+    });
+
+    const tabItems = [
+        {
+            key: 'my-products',
+            label: `Kendi Ürünlerim (${myProducts.length})`,
+            children: <Table {...tableProps(myProducts)} />
+        },
+        {
+            key: 'b2b-products',
+            label: (
+                <span>
+                    Tedarik Edilenler (B2B)
+                    <Tag color="orange" style={{ marginLeft: 8, borderRadius: 10 }}>{b2bProducts.length}</Tag>
+                </span>
+            ),
+            children: <Table {...tableProps(b2bProducts)} />
+        }
+    ];
+
     return (
         <div>
             <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
@@ -108,12 +137,7 @@ const ProductList: React.FC = () => {
                 </Button>
             </div>
 
-            <Table
-                dataSource={products}
-                columns={columns}
-                rowKey="id"
-                loading={loading}
-            />
+            <Tabs defaultActiveKey="my-products" items={tabItems} />
 
             <Modal
                 title={editingProduct ? "Ürün Düzenle" : "Yeni Ürün Ekle"}
