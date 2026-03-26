@@ -96,7 +96,7 @@ const IntegrationSettings: React.FC = () => {
     const fetchIntegrations = async () => {
         try {
             const { data } = await client.get('/integrations');
-            setIntegrations(data);
+            setIntegrations(Array.isArray(data) ? data : ((data as any)?.data || []));
         } catch (error) {
             console.error('Failed to fetch integrations', error);
         } finally {
