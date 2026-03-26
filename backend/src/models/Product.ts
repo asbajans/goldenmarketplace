@@ -28,6 +28,7 @@ interface ProductAttributes {
   videoUrl?: string;
   marketplaces?: string[];
   tags?: string[];
+  originalStoreName?: string;
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -54,6 +55,7 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public videoUrl?: string;
   public marketplaces?: string[];
   public tags?: string[];
+  public originalStoreName?: string;
   public isActive!: boolean;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -163,6 +165,11 @@ Product.init(
       type: DataTypes.JSON,
       allowNull: true,
       defaultValue: []
+    },
+    originalStoreName: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: 'If cloned from B2B, tracks original stock owner name'
     },
     isActive: {
       type: DataTypes.BOOLEAN,

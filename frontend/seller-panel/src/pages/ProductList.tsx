@@ -59,7 +59,29 @@ const ProductList: React.FC = () => {
 
     const columns = [
         { title: 'Resim', dataIndex: 'images', key: 'images', render: (imgs: string[]) => imgs && imgs.length > 0 ? <img src={imgs[0]} alt="product" style={{ width: 50 }} /> : 'Yok' },
-        { title: 'Ürün Adı', dataIndex: 'title', key: 'title' },
+        { 
+            title: 'Ürün Adı', 
+            dataIndex: 'title', 
+            key: 'title',
+            render: (text: string, record: Product) => (
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span>{text}</span>
+                    {record.originalStoreName && (
+                        <span style={{
+                            fontSize: 10,
+                            padding: '2px 6px',
+                            background: '#fff2e8',
+                            color: '#d4380d',
+                            border: '1px solid #ffbb96',
+                            borderRadius: 4,
+                            marginTop: 4,
+                            display: 'inline-block',
+                            width: 'fit-content'
+                        }}>TEDARİK: {record.originalStoreName}</span>
+                    )}
+                </div>
+            )
+        },
         { title: 'Kategori', dataIndex: 'category', key: 'category' },
         { title: 'Gram', dataIndex: 'gramWeight', key: 'gramWeight', render: (val: number) => `${val} gr` },
         { title: 'Milyem', dataIndex: 'milyem', key: 'milyem' },

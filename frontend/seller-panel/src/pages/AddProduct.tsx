@@ -64,6 +64,8 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [integrations, setIntegrations] = useState<Integration[]>([]);
     const [integrationsLoading, setIntegrationsLoading] = useState(true);
 
+    const isCloned = !!initialValues?.originalStoreName;
+
     useEffect(() => {
         fetchGoldPrice();
         fetchIntegrations();
@@ -202,14 +204,20 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         >
             {/* TEMEL BİLGİLER */}
             <Card title="Temel Bilgiler" style={{ marginBottom: 16 }}>
+                {isCloned && (
+                    <div style={{ marginBottom: 16, padding: '8px 12px', background: '#fff2e8', border: '1px solid #ffd8bf', color: '#d4380d', borderRadius: 4 }}>
+                        <InfoCircleOutlined style={{ marginRight: 8 }} />
+                        Bu ürün B2B sisteminden kopyalanmıştır. Sadece Stok Adedi, Kâr Marjı ve Pazaryeri ayarları değiştirilebilir.
+                    </div>
+                )}
                 <Form.Item name="title" label="Ürün Adı" rules={[{ required: true, message: 'Ürün adı gerekli' }]}>
-                    <Input placeholder="Örn: 22 Ayar Altın Burma Bilezik" onChange={handleTitleChange} />
+                    <Input placeholder="Örn: 22 Ayar Altın Burma Bilezik" onChange={handleTitleChange} disabled={isCloned} />
                 </Form.Item>
 
                 <Row gutter={16}>
                     <Col span={12}>
                         <Form.Item name="category" label="Kategori" rules={[{ required: true, message: 'Kategori seçiniz' }]}>
-                            <Select placeholder="Kategori Seçin" onChange={handleCategoryChange}>
+                            <Select placeholder="Kategori Seçin" onChange={handleCategoryChange} disabled={isCloned}>
                                 {CATEGORIES.map(c => <Option key={c} value={c}>{c}</Option>)}
                             </Select>
                         </Form.Item>
@@ -228,6 +236,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                             rules={[{ required: true, message: 'SKU gerekli' }]}
                         >
                             <Input
+                                disabled={isCloned}
                                 placeholder="Örn: BLZ-14K-001 (benzersiz olmalı)"
                                 addonAfter={
                                     <Tooltip title="Otomatik SKU oluştur">
@@ -274,6 +283,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                             rules={[{ required: true, message: 'Gram gerekli' }]}
                         >
                             <InputNumber
+                                disabled={isCloned}
                                 style={{ width: '100%' }}
                                 min={0.01}
                                 step={0.01}
@@ -288,7 +298,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                             label="Milyem (Saflık)"
                             rules={[{ required: true, message: 'Milyem seçiniz' }]}
                         >
-                            <Select placeholder="Milyem Seçin">
+                            <Select placeholder="Milyem Seçin" disabled={isCloned}>
                                 {MILYEM_OPTIONS.map(m => (
                                     <Option key={m.value} value={m.value}>{m.label}</Option>
                                 ))}
@@ -327,6 +337,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 {/* B2B Section */}
                 <div style={{ background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
                     <Checkbox
+                        disabled={isCloned}
                         checked={isB2BEnabled}
                         onChange={e => setIsB2BEnabled(e.target.checked)}
                         style={{ fontWeight: 600, color: '#389e0d' }}
@@ -342,6 +353,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                                     rules={[{ required: true, message: 'B2B iskontosu gerekli' }]}
                                 >
                                     <InputNumber
+                                        disabled={isCloned}
                                         style={{ width: '100%' }}
                                         min={0}
                                         max={99}
@@ -401,7 +413,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             {/* MEDYA */}
             <Card title="Medya ve Açıklama" style={{ marginBottom: 16 }}>
                 <Form.Item label="Ürün Görselleri (Maks 6)">
-                    <Upload listType="picture-card" maxCount={6} beforeUpload={() => false}>
+                    <Upload disabled={isCloned} listType="picture-card" maxCount={6} beforeUpload={() => false}>
                         <div>
                             <PlusOutlined />
                             <div style={{ marginTop: 8 }}>Yükle</div>
@@ -410,13 +422,13 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 </Form.Item>
 
                 <Form.Item label="Ürün Videosu">
-                    <Upload maxCount={1} beforeUpload={() => false}>
-                        <Button icon={<VideoCameraOutlined />}>Video Seç</Button>
+                    <Upload disabled={isCloned} maxCount={1} beforeUpload={() => false}>
+                        <Button disabled={isCloned} icon={<VideoCameraOutlined />}>Video Seç</Button>
                     </Upload>
                 </Form.Item>
 
                 <Form.Item name="description" label="Ürün Açıklaması">
-                    <Input.TextArea rows={4} placeholder="Ürün detaylarını buraya yazın..." />
+                    <Input.TextArea disabled={isCloned} rows={4} placeholder="Ürün detaylarını buraya yazın..." />
                 </Form.Item>
             </Card>
 

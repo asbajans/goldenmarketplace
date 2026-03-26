@@ -16,6 +16,7 @@ export interface Product {
     videoUrl?: string;
     marketplaces?: string[];
     tags?: string[];
+    originalStoreName?: string;
     isActive: boolean;
 }
 

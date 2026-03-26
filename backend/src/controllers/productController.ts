@@ -185,27 +185,29 @@ export class ProductController {
         }
       }
 
+      const isCloned = !!product.originalStoreName;
+
       // Recalculate prices if gram/milyem changed
-      const finalGramWeight = gramWeight || product.gramWeight;
-      const finalMilyem = milyem || product.milyem;
+      const finalGramWeight = isCloned ? product.gramWeight : (gramWeight || product.gramWeight);
+      const finalMilyem = isCloned ? product.milyem : (milyem || product.milyem);
       const finalProfitMargin = profitMargin !== undefined ? profitMargin : product.profitMargin;
       const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(
         Number(finalGramWeight), Number(finalMilyem), Number(finalProfitMargin)
       );
 
       const tags = ProductController.generateTags(
-        title || product.title,
-        category || product.category
+        isCloned ? product.title : (title || product.title),
+        isCloned ? product.category : (category || product.category)
       );
 
-      const finalIsB2BEnabled = isB2BEnabled !== undefined ? !!isB2BEnabled : product.isB2BEnabled;
-      const finalB2bDiscount = b2bDiscount !== undefined ? b2bDiscount : product.b2bDiscount;
-      const finalB2bPrice = Math.round(priceTRY * (1 - (finalIsB2BEnabled ? finalB2bDiscount : 0) / 100) * 100) / 100;
+      const finalIsB2BEnabled = isCloned ? false : (isB2BEnabled !== undefined ? !!isB2BEnabled : product.isB2BEnabled);
+      const finalB2bDiscount = isCloned ? 0 : (b2bDiscount !== undefined ? b2bDiscount : product.b2bDiscount);
+      const finalB2bPrice = isCloned ? 0 : Math.round(priceTRY * (1 - (finalIsB2BEnabled ? finalB2bDiscount : 0) / 100) * 100) / 100;
 
       await product.update({
-        title: title || product.title,
-        description: description || product.description,
-        category: category || product.category,
+        title: isCloned ? product.title : (title || product.title),
+        description: isCloned ? product.description : (description || product.description),
+        category: isCloned ? product.category : (category || product.category),
         gramWeight: finalGramWeight,
         milyem: finalMilyem,
         profitMargin: finalProfitMargin,
@@ -215,10 +217,10 @@ export class ProductController {
         b2bDiscount: finalIsB2BEnabled ? finalB2bDiscount : 0,
         b2bPrice: finalB2bPrice,
         quantity: quantity !== undefined ? quantity : product.quantity,
-        images: images || product.images,
-        videoUrl: videoUrl !== undefined ? videoUrl : product.videoUrl,
+        images: isCloned ? product.images : (images || product.images),
+        videoUrl: isCloned ? product.videoUrl : (videoUrl !== undefined ? videoUrl : product.videoUrl),
         marketplaces: marketplaces || product.marketplaces,
-        tags
+        tags: isCloned ? product.tags : tags
       });
 
       // Trigger marketplace sync (non-blocking)

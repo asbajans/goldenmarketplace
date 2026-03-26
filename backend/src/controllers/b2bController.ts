@@ -274,6 +274,7 @@ export class B2BController {
         videoUrl: originalProduct.videoUrl,
         marketplaces: marketplaces || [],
         tags: [...(originalProduct.tags || []), 'B2B'],
+        originalStoreName: ownerName,
         isActive: true
       });
 
