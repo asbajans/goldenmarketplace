@@ -192,14 +192,14 @@ const B2BMarket: React.FC = () => {
                   <div style={{ marginTop: 12 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                       <Text type="secondary" style={{ fontSize: 11 }}>Satış Fiyatı:</Text>
-                      <Text delete style={{ fontSize: 13, color: '#999' }}>
+                      <Text style={{ fontSize: 13, color: '#666' }}>
                         {Number(product.priceTRY).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
                       </Text>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Text style={{ fontSize: 11, color: '#389e0d', fontWeight: 600 }}>B2B Fiyatı:</Text>
                       <div>
-                        <Tag color="green" style={{ marginRight: 4, fontSize: 10 }}>%{discount} indirim</Tag>
+                        <Tag color="green" style={{ marginRight: 4, fontSize: 10 }}>%{discount} iskonto</Tag>
                         <Text strong style={{ fontSize: 15, color: '#389e0d' }}>
                           {Number(product.b2bPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
                         </Text>

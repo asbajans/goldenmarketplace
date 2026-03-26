@@ -77,9 +77,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     </Form.Item>
                 </Form>
 
-                <div style={{ marginTop: 24, textAlign: 'center', color: '#8c8c8c' }}>
-                    <p>Varsayılan: admin@golden.com / admin123</p>
-                </div>
             </Card>
         </div>
     );

@@ -43,3 +43,6 @@ export const getOutgoingRequests = () => client.get<B2BRequest[]>('/b2b/requests
 export const approveB2BRequest = (id: string) => client.put(`/b2b/requests/${id}/approve`);
 
 export const rejectB2BRequest = (id: string) => client.put(`/b2b/requests/${id}/reject`);
+
+export const listB2BProduct = (id: string, payload: { profitMargin: number; marketplaces: string[]; quantity?: number }) => 
+  client.post(`/b2b/requests/${id}/list`, payload);

@@ -21,5 +21,6 @@ router.get('/requests/incoming', B2BController.getIncomingRequests);
 router.get('/requests/outgoing', B2BController.getOutgoingRequests);
 router.put('/requests/:id/approve', B2BController.approveRequest);
 router.put('/requests/:id/reject', B2BController.rejectRequest);
+router.post('/requests/:id/list', B2BController.listB2BProduct);
 
 export default router;

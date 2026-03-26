@@ -7,6 +7,7 @@ import { Request, Response } from 'express';
 import Product from '../models/Product';
 import B2BRequest from '../models/B2BRequest';
 import Store from '../models/Store';
+import goldPriceService from '../services/goldPriceService';
 
 export class B2BController {
   /**
@@ -219,6 +220,67 @@ export class B2BController {
     } catch (error: any) {
       console.error('[B2B] rejectRequest error:', error);
       return res.status(500).json({ error: 'Red işlemi başarısız' });
+    }
+  }
+  /**
+   * POST /b2b/requests/:id/list
+   * Requester lists the approved product in their store with a custom profit margin.
+   */
+  static async listB2BProduct(req: Request, res: Response) {
+    try {
+      const user = (req as any).user;
+      const store = user ? await Store.findOne({ where: { userId: user.id } }) : null;
+      if (!store) return res.status(403).json({ error: 'Mağaza bulunamadı' });
+
+      const request = await B2BRequest.findOne({
+        where: { id: req.params.id, requesterStoreId: store.id, status: 'approved' }
+      });
+      if (!request) return res.status(404).json({ error: 'Onaylanmış talep bulunamadı' });
+
+      const originalProduct = await Product.findByPk(request.productId, {
+        include: [{ model: Store, as: 'store', attributes: ['id', ['storeName', 'name']] }]
+      });
+      if (!originalProduct) return res.status(404).json({ error: 'Orijinal ürün bulunamadı' });
+
+      const { profitMargin, marketplaces, quantity = 1 } = req.body;
+      if (profitMargin === undefined) return res.status(400).json({ error: 'Kâr oranı gerekli' });
+
+      const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(
+        originalProduct.gramWeight, originalProduct.milyem, profitMargin
+      );
+
+      const ownerName = (originalProduct as any).store?.dataValues?.name || 'B2B Tedarikçisi';
+      const b2bDescription = originalProduct.description + `\n\n---\nBu ürün B2B tedarik ağından (${ownerName}) listelenmektedir.`;
+      
+      const newSku = `${originalProduct.sku}-B2B-${store.id.substring(0, 4)}`;
+
+      const newProduct = await Product.create({
+        storeId: store.id,
+        title: originalProduct.title,
+        slug: `${originalProduct.slug}-b2b-${Date.now()}`,
+        description: b2bDescription,
+        category: originalProduct.category,
+        sku: newSku,
+        gramWeight: originalProduct.gramWeight,
+        milyem: originalProduct.milyem,
+        profitMargin: profitMargin,
+        priceTRY,
+        priceUSD,
+        isB2BEnabled: false,
+        b2bDiscount: 0,
+        b2bPrice: 0,
+        quantity,
+        images: originalProduct.images,
+        videoUrl: originalProduct.videoUrl,
+        marketplaces: marketplaces || [],
+        tags: [...(originalProduct.tags || []), 'B2B'],
+        isActive: true
+      });
+
+      return res.json({ message: 'Ürün başarıyla listelendi!', product: newProduct });
+    } catch (error: any) {
+      console.error('[B2B] listB2BProduct error:', error);
+      return res.status(500).json({ error: 'Ürün listelenemedi' });
     }
   }
 }

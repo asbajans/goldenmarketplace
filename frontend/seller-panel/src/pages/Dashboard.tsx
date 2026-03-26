@@ -18,9 +18,20 @@ const Dashboard: React.FC = () => {
         // I will implement a placeholder fetch to prove wiring
     }, []);
 
+    let userName = '';
+    let storeName = '';
+    try {
+        const u = JSON.parse(localStorage.getItem('user') || 'null');
+        if (u) {
+            userName = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.name;
+            storeName = u.store?.storeName || u.store?.name || '';
+        }
+    } catch (e) {}
+
     return (
         <div>
-            <h1>Dashboard</h1>
+            <h1 style={{ marginBottom: 4 }}>Hoş Geldiniz, {userName || 'Satıcı'}</h1>
+            {storeName && <h3 style={{ marginTop: 0, color: '#666', fontWeight: 'normal' }}>Mağaza: {storeName}</h3>}
             <Row gutter={16}>
                 <Col xs={24} sm={12} lg={6}>
                     <Card>

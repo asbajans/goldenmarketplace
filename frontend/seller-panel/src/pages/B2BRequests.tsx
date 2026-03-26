@@ -1,16 +1,27 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Tabs, Table, Tag, Button, message, Typography, Space,
-  Empty, Spin, Popconfirm, Avatar, Tooltip
+  Empty, Spin, Popconfirm, Avatar, Tooltip, Modal, Form, InputNumber, Checkbox, Row, Col
 } from 'antd';
 import {
   CheckOutlined, CloseOutlined, ShopOutlined, GoldOutlined
 } from '@ant-design/icons';
 import {
   getIncomingRequests, getOutgoingRequests,
-  approveB2BRequest, rejectB2BRequest,
+  approveB2BRequest, rejectB2BRequest, listB2BProduct,
   type B2BRequest
 } from '../api/b2b';
+
+const ALL_PLATFORMS = [
+  { key: 'golden', name: 'Golden Marketplace', disabled: true },
+  { key: 'etsy', name: 'Etsy' },
+  { key: 'amazon', name: 'Amazon' },
+  { key: 'trendyol', name: 'Trendyol' },
+  { key: 'hepsiburada', name: 'Hepsiburada' },
+  { key: 'n11', name: 'N11' },
+  { key: 'pazarama', name: 'Pazarama' },
+];
 
 const { Title, Text } = Typography;
 
@@ -30,6 +41,9 @@ const B2BRequests: React.FC = () => {
   const [loadingIncoming, setLoadingIncoming] = useState(true);
   const [loadingOutgoing, setLoadingOutgoing] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [listModal, setListModal] = useState<{ visible: boolean; request: B2BRequest | null; loading: boolean }>({ visible: false, request: null, loading: false });
+  const [form] = Form.useForm();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchIncoming();
@@ -81,6 +95,33 @@ const B2BRequests: React.FC = () => {
       message.error(err?.response?.data?.error || 'Ret başarısız');
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleOpenListModal = (request: B2BRequest) => {
+    setListModal({ visible: true, request, loading: false });
+    form.setFieldsValue({
+      profitMargin: 20,
+      marketplaces: ['golden']
+    });
+  };
+
+  const handleListProduct = async (values: any) => {
+    if (!listModal.request) return;
+    setListModal(prev => ({ ...prev, loading: true }));
+    try {
+      await listB2BProduct(listModal.request.id, {
+        profitMargin: values.profitMargin,
+        marketplaces: values.marketplaces
+      });
+      message.success('Ürün başarıyla mağazanıza eklendi! Ürünlerim sayfasına yönlendiriliyorsunuz.');
+      setListModal({ visible: false, request: null, loading: false });
+      setTimeout(() => {
+        navigate('/products');
+      }, 1500);
+    } catch (err: any) {
+      message.error(err?.response?.data?.error || 'Ürün listelenirken hata oluştu');
+      setListModal(prev => ({ ...prev, loading: false }));
     }
   };
 
@@ -248,6 +289,23 @@ const B2BRequests: React.FC = () => {
       dataIndex: 'createdAt',
       key: 'createdAt',
       render: (d: string) => new Date(d).toLocaleDateString('tr-TR')
+    },
+    {
+      title: 'İşlem',
+      key: 'action',
+      render: (_: any, record: B2BRequest) =>
+        record.status === 'approved' ? (
+          <Button
+            type="primary"
+            size="small"
+            onClick={() => handleOpenListModal(record)}
+            style={{ background: '#1890ff' }}
+          >
+            Mağazamda Listele
+          </Button>
+        ) : (
+          <Text type="secondary" style={{ fontSize: 12 }}>—</Text>
+        )
     }
   ];
 
@@ -310,6 +368,48 @@ const B2BRequests: React.FC = () => {
         </Text>
       </div>
       <Tabs defaultActiveKey="incoming" items={tabItems} />
+
+      <Modal
+        title="Mağazamda Listele"
+        open={listModal.visible}
+        onCancel={() => setListModal({ visible: false, request: null, loading: false })}
+        onOk={() => form.submit()}
+        confirmLoading={listModal.loading}
+        okText="Onayla ve Listele"
+        cancelText="İptal"
+      >
+        {listModal.request && (
+          <div style={{ marginBottom: 16 }}>
+            <Text type="secondary">
+              Bu ürün, maliyet olarak B2B tedarikçisinin belirlediği fiyatı 
+              kullanarak yeniden hesaplanacaktır. Sadece kendi kâr marjınızı ve eklemek istediğiniz pazaryerlerini seçin.
+            </Text>
+          </div>
+        )}
+        <Form form={form} layout="vertical" onFinish={handleListProduct}>
+          <Form.Item
+            name="profitMargin"
+            label="Kâr Oranı (%)"
+            rules={[{ required: true, message: 'Lütfen kâr oranı belirleyin' }]}
+          >
+            <InputNumber min={0} max={500} style={{ width: '100%' }} addonAfter="%" />
+          </Form.Item>
+
+          <Form.Item name="marketplaces" label="Pazaryerleri">
+            <Checkbox.Group style={{ width: '100%' }}>
+              <Row gutter={[16, 12]}>
+                {ALL_PLATFORMS.map(opt => (
+                  <Col span={8} key={opt.key}>
+                    <Checkbox value={opt.key} disabled={opt.disabled}>
+                      {opt.name}
+                    </Checkbox>
+                  </Col>
+                ))}
+              </Row>
+            </Checkbox.Group>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

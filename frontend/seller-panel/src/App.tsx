@@ -146,7 +146,23 @@ const App: React.FC = () => {
               height: 64,
             }}
           />
-          <Button icon={<LogoutOutlined />} onClick={handleLogout}>Çıkış</Button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {(() => {
+              try {
+                const u = JSON.parse(localStorage.getItem('user') || 'null');
+                if (u) {
+                  return (
+                    <div style={{ textAlign: 'right', lineHeight: '1.2', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <strong style={{ fontSize: '14px' }}>{u.store?.storeName || u.store?.name || 'Benim Mağazam'}</strong>
+                      <span style={{ fontSize: '12px', color: '#888' }}>{u.firstName} {u.lastName}</span>
+                    </div>
+                  );
+                }
+              } catch (e) {}
+              return null;
+            })()}
+            <Button icon={<LogoutOutlined />} onClick={handleLogout} danger>Çıkış Yap</Button>
+          </div>
         </Header>
         <Content
           style={{

@@ -20,7 +20,15 @@ export class ProductController {
 
       const where: any = { isActive: true };
 
-      if (storeId) where.storeId = storeId;
+      const user = (req as any).user;
+      
+      if (storeId) {
+        where.storeId = storeId;
+      } else if (user && user.role !== 'admin') {
+        const store = await Store.findOne({ where: { userId: user.id } });
+        if (store) where.storeId = store.id;
+        else return res.status(403).json({ error: { message: 'Shop not found' } });
+      }
       if (category) where.category = category;
       if (search) {
         where.title = { [Op.substring]: String(search) };
