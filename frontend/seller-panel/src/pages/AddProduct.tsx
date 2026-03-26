@@ -262,7 +262,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 style={{ marginBottom: 16 }}
                 extra={
                     <Text type="secondary" style={{ fontSize: '0.75em' }}>
-                        24K Gram: {gold24KGramTRY.toLocaleString('tr-TR')} ₺
+                        24K Gram: {(gold24KGramTRY || 0).toLocaleString('tr-TR')} ₺
                     </Text>
                 }
             >
