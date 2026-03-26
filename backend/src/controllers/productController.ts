@@ -59,7 +59,8 @@ export class ProductController {
     try {
       const {
         title, description, category, sku, quantity,
-        images, videoUrl, marketplaces, gramWeight, milyem, profitMargin
+        images, videoUrl, marketplaces, gramWeight, milyem, profitMargin,
+        isB2BEnabled, b2bDiscount
       } = req.body;
 
       // Validate required gold fields
@@ -85,6 +86,11 @@ export class ProductController {
 
       // Calculate prices from gram + milyem + profit margin
       const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(gramWeight, milyem, profitMargin || 0);
+
+      // Handle B2B fields
+      const finalB2bDiscount = isB2BEnabled ? (b2bDiscount || 0) : 0;
+      const b2bPrice = Math.round(priceTRY * (1 - finalB2bDiscount / 100) * 100) / 100;
+
       const tags = ProductController.generateTags(title, category);
 
       const product = await Product.create({
@@ -99,6 +105,9 @@ export class ProductController {
         profitMargin: profitMargin || 0,
         priceTRY,
         priceUSD,
+        isB2BEnabled: !!isB2BEnabled,
+        b2bDiscount: finalB2bDiscount,
+        b2bPrice,
         quantity: quantity || 0,
         images: Array.isArray(images) ? images : [],
         videoUrl,
@@ -149,7 +158,8 @@ export class ProductController {
       const { id } = req.params;
       const {
         title, description, category, quantity,
-        images, videoUrl, marketplaces, gramWeight, milyem, profitMargin
+        images, videoUrl, marketplaces, gramWeight, milyem, profitMargin,
+        isB2BEnabled, b2bDiscount
       } = req.body;
 
       const product = await Product.findByPk(id);
@@ -172,6 +182,10 @@ export class ProductController {
         category || product.category
       );
 
+      const finalIsB2BEnabled = isB2BEnabled !== undefined ? !!isB2BEnabled : product.isB2BEnabled;
+      const finalB2bDiscount = b2bDiscount !== undefined ? b2bDiscount : product.b2bDiscount;
+      const finalB2bPrice = Math.round(priceTRY * (1 - (finalIsB2BEnabled ? finalB2bDiscount : 0) / 100) * 100) / 100;
+
       await product.update({
         title: title || product.title,
         description: description || product.description,
@@ -181,6 +195,9 @@ export class ProductController {
         profitMargin: finalProfitMargin,
         priceTRY,
         priceUSD,
+        isB2BEnabled: finalIsB2BEnabled,
+        b2bDiscount: finalIsB2BEnabled ? finalB2bDiscount : 0,
+        b2bPrice: finalB2bPrice,
         quantity: quantity !== undefined ? quantity : product.quantity,
         images: images || product.images,
         videoUrl: videoUrl !== undefined ? videoUrl : product.videoUrl,
