@@ -16,7 +16,9 @@ export class B2BController {
    */
   static async getB2BProducts(req: Request, res: Response) {
     try {
-      const storeId = (req as any).user?.storeId;
+      const user = (req as any).user;
+      const store = user ? await Store.findOne({ where: { userId: user.id } }) : null;
+      const storeId = store ? store.id : null;
 
       const products = await Product.findAll({
         where: { isB2BEnabled: true, isActive: true },
@@ -56,7 +58,7 @@ export class B2BController {
    */
   static async createRequest(req: Request, res: Response) {
     try {
-      const store = (req as any).user?.store;
+      const store = await Store.findOne({ where: { userId: (req as any).user.id } });
       if (!store) return res.status(403).json({ error: 'Mağaza bulunamadı' });
 
       const { productId, requestNote } = req.body;
@@ -106,7 +108,8 @@ export class B2BController {
    */
   static async getIncomingRequests(req: Request, res: Response) {
     try {
-      const store = (req as any).user?.store;
+      const user = (req as any).user;
+      const store = user ? await Store.findOne({ where: { userId: user.id } }) : null;
       if (!store) return res.status(403).json({ error: 'Mağaza bulunamadı' });
 
       const requests = await B2BRequest.findAll({
@@ -139,7 +142,8 @@ export class B2BController {
    */
   static async getOutgoingRequests(req: Request, res: Response) {
     try {
-      const store = (req as any).user?.store;
+      const user = (req as any).user;
+      const store = user ? await Store.findOne({ where: { userId: user.id } }) : null;
       if (!store) return res.status(403).json({ error: 'Mağaza bulunamadı' });
 
       const requests = await B2BRequest.findAll({
@@ -172,7 +176,8 @@ export class B2BController {
    */
   static async approveRequest(req: Request, res: Response) {
     try {
-      const store = (req as any).user?.store;
+      const user = (req as any).user;
+      const store = user ? await Store.findOne({ where: { userId: user.id } }) : null;
       if (!store) return res.status(403).json({ error: 'Mağaza bulunamadı' });
 
       const request = await B2BRequest.findOne({
@@ -197,7 +202,8 @@ export class B2BController {
    */
   static async rejectRequest(req: Request, res: Response) {
     try {
-      const store = (req as any).user?.store;
+      const user = (req as any).user;
+      const store = user ? await Store.findOne({ where: { userId: user.id } }) : null;
       if (!store) return res.status(403).json({ error: 'Mağaza bulunamadı' });
 
       const request = await B2BRequest.findOne({
