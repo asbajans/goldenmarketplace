@@ -48,6 +48,7 @@ export class AdminController {
             const user = await User.findByPk(id);
             if (!user) return res.status(404).json({ error: 'User not found' });
 
+            const wasInactive = !user.isActive;
             let updateData: any = { email, firstName, lastName, userType, phone, isActive };
 
             if (password) {
@@ -55,6 +56,21 @@ export class AdminController {
             }
 
             await user.update(updateData);
+
+            // Auto-create store if seller is activated and has a pending store name
+            if (wasInactive && isActive && user.userType === 'seller' && user.pendingStoreName) {
+                const existingStore = await Store.findOne({ where: { userId: user.id } });
+                if (!existingStore) {
+                    await Store.create({
+                        userId: user.id,
+                        storeName: user.pendingStoreName,
+                        storeSlug: user.pendingStoreName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
+                        isActive: true
+                    } as any);
+                    await user.update({ pendingStoreName: null } as any);
+                }
+            }
+
             return res.json(user);
         } catch (error: any) {
             return res.status(400).json({ error: error.message || 'Failed to update user' });
@@ -186,7 +202,7 @@ export class AdminController {
     // --- SUBSCRIPTION PLANS ---
     static async getSubscriptionPlans(_req: Request, res: Response): Promise<Response> {
         try {
-            const plans = await SubscriptionPlan.findAll({ order: [['price', 'ASC']] });
+            const plans = await SubscriptionPlan.findAll({ order: [['monthlyPrice', 'ASC']] });
             return res.json(plans);
         } catch (error) {
             console.error('Admin Error [getSubscriptionPlans]:', error);
@@ -196,14 +212,16 @@ export class AdminController {
 
     static async createSubscriptionPlan(req: Request, res: Response): Promise<Response> {
         try {
-            const { name, description, price, currency, interval, productLimit, features, stripePriceId, isActive } = req.body;
+            const { name, description, monthlyPrice, yearlyPrice, currency, interval, productLimit, integrationLimit, features, stripePriceId, isActive } = req.body;
             const plan = await SubscriptionPlan.create({
                 name,
                 description,
-                price,
+                monthlyPrice,
+                yearlyPrice,
                 currency,
                 interval,
                 productLimit,
+                integrationLimit,
                 features,
                 stripePriceId,
                 isActive: isActive !== undefined ? isActive : true
@@ -217,7 +235,7 @@ export class AdminController {
     static async updateSubscriptionPlan(req: Request, res: Response) {
         try {
             const { id } = req.params;
-            const { name, description, price, currency, interval, productLimit, features, stripePriceId, isActive } = req.body;
+            const { name, description, monthlyPrice, yearlyPrice, currency, interval, productLimit, integrationLimit, features, stripePriceId, isActive } = req.body;
             const plan = await SubscriptionPlan.findByPk(id);
             if (!plan) {
                 return res.status(404).json({ error: 'Plan not found' });
@@ -225,10 +243,12 @@ export class AdminController {
             await plan.update({
                 name,
                 description,
-                price,
+                monthlyPrice,
+                yearlyPrice,
                 currency,
                 interval,
                 productLimit,
+                integrationLimit,
                 features,
                 stripePriceId,
                 isActive

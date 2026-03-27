@@ -29,7 +29,7 @@ export const SubscriptionsPage: React.FC = () => {
     const handleAdd = () => {
         setEditingPlan(null);
         form.resetFields();
-        form.setFieldsValue({ isActive: true, price: 0, productLimit: 50, features: [] });
+        form.setFieldsValue({ isActive: true, monthlyPrice: 0, yearlyPrice: 0, productLimit: 50, integrationLimit: 1, features: [] });
         setIsModalVisible(true);
     };
 
@@ -73,8 +73,10 @@ export const SubscriptionsPage: React.FC = () => {
 
     const columns = [
         { title: 'Paket Adı', dataIndex: 'name', key: 'name' },
-        { title: 'Ücret (₺)', dataIndex: 'price', key: 'price', render: (val: any) => `${val} ₺` },
+        { title: 'Aylık (₺)', dataIndex: 'monthlyPrice', key: 'monthlyPrice', render: (val: any) => `${val} ₺` },
+        { title: 'Yıllık (₺)', dataIndex: 'yearlyPrice', key: 'yearlyPrice', render: (val: any) => `${val} ₺` },
         { title: 'Ürün Limiti', dataIndex: 'productLimit', key: 'productLimit' },
+        { title: 'Entegrasyon', dataIndex: 'integrationLimit', key: 'integrationLimit' },
         {
             title: 'Özellikler',
             dataIndex: 'features',
@@ -133,13 +135,21 @@ export const SubscriptionsPage: React.FC = () => {
                         <Input.TextArea rows={2} />
                     </Form.Item>
 
-                    <Space size="large">
-                        <Form.Item name="price" label="Aylık Ücret (₺)" rules={[{ required: true }]}>
-                            <InputNumber min={0} step={10} style={{ width: '150px' }} />
+                    <Space size="large" wrap>
+                        <Form.Item name="monthlyPrice" label="Aylık Ücret (₺)" rules={[{ required: true }]}>
+                            <InputNumber min={0} step={10} style={{ width: '130px' }} />
+                        </Form.Item>
+
+                        <Form.Item name="yearlyPrice" label="Yıllık Ücret (₺)" rules={[{ required: true }]}>
+                            <InputNumber min={0} step={50} style={{ width: '130px' }} />
                         </Form.Item>
 
                         <Form.Item name="productLimit" label="Ürün Limiti" rules={[{ required: true }]}>
-                            <InputNumber min={1} style={{ width: '150px' }} />
+                            <InputNumber min={1} style={{ width: '130px' }} />
+                        </Form.Item>
+
+                        <Form.Item name="integrationLimit" label="Entegrasyon Limiti" rules={[{ required: true }]}>
+                            <InputNumber min={0} style={{ width: '130px' }} />
                         </Form.Item>
                     </Space>
 

@@ -19,6 +19,7 @@ interface UserAttributes {
   subscriptionStatus?: 'active' | 'inactive' | 'past_due' | 'canceled' | 'trialing';
   subscriptionPlan?: string;
   subscriptionEndDate?: Date;
+  pendingStoreName?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -36,6 +37,7 @@ class User extends Model<UserAttributes> implements UserAttributes {
   public subscriptionStatus?: 'active' | 'inactive' | 'past_due' | 'canceled' | 'trialing';
   public subscriptionPlan?: string;
   public subscriptionEndDate?: Date;
+  public pendingStoreName?: string;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -92,6 +94,10 @@ User.init(
     },
     subscriptionEndDate: {
       type: DataTypes.DATE,
+      allowNull: true
+    },
+    pendingStoreName: {
+      type: DataTypes.STRING,
       allowNull: true
     }
   },

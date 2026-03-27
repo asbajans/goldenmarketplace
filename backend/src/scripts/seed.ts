@@ -138,30 +138,36 @@ const seed = async () => {
             {
                 name: 'Bronz',
                 description: 'Yeni başlayanlar için ideal',
-                price: 99.00,
+                monthlyPrice: 99.00,
+                yearlyPrice: 990.00,
                 currency: 'TRY',
                 interval: 'month',
                 productLimit: 50,
+                integrationLimit: 1,
                 features: ['50 Ürün Listeleme', 'Temel İstatistikler', 'Standart Destek'],
                 isActive: true
             },
             {
                 name: 'Gümüş',
                 description: 'Büyüyen işletmeler için',
-                price: 199.00,
+                monthlyPrice: 199.00,
+                yearlyPrice: 1990.00,
                 currency: 'TRY',
                 interval: 'month',
                 productLimit: 200,
+                integrationLimit: 3,
                 features: ['200 Ürün Listeleme', 'Gelişmiş İstatistikler', 'Öncelikli Destek', 'Reklam Kredisi'],
                 isActive: true
             },
             {
                 name: 'Altın',
                 description: 'Profesyonel satıcılar için',
-                price: 399.00,
+                monthlyPrice: 399.00,
+                yearlyPrice: 3990.00,
                 currency: 'TRY',
                 interval: 'month',
                 productLimit: 1000,
+                integrationLimit: 10,
                 features: ['Sınırsız Ürün', 'VIP Destek', 'Altın Endeksli Reklam', 'Tüm Hazır Entegrasyonlar'],
                 isActive: true
             }

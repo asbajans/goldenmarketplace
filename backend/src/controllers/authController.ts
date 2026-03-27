@@ -15,7 +15,7 @@ export class AuthController {
    */
   static async register(req: Request, res: Response) {
     try {
-      const { email, password, firstName, lastName, userType } = req.body;
+      const { email, password, firstName, lastName, userType, phone, storeName } = req.body;
 
       // Check if user already exists
       const existingUser = await User.findOne({ where: { email } });
@@ -37,8 +37,10 @@ export class AuthController {
         password: hashedPassword,
         firstName,
         lastName,
+        phone,
         userType: userType || 'customer',
-        isActive: true
+        isActive: userType === 'seller' ? false : true,
+        pendingStoreName: userType === 'seller' ? storeName : undefined
       });
 
       // Generate token
@@ -49,7 +51,7 @@ export class AuthController {
       });
 
       return res.status(201).json({
-        message: 'User registered successfully',
+        message: userType === 'seller' ? 'Kayıt alındı. Yönetici onayının ardından hesabınız aktifleşecektir.' : 'User registered successfully',
         token,
         user: {
           id: user.id,

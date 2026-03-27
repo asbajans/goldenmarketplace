@@ -15,7 +15,7 @@ const Register: React.FC = () => {
                 ...values,
                 userType: 'seller'
             });
-            message.success('Kayıt başarılı! Şimdi giriş yapabilirsiniz.');
+            message.success('Kayıt alındı. Yönetici onayından sonra giriş yapabilirsiniz.');
             navigate('/login');
         } catch (error: any) {
             console.error(error);
@@ -54,13 +54,29 @@ const Register: React.FC = () => {
 
                     <Form.Item
                         name="email"
-                        label="Email"
+                        label="E-posta"
                         rules={[
                             { required: true, message: 'Lütfen email giriniz!' },
                             { type: 'email', message: 'Geçerli bir email giriniz!' }
                         ]}
                     >
-                        <Input prefix={<MailOutlined />} placeholder="Email" />
+                        <Input prefix={<MailOutlined />} placeholder="E-posta" />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="phone"
+                        label="Telefon Numarası"
+                        rules={[{ required: true, message: 'Lütfen telefon numaranızı giriniz!' }]}
+                    >
+                        <Input placeholder="05XX XXX XX XX" />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="storeName"
+                        label="Mağaza Adı"
+                        rules={[{ required: true, message: 'Lütfen mağaza adınızı giriniz!' }]}
+                    >
+                        <Input placeholder="Mağazanızın Adı" />
                     </Form.Item>
 
                     <Form.Item
