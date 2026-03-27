@@ -14,6 +14,7 @@ router.get('/users', AdminController.getUsers);
 router.post('/users', AdminController.createUser);
 router.put('/users/:id', AdminController.updateUser);
 router.delete('/users/:id', AdminController.deleteUser);
+router.put('/users/:id/assign-plan', AdminController.assignPlanToUser);
 
 // --- STORES (Sellers) ---
 router.get('/stores', AdminController.getStores);
@@ -32,6 +33,10 @@ router.get('/subscription-plans', AdminController.getSubscriptionPlans);
 router.post('/subscription-plans', AdminController.createSubscriptionPlan);
 router.put('/subscription-plans/:id', AdminController.updateSubscriptionPlan);
 router.delete('/subscription-plans/:id', AdminController.deleteSubscriptionPlan);
+
+// --- ALL PRODUCTS (admin view) ---
+router.get('/products', AdminController.getAllProducts);
+router.put('/products/:id', AdminController.updateProductByAdmin);
 
 // --- INTEGRATIONS ---
 router.get('/integrations', AdminController.getIntegrations);

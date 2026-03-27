@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import User from '../models/User';
 import Store from '../models/Store';
+import Product from '../models/Product';
 import Category from '../models/Category';
 import SubscriptionPlan from '../models/SubscriptionPlan';
 import Integration from '../models/Integration';
@@ -262,6 +263,96 @@ export class AdminController {
         } catch (error: any) {
             console.error('Admin Error [getIntegrations]:', error);
             return res.status(500).json({ error: 'Failed to fetch integrations' });
+        }
+    }
+    // --- ALL PRODUCTS (Admin) ---
+    static async getAllProducts(_req: Request, res: Response): Promise<Response> {
+        try {
+            const products = await Product.findAll({
+                include: [{ model: Store, as: 'store', attributes: ['id', ['storeName', 'name']] }],
+                order: [['createdAt', 'DESC']]
+            });
+            return res.json({ data: products });
+        } catch (error) {
+            console.error('Admin Error [getAllProducts]:', error);
+            return res.status(500).json({ error: 'Failed to fetch products' });
+        }
+    }
+
+    static async updateProductByAdmin(req: Request, res: Response): Promise<Response> {
+        try {
+            const { id } = req.params;
+            const product = await Product.findByPk(id);
+            if (!product) return res.status(404).json({ error: 'Product not found' });
+
+            const {
+                title, description, category, gramWeight, milyem, effectiveMilyem,
+                profitMargin, isB2BEnabled, b2bDiscount, quantity, isActive,
+                images, marketplaces
+            } = req.body;
+
+            const goldPriceService = require('../services/goldPriceService').default;
+            const finalMilyem = milyem ?? product.milyem;
+            const finalEffective = (effectiveMilyem && effectiveMilyem >= finalMilyem) ? effectiveMilyem : finalMilyem;
+            const finalGram = gramWeight ?? product.gramWeight;
+            const finalMargin = profitMargin ?? product.profitMargin;
+            const gramHas = Math.round(finalGram * (finalEffective / 1000) * 10000) / 10000;
+            const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(finalGram, finalEffective, finalMargin);
+            const finalIsB2B = isB2BEnabled !== undefined ? !!isB2BEnabled : product.isB2BEnabled;
+            const finalDiscount = b2bDiscount ?? product.b2bDiscount;
+            const b2bPrice = finalIsB2B ? Math.round(priceTRY * (1 - finalDiscount / 100) * 100) / 100 : 0;
+
+            await product.update({
+                title: title ?? product.title,
+                description: description ?? product.description,
+                category: category ?? product.category,
+                gramWeight: finalGram,
+                milyem: finalMilyem,
+                effectiveMilyem: finalEffective,
+                gramHas,
+                profitMargin: finalMargin,
+                priceTRY,
+                priceUSD,
+                isB2BEnabled: finalIsB2B,
+                b2bDiscount: finalDiscount,
+                b2bPrice,
+                quantity: quantity ?? product.quantity,
+                isActive: isActive ?? product.isActive,
+                images: images ?? product.images,
+                marketplaces: marketplaces ?? product.marketplaces,
+            });
+            return res.json(product);
+        } catch (error: any) {
+            console.error('Admin Error [updateProductByAdmin]:', error);
+            return res.status(400).json({ error: error.message || 'Failed to update product' });
+        }
+    }
+
+    // --- USER PLAN ASSIGNMENT ---
+    static async assignPlanToUser(req: Request, res: Response): Promise<Response> {
+        try {
+            const { id } = req.params;
+            const { subscriptionPlanId, subscriptionStatus } = req.body;
+
+            const user = await User.findByPk(id);
+            if (!user) return res.status(404).json({ error: 'User not found' });
+
+            let planName: string | undefined;
+            if (subscriptionPlanId) {
+                const plan = await SubscriptionPlan.findByPk(subscriptionPlanId);
+                if (!plan) return res.status(404).json({ error: 'Subscription plan not found' });
+                planName = plan.name;
+            }
+
+            await user.update({
+                subscriptionPlan: planName || user.subscriptionPlan,
+                subscriptionStatus: subscriptionStatus || 'active'
+            } as any);
+
+            return res.json({ success: true, user });
+        } catch (error: any) {
+            console.error('Admin Error [assignPlanToUser]:', error);
+            return res.status(500).json({ error: error.message || 'Failed to assign plan' });
         }
     }
 }

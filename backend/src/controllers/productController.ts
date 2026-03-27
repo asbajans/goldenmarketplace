@@ -7,6 +7,8 @@ import { Request, Response } from 'express';
 import { Op } from 'sequelize';
 import Product from '../models/Product';
 import Store from '../models/Store';
+import User from '../models/User';
+import SubscriptionPlan from '../models/SubscriptionPlan';
 import goldPriceService from '../services/goldPriceService';
 import { productSyncQueue } from '../jobs/productSyncJob';
 
@@ -94,6 +96,28 @@ export class ProductController {
         return res.status(400).json({
           error: { message: 'You do not have a store created yet.', status: 400 }
         });
+      }
+
+      // Subscription plan limit enforcement
+      const user = await User.findByPk((req as any).user.id);
+      const FREE_TIER_LIMIT = 5;
+      if (user) {
+        let productLimit = FREE_TIER_LIMIT;
+        if (user.subscriptionPlan) {
+          const plan = await SubscriptionPlan.findOne({ where: { name: user.subscriptionPlan, isActive: true } });
+          if (plan) productLimit = plan.productLimit;
+        }
+        const existingCount = await Product.count({ where: { storeId: store.id } });
+        if (existingCount >= productLimit) {
+          return res.status(403).json({
+            error: {
+              message: `Paket limitinize ulaştınız. Mevcut paketiniz maksimum ${productLimit} ürün izni vermektedir. Lütfen pakedinizi yükseltin.`,
+              status: 403,
+              productLimit,
+              currentCount: existingCount
+            }
+          });
+        }
       }
 
       // Calculate prices from gram + effectiveMilyem + profit margin
