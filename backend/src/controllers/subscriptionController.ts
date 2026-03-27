@@ -12,7 +12,7 @@ export class SubscriptionController {
         try {
             const plans = await SubscriptionPlan.findAll({
                 where: { isActive: true },
-                order: [['price', 'ASC']]
+                order: [['monthlyPrice', 'ASC']]
             });
             return res.status(200).json(plans);
         } catch (error) {
