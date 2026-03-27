@@ -55,6 +55,9 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [b2bPrice, setB2bPrice] = useState<number>(0);
     const [gramHas, setGramHas] = useState<number>(0);
     const [isB2BEnabled, setIsB2BEnabled] = useState(false);
+    const [tags, setTags] = useState<string[]>([]);
+    const [integrations, setIntegrations] = useState<Integration[]>([]);
+    const [integrationsLoading, setIntegrationsLoading] = useState(true);
     const isCloned = !!initialValues?.originalStoreName;
 
     useEffect(() => {
