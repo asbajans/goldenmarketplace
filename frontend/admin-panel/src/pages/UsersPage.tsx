@@ -27,7 +27,7 @@ export const UsersPage: React.FC = () => {
                 AdminAPI.getUsers(),
                 AdminAPI.getSubscriptionPlans()
             ]);
-            setUsers(Array.isArray(usersRes?.data) ? usersRes.data : []);
+            setUsers(Array.isArray(usersRes) ? usersRes : []);
             setPlans(Array.isArray(plansRes) ? plansRes : []);
         } catch (error) {
             message.error('Veriler yüklenemedi');

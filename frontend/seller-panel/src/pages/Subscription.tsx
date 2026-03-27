@@ -85,9 +85,10 @@ const Subscription: React.FC = () => {
                                     )}
                                     <div style={{ textAlign: 'center', marginBottom: 20 }}>
                                         <Title level={3} style={{ color: planColor }}>{plan.name}</Title>
-                                        <Title level={1} style={{ margin: '10px 0' }}>
-                                            {plan.price}₺ <span style={{ fontSize: '16px', color: '#999' }}>/{plan.interval === 'year' ? 'yıl' : 'ay'}</span>
+                                        <Title level={2} style={{ margin: '10px 0' }}>
+                                            {plan.monthlyPrice}₺ <span style={{ fontSize: '16px', color: '#999' }}>/ ay</span>
                                         </Title>
+                                        <Paragraph type="secondary" style={{ margin: 0 }}>Yıllık: {plan.yearlyPrice}₺</Paragraph>
                                     </div>
 
                                     <div style={{ flex: 1 }}>
