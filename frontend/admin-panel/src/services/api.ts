@@ -65,6 +65,11 @@ export const AdminAPI = {
     createUser: (data: any) => api.post('/users', data).then((res) => res.data),
     updateUser: (id: string, data: any) => api.put(`/users/${id}`, data).then((res) => res.data),
     deleteUser: (id: string) => api.delete(`/users/${id}`).then((res) => res.data),
+    assignPlanToUser: (id: string, data: any) => api.put(`/users/${id}/assign-plan`, data).then((res) => res.data),
+
+    // Products (All Stores)
+    getAllProducts: () => api.get('/products').then((res) => res.data),
+    updateProduct: (id: string, data: any) => api.put(`/products/${id}`, data).then((res) => res.data),
 
     // Stores
     getStores: () => api.get('/stores').then((res) => res.data),

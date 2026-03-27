@@ -13,6 +13,7 @@ import './App.css';
 
 import UsersPage from './pages/UsersPage';
 import SellersPage from './pages/SellersPage';
+import ProductsPage from './pages/ProductsPage';
 import CategoriesPage from './pages/CategoriesPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import IntegrationsPage from './pages/IntegrationsPage';
@@ -75,6 +76,11 @@ function App() {
       label: 'Satıcılar'
     },
     {
+      key: 'products',
+      icon: <ShoppingOutlined />,
+      label: 'Tüm Ürünler'
+    },
+    {
       key: 'categories',
       icon: <AppstoreOutlined />,
       label: 'Kategoriler'
@@ -132,6 +138,9 @@ function App() {
 
       case 'sellers':
         return <SellersPage />;
+
+      case 'products':
+        return <ProductsPage />;
 
       case 'categories':
         return <CategoriesPage />;

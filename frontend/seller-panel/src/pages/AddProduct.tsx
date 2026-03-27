@@ -27,13 +27,11 @@ interface Integration {
     isActive: boolean;
 }
 
-const CATEGORIES = [
-    'Bilezik', 'Kolye', 'Yüzük', 'Küpe', 'Gram Altın',
-    'Cumhuriyet Altını', 'Çeyrek Altın', 'Yarım Altın',
-    'Tam Altın', 'Pırlanta', 'Gümüş', 'Diğer'
-];
-
-
+interface Category {
+    id: string;
+    name: string;
+    slug: string;
+}
 
 const ALL_PLATFORMS = [
     { key: 'golden', name: 'Golden Marketplace', color: '#d4a017' },
@@ -57,13 +55,24 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [isB2BEnabled, setIsB2BEnabled] = useState(false);
     const [tags, setTags] = useState<string[]>([]);
     const [integrations, setIntegrations] = useState<Integration[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]);
     const [integrationsLoading, setIntegrationsLoading] = useState(true);
     const isCloned = !!initialValues?.originalStoreName;
 
     useEffect(() => {
         fetchGoldPrice();
         fetchIntegrations();
+        fetchCategories();
     }, []);
+
+    const fetchCategories = async () => {
+        try {
+            const { data } = await client.get('/categories');
+            setCategories(Array.isArray(data) ? data : []);
+        } catch (error) {
+            console.error('Failed to fetch categories:', error);
+        }
+    };
 
     const fetchGoldPrice = async () => {
         try {
@@ -227,7 +236,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                     <Col span={12}>
                         <Form.Item name="category" label="Kategori" rules={[{ required: true, message: 'Kategori seçiniz' }]}>
                             <Select placeholder="Kategori Seçin" onChange={handleCategoryChange} disabled={isCloned}>
-                                {CATEGORIES.map(c => <Option key={c} value={c}>{c}</Option>)}
+                                {categories.map(c => <Option key={c.id} value={c.name}>{c.name}</Option>)}
                             </Select>
                         </Form.Item>
                     </Col>
