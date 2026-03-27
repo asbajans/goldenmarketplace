@@ -27,6 +27,7 @@ interface ProductAttributes {
   b2bPrice: number;
   quantity: number;
   images: string[];
+  videos?: string[];
   videoUrl?: string;
   marketplaces?: string[];
   tags?: string[];
@@ -57,6 +58,7 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public b2bPrice!: number;
   public quantity!: number;
   public images!: string[];
+  public videos?: string[];
   public videoUrl?: string;
   public marketplaces?: string[];
   public tags?: string[];
@@ -164,6 +166,11 @@ Product.init(
       defaultValue: 0
     },
     images: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      defaultValue: []
+    },
+    videos: {
       type: DataTypes.JSON,
       allowNull: true,
       defaultValue: []

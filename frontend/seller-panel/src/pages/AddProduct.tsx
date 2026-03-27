@@ -4,6 +4,8 @@ import {
     Form, Input, Button, InputNumber, message, Upload,
     Select, Checkbox, Space, Card, Tag, Typography, Statistic, Row, Col, Divider, Spin, Tooltip
 } from 'antd';
+import type { UploadFile, UploadChangeParam } from 'antd/es/upload';
+import type { RcFile } from 'antd/es/upload/interface';
 import {
     PlusOutlined, VideoCameraOutlined,
     DoubleRightOutlined, InfoCircleOutlined,
@@ -57,12 +59,25 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [integrations, setIntegrations] = useState<Integration[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [integrationsLoading, setIntegrationsLoading] = useState(true);
+    const [fileList, setFileList] = useState<UploadFile[]>([]);
+    const [videoFile, setVideoFile] = useState<UploadFile[]>([]);
     const isCloned = !!initialValues?.originalStoreName;
 
     useEffect(() => {
         fetchGoldPrice();
         fetchIntegrations();
         fetchCategories();
+        // Pre-populate image previews when editing
+        if (initialValues?.images && Array.isArray(initialValues.images) && initialValues.images.length > 0) {
+            setFileList(
+                initialValues.images.map((url: string, i: number) => ({
+                    uid: `-${i}`,
+                    name: `image-${i}`,
+                    status: 'done',
+                    url
+                } as UploadFile))
+            );
+        }
     }, []);
 
     const fetchCategories = async () => {
@@ -95,6 +110,16 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         } finally {
             setIntegrationsLoading(false);
         }
+    };
+
+    // Convert a File object to a base64 data URL string
+    const convertToBase64 = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+        });
     };
 
     const calculateLivePrice = useCallback((gramWeight?: number, milyem?: number, effectiveMilyem?: number, profitMargin?: number, b2bDiscount?: number) => {
@@ -157,12 +182,26 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 ? Math.round(priceTRY * (1 - b2bDiscount / 100) * 100) / 100
                 : priceTRY;
 
+            // Convert selected images to base64
+            const rawImageFiles = fileList
+                .map(f => f.originFileObj)
+                .filter((f): f is RcFile => !!f);
+            const base64Images: string[] = await Promise.all(rawImageFiles.map(convertToBase64));
+            // Include existing images (already URLs when editing)
+            const existingUrls = fileList.filter(f => f.url && !f.originFileObj).map(f => f.url as string);
+            const allImages = [...existingUrls, ...base64Images];
+
+            // Convert video if selected
+            const rawVideoFiles = videoFile.map(f => f.originFileObj).filter((f): f is RcFile => !!f);
+            const base64Videos: string[] = await Promise.all(rawVideoFiles.map(convertToBase64));
+
             await createProduct({
                 ...values,
                 profitMargin: values.profitMargin || 0,
                 quantity: Number(values.quantity || 0),
                 tags,
-                images: [],
+                images: allImages,
+                videos: base64Videos,
                 marketplaces: values.marketplaces || ['golden'],
                 isB2BEnabled,
                 b2bDiscount: isB2BEnabled ? b2bDiscount : 0,
@@ -176,6 +215,8 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             setB2bPrice(0);
             setIsB2BEnabled(false);
             setTags([]);
+            setFileList([]);
+            setVideoFile([]);
             onSuccess();
         } catch (error: any) {
             console.error(error);
@@ -463,16 +504,33 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             {/* MEDYA */}
             <Card title="Medya ve Açıklama" style={{ marginBottom: 16 }}>
                 <Form.Item label="Ürün Görselleri (Maks 6)">
-                    <Upload disabled={isCloned} listType="picture-card" maxCount={6} beforeUpload={() => false}>
-                        <div>
-                            <PlusOutlined />
-                            <div style={{ marginTop: 8 }}>Yükle</div>
-                        </div>
+                    <Upload
+                        disabled={isCloned}
+                        listType="picture-card"
+                        maxCount={6}
+                        fileList={fileList}
+                        beforeUpload={() => false}
+                        accept="image/*"
+                        onChange={({ fileList: newList }: UploadChangeParam) => setFileList(newList)}
+                    >
+                        {fileList.length < 6 && (
+                            <div>
+                                <PlusOutlined />
+                                <div style={{ marginTop: 8 }}>Yükle</div>
+                            </div>
+                        )}
                     </Upload>
                 </Form.Item>
 
                 <Form.Item label="Ürün Videosu">
-                    <Upload disabled={isCloned} maxCount={1} beforeUpload={() => false}>
+                    <Upload
+                        disabled={isCloned}
+                        maxCount={1}
+                        fileList={videoFile}
+                        beforeUpload={() => false}
+                        accept="video/*"
+                        onChange={({ fileList: newList }: UploadChangeParam) => setVideoFile(newList)}
+                    >
                         <Button disabled={isCloned} icon={<VideoCameraOutlined />}>Video Seç</Button>
                     </Upload>
                 </Form.Item>
