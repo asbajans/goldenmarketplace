@@ -119,6 +119,9 @@ export class AuthController {
           firstName: user.firstName,
           lastName: user.lastName,
           userType: user.userType,
+          subscriptionPlan: user.subscriptionPlan,
+          subscriptionStatus: user.subscriptionStatus,
+          subscriptionEndDate: user.subscriptionEndDate,
           store: (user as any).store
         }
       });
@@ -205,6 +208,9 @@ export class AuthController {
           lastName: user.lastName,
           userType: user.userType,
           isActive: user.isActive,
+          subscriptionPlan: user.subscriptionPlan,
+          subscriptionStatus: user.subscriptionStatus,
+          subscriptionEndDate: user.subscriptionEndDate,
           store: (user as any).store
         }
       });

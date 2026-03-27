@@ -1,30 +1,45 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Card, Button, Space, Modal, Form, Input, Select, Switch, message, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, GiftOutlined } from '@ant-design/icons';
 import { AdminAPI } from '../services/api';
+
+const { Option } = Select;
 
 export const UsersPage: React.FC = () => {
     const [users, setUsers] = useState<any[]>([]);
+    const [plans, setPlans] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    
+    // User Edit Modal
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [editingUser, setEditingUser] = useState<any>(null);
     const [form] = Form.useForm();
 
-    const fetchUsers = async () => {
+    // Plan Assignment Modal
+    const [isAssignModalVisible, setIsAssignModalVisible] = useState(false);
+    const [assigningUser, setAssigningUser] = useState<any>(null);
+    const [assignForm] = Form.useForm();
+
+    const fetchData = async () => {
         setLoading(true);
         try {
-            const data = await AdminAPI.getUsers();
-            setUsers(Array.isArray(data) ? data : []);
+            const [usersRes, plansRes] = await Promise.all([
+                AdminAPI.getUsers(),
+                AdminAPI.getSubscriptionPlans()
+            ]);
+            setUsers(Array.isArray(usersRes?.data) ? usersRes.data : []);
+            setPlans(Array.isArray(plansRes) ? plansRes : []);
         } catch (error) {
-            message.error('Failed to load users');
+            message.error('Veriler yüklenemedi');
             setUsers([]);
+            setPlans([]);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchUsers();
+        fetchData();
     }, []);
 
     const handleAdd = () => {
@@ -40,16 +55,26 @@ export const UsersPage: React.FC = () => {
         setIsModalVisible(true);
     };
 
+    const handleAssignPlan = (record: any) => {
+        setAssigningUser(record);
+        const userPlan = plans.find(p => p.name === record.subscriptionPlan);
+        assignForm.setFieldsValue({
+            subscriptionPlanId: userPlan?.id,
+            subscriptionStatus: record.subscriptionStatus || 'active'
+        });
+        setIsAssignModalVisible(true);
+    };
+
     const handleDelete = (id: string) => {
         Modal.confirm({
-            title: 'Are you sure you want to delete this user?',
+            title: 'Kullanıcıyı silmek istediğinize emin misiniz?',
             onOk: async () => {
                 try {
                     await AdminAPI.deleteUser(id);
-                    message.success('User deleted successfully');
-                    fetchUsers();
+                    message.success('Kullanıcı silindi');
+                    fetchData();
                 } catch (error) {
-                    message.error('Failed to delete user');
+                    message.error('Kullanıcı silinemedi');
                 }
             }
         });
@@ -59,30 +84,58 @@ export const UsersPage: React.FC = () => {
         try {
             if (editingUser) {
                 await AdminAPI.updateUser(editingUser.id, values);
-                message.success('User updated successfully');
+                message.success('Kullanıcı güncellendi');
             } else {
                 await AdminAPI.createUser(values);
-                message.success('User created successfully');
+                message.success('Kullanıcı oluşturuldu');
             }
             setIsModalVisible(false);
-            fetchUsers();
+            fetchData();
         } catch (error: any) {
             const errMsg = error.response?.data?.error;
-            message.error(typeof errMsg === 'string' ? errMsg : 'Operation failed');
+            message.error(typeof errMsg === 'string' ? errMsg : 'İşlem başarısız');
+        }
+    };
+
+    const submitAssignPlan = async (values: any) => {
+        if (!assigningUser) return;
+        try {
+            await AdminAPI.assignPlanToUser(assigningUser.id, values);
+            message.success('Paket ataması başarılı. Süre bugün itibariyle +1 Ay uzatıldı.');
+            setIsAssignModalVisible(false);
+            fetchData();
+        } catch (error) {
+            message.error('Paket atanamadı');
         }
     };
 
     const columns = [
         { title: 'Ad Soyad', key: 'name', render: (_: any, record: any) => `${record.firstName} ${record.lastName}` },
         { title: 'E-posta', dataIndex: 'email', key: 'email' },
-        { title: 'Telefon', dataIndex: 'phone', key: 'phone' },
         {
             title: 'Tip',
             dataIndex: 'userType',
             key: 'userType',
             render: (type: string) => {
                 const colors: any = { admin: 'red', seller: 'blue', customer: 'green' };
-                return <Tag color={colors[type]}>{type.toUpperCase()}</Tag>;
+                return <Tag color={colors[type]}>{type?.toUpperCase()}</Tag>;
+            }
+        },
+        { 
+            title: 'Abonelik Paketi', 
+            dataIndex: 'subscriptionPlan', 
+            key: 'subscriptionPlan',
+            render: (val: string, record: any) => {
+                if (record.userType !== 'seller') return '-';
+                return val ? <Tag color="purple">{val}</Tag> : <Tag color="default">Varsayılan (5 Limit)</Tag>;
+            }
+        },
+        { 
+            title: 'Bitiş Tarihi', 
+            key: 'endDate',
+            render: (_: any, record: any) => {
+                if (record.userType !== 'seller' || !record.subscriptionEndDate) return '-';
+                return new Date(record.subscriptionEndDate).toLocaleDateString('tr-TR');
             }
         },
         {
@@ -96,6 +149,11 @@ export const UsersPage: React.FC = () => {
             key: 'actions',
             render: (_: any, record: any) => (
                 <Space>
+                    {record.userType === 'seller' && (
+                        <Button size="small" type="primary" ghost icon={<GiftOutlined />} onClick={() => handleAssignPlan(record)}>
+                            Paket Ata
+                        </Button>
+                    )}
                     <Button icon={<EditOutlined />} type="link" onClick={() => handleEdit(record)} />
                     <Button icon={<DeleteOutlined />} type="link" danger onClick={() => handleDelete(record.id)} />
                 </Space>
@@ -110,7 +168,8 @@ export const UsersPage: React.FC = () => {
                 columns={columns}
                 rowKey="id"
                 loading={loading}
-                pagination={{ pageSize: 10 }}
+                pagination={{ pageSize: 15 }}
+                scroll={{ x: 'max-content' }}
             />
 
             <Modal
@@ -120,12 +179,14 @@ export const UsersPage: React.FC = () => {
                 onOk={() => form.submit()}
             >
                 <Form form={form} layout="vertical" onFinish={parseSubmit}>
-                    <Form.Item name="firstName" label="Ad" rules={[{ required: true }]}>
-                        <Input />
-                    </Form.Item>
-                    <Form.Item name="lastName" label="Soyad" rules={[{ required: true }]}>
-                        <Input />
-                    </Form.Item>
+                    <Space size="large">
+                        <Form.Item name="firstName" label="Ad" rules={[{ required: true }]}>
+                            <Input />
+                        </Form.Item>
+                        <Form.Item name="lastName" label="Soyad" rules={[{ required: true }]}>
+                            <Input />
+                        </Form.Item>
+                    </Space>
                     <Form.Item name="email" label="E-posta" rules={[{ required: true, type: 'email' }]}>
                         <Input />
                     </Form.Item>
@@ -134,23 +195,43 @@ export const UsersPage: React.FC = () => {
                             <Input.Password />
                         </Form.Item>
                     )}
-                    {editingUser && (
-                        <Form.Item name="password" label="Yeni Şifre (Boş bırakılabilir)">
-                            <Input.Password placeholder="Değiştirmek istemiyorsanız boş bırakın" />
-                        </Form.Item>
-                    )}
-                    <Form.Item name="phone" label="Telefon">
-                        <Input />
-                    </Form.Item>
                     <Form.Item name="userType" label="Kullanıcı Tipi" rules={[{ required: true }]}>
                         <Select>
-                            <Select.Option value="customer">Customer</Select.Option>
-                            <Select.Option value="seller">Seller</Select.Option>
-                            <Select.Option value="admin">Admin</Select.Option>
+                            <Option value="customer">Customer</Option>
+                            <Option value="seller">Seller</Option>
+                            <Option value="admin">Admin</Option>
                         </Select>
                     </Form.Item>
                     <Form.Item name="isActive" label="Aktif mi?" valuePropName="checked">
                         <Switch />
+                    </Form.Item>
+                </Form>
+            </Modal>
+
+            <Modal
+                title={`Paket Ata: ${assigningUser?.firstName} ${assigningUser?.lastName}`}
+                open={isAssignModalVisible}
+                onCancel={() => setIsAssignModalVisible(false)}
+                onOk={() => assignForm.submit()}
+            >
+                <div style={{ background: '#e6f7ff', padding: '12px', borderRadius: 8, marginBottom: 16 }}>
+                    <span style={{ color: '#1890ff', fontWeight: 600 }}>Bilgi:</span> Buradan paket atadığınızda satıcının abonelik başlama tarihi bugün olarak ayarlanır ve bitiş tarihi tam <b>30 gün</b> sonrasına uzatılır.
+                </div>
+                <Form form={assignForm} layout="vertical" onFinish={submitAssignPlan}>
+                    <Form.Item name="subscriptionPlanId" label="Abonelik Paketi (Limit)">
+                        <Select placeholder="Paket Seçiniz" allowClear>
+                            {plans.map(p => (
+                                <Option key={p.id} value={p.id}>{p.name} ({p.productLimit} Ürün)</Option>
+                            ))}
+                        </Select>
+                    </Form.Item>
+                    <Form.Item name="subscriptionStatus" label="Abonelik Durumu">
+                        <Select>
+                            <Option value="active">Aktif</Option>
+                            <Option value="inactive">Pasif / Bekleniyor</Option>
+                            <Option value="past_due">Gecikmiş Ödeme</Option>
+                            <Option value="canceled">İptal Edildi</Option>
+                        </Select>
                     </Form.Item>
                 </Form>
             </Modal>

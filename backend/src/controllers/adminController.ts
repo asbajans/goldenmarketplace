@@ -344,9 +344,14 @@ export class AdminController {
                 planName = plan.name;
             }
 
+            // Calculate end date (+30 days)
+            const endDate = new Date();
+            endDate.setDate(endDate.getDate() + 30);
+
             await user.update({
                 subscriptionPlan: planName || user.subscriptionPlan,
-                subscriptionStatus: subscriptionStatus || 'active'
+                subscriptionStatus: subscriptionStatus || 'active',
+                subscriptionEndDate: endDate
             } as any);
 
             return res.json({ success: true, user });

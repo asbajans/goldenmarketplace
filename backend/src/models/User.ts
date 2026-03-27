@@ -18,6 +18,7 @@ interface UserAttributes {
   stripeCustomerId?: string;
   subscriptionStatus?: 'active' | 'inactive' | 'past_due' | 'canceled' | 'trialing';
   subscriptionPlan?: string;
+  subscriptionEndDate?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -34,6 +35,7 @@ class User extends Model<UserAttributes> implements UserAttributes {
   public stripeCustomerId?: string;
   public subscriptionStatus?: 'active' | 'inactive' | 'past_due' | 'canceled' | 'trialing';
   public subscriptionPlan?: string;
+  public subscriptionEndDate?: Date;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -86,6 +88,10 @@ User.init(
     },
     subscriptionPlan: {
       type: DataTypes.STRING,
+      allowNull: true
+    },
+    subscriptionEndDate: {
+      type: DataTypes.DATE,
       allowNull: true
     }
   },
