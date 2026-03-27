@@ -53,11 +53,8 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [priceTRY, setPriceTRY] = useState<number>(0);
     const [priceUSD, setPriceUSD] = useState<number>(0);
     const [b2bPrice, setB2bPrice] = useState<number>(0);
+    const [gramHas, setGramHas] = useState<number>(0);
     const [isB2BEnabled, setIsB2BEnabled] = useState(false);
-    const [tags, setTags] = useState<string[]>([]);
-    const [integrations, setIntegrations] = useState<Integration[]>([]);
-    const [integrationsLoading, setIntegrationsLoading] = useState(true);
-
     const isCloned = !!initialValues?.originalStoreName;
 
     useEffect(() => {
@@ -88,11 +85,16 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         }
     };
 
-    const calculateLivePrice = useCallback((gramWeight?: number, milyem?: number, profitMargin?: number, b2bDiscount?: number) => {
+    const calculateLivePrice = useCallback((gramWeight?: number, milyem?: number, effectiveMilyem?: number, profitMargin?: number, b2bDiscount?: number) => {
         const gw = gramWeight || 0;
         const ml = milyem || 0;
+        const em = (effectiveMilyem && effectiveMilyem >= ml) ? effectiveMilyem : ml;
         const pm = profitMargin || 0;
         const bd = b2bDiscount || 0;
+
+        if (gw > 0) {
+            setGramHas(Math.round(gw * (em / 1000) * 10000) / 10000);
+        }
 
         if (isCloned) {
             const initialMargin = initialValues?.profitMargin || 0;
@@ -103,8 +105,8 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             setPriceTRY(Math.round(tl * 100) / 100);
             setPriceUSD(Math.round(usd * 100) / 100);
             setB2bPrice(0);
-        } else if (gw > 0 && ml > 0 && gold24KGramTRY > 0) {
-            const materialCost = gw * (ml / 1000) * gold24KGramTRY;
+        } else if (gw > 0 && em > 0 && gold24KGramTRY > 0) {
+            const materialCost = gw * (em / 1000) * gold24KGramTRY;
             const tl = materialCost * (1 + pm / 100);
             const usd = tl / usdTryRate;
             const b2b = tl * (1 - bd / 100);
@@ -200,8 +202,9 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             }}
             onFinish={onFinish}
             onValuesChange={(changed, allValues) => {
-                if (changed.gramWeight !== undefined || changed.milyem !== undefined || changed.profitMargin !== undefined || changed.b2bDiscount !== undefined) {
-                    calculateLivePrice(allValues.gramWeight, allValues.milyem, allValues.profitMargin, allValues.b2bDiscount);
+                if (changed.gramWeight !== undefined || changed.milyem !== undefined ||
+                    changed.effectiveMilyem !== undefined || changed.profitMargin !== undefined || changed.b2bDiscount !== undefined) {
+                    calculateLivePrice(allValues.gramWeight, allValues.milyem, allValues.effectiveMilyem, allValues.profitMargin, allValues.b2bDiscount);
                 }
             }}
         >
@@ -295,14 +298,18 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                             />
                         </Form.Item>
                     </Col>
-                    <Col span={6}>
+                    <Col span={4}>
                         <Form.Item
                             name="milyem"
-                            label="Milyem (Saflık)"
+                            label={
+                              <Tooltip title="Takının gerçek alaşım saflığı (333=8K, 585=14K, 750=18K, 916=22K, 999=24K)">
+                                Alaşım Milyemi <InfoCircleOutlined style={{ color: '#888', fontSize: 11 }} />
+                              </Tooltip>
+                            }
                             rules={[{ required: true, message: 'Milyem giriniz' }]}
                         >
                             <InputNumber 
-                                placeholder="Örn: 916" 
+                                placeholder="Örn: 916"
                                 disabled={isCloned} 
                                 style={{ width: '100%' }}
                                 min={1}
@@ -311,7 +318,26 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                             />
                         </Form.Item>
                     </Col>
-                    <Col span={6}>
+                    <Col span={4}>
+                        <Form.Item
+                            name="effectiveMilyem"
+                            label={
+                              <Tooltip title="İşçilik ve kâr dahil kuyumcu hesabıyla bulunan efektif saf altın milyemi. Boş bırakılırsa alaşım milyemi kullanılır.">
+                                Efektif Milyem <InfoCircleOutlined style={{ color: '#d4a017', fontSize: 11 }} />
+                              </Tooltip>
+                            }
+                        >
+                            <InputNumber
+                                placeholder="Örn: 980"
+                                disabled={isCloned}
+                                style={{ width: '100%' }}
+                                min={1}
+                                max={1000}
+                                step={1}
+                            />
+                        </Form.Item>
+                    </Col>
+                    <Col span={4}>
                         <Form.Item
                             name="profitMargin"
                             label={<><PercentageOutlined /> Kâr Marjı (%)</>}
@@ -328,12 +354,18 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                         </Form.Item>
                     </Col>
                     <Col span={6}>
-                        <Form.Item
-                            name="quantity"
-                            label="Stok Adedi"
-                            rules={[{ required: true }]}
-                        >
-                            <InputNumber style={{ width: '100%' }} min={0} placeholder="0" />
+                        <Form.Item name="quantity" label="Stok Adedi" rules={[{ required: true }]}>
+                            <InputNumber style={{ width: '100%' }} min={0} placeholder="0" disabled={isCloned} />
+                        </Form.Item>
+                    </Col>
+                    <Col span={6}>
+                        <Form.Item label="Gram Has (Has Altın Eşdeğeri)">
+                            <div style={{ background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 6, padding: '8px 12px', textAlign: 'center' }}>
+                                <span style={{ fontSize: 18, fontWeight: 700, color: '#d4a017' }}>
+                                    {gramHas > 0 ? gramHas.toLocaleString('tr-TR', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '—'}
+                                </span>
+                                <span style={{ fontSize: 12, color: '#888', marginLeft: 4 }}>gr has</span>
+                            </div>
                         </Form.Item>
                     </Col>
                 </Row>

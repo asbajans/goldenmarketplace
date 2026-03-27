@@ -17,6 +17,8 @@ interface ProductAttributes {
   sku: string;
   gramWeight: number;
   milyem: number;
+  effectiveMilyem?: number;
+  gramHas?: number;
   profitMargin: number;
   priceTRY: number;
   priceUSD: number;
@@ -45,6 +47,8 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public sku!: string;
   public gramWeight!: number;
   public milyem!: number;
+  public effectiveMilyem?: number;
+  public gramHas?: number;
   public profitMargin!: number;
   public priceTRY!: number;
   public priceUSD!: number;
@@ -107,7 +111,17 @@ Product.init(
     milyem: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      comment: 'Gold fineness (333=8K, 585=14K, 750=18K, 916=22K, 999=24K)'
+      comment: 'Gold fineness of the alloy (333=8K, 585=14K, 750=18K, 916=22K, 999=24K)'
+    },
+    effectiveMilyem: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: 'Labor+profit-adjusted effective milyem used for pure-gold pricing (>=milyem)'
+    },
+    gramHas: {
+      type: DataTypes.DECIMAL(10, 4),
+      allowNull: true,
+      comment: 'Calculated: gramWeight x effectiveMilyem/1000'
     },
     profitMargin: {
       type: DataTypes.DECIMAL(5, 2),

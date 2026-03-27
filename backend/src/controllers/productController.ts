@@ -67,7 +67,7 @@ export class ProductController {
     try {
       const {
         title, description, category, sku, quantity,
-        images, videoUrl, marketplaces, gramWeight, milyem, profitMargin,
+        images, videoUrl, marketplaces, gramWeight, milyem, effectiveMilyem, profitMargin,
         isB2BEnabled, b2bDiscount
       } = req.body;
 
@@ -77,11 +77,15 @@ export class ProductController {
           error: { message: 'Gram ağırlığı zorunludur ve 0\'dan büyük olmalıdır.', status: 400 }
         });
       }
-      if (!milyem || ![333, 585, 750, 916, 999].includes(milyem)) {
+      if (!milyem || milyem <= 0 || milyem > 1000) {
         return res.status(400).json({
-          error: { message: 'Geçerli bir milyem değeri giriniz (333, 585, 750, 916, 999).', status: 400 }
+          error: { message: 'Geçerli bir milyem değeri giriniz (1-1000).', status: 400 }
         });
       }
+
+      // effectiveMilyem must be >= milyem if provided
+      const finalEffectiveMilyem = effectiveMilyem && effectiveMilyem >= milyem ? effectiveMilyem : milyem;
+      const gramHas = Math.round(gramWeight * (finalEffectiveMilyem / 1000) * 10000) / 10000;
 
       // Find store for current user
       const store = await Store.findOne({ where: { userId: (req as any).user.id } });
@@ -92,8 +96,8 @@ export class ProductController {
         });
       }
 
-      // Calculate prices from gram + milyem + profit margin
-      const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(gramWeight, milyem, profitMargin || 0);
+      // Calculate prices from gram + effectiveMilyem + profit margin
+      const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(gramWeight, finalEffectiveMilyem, profitMargin || 0);
 
       // Handle B2B fields
       const finalB2bDiscount = isB2BEnabled ? (b2bDiscount || 0) : 0;
@@ -110,6 +114,8 @@ export class ProductController {
         sku,
         gramWeight,
         milyem,
+        effectiveMilyem: finalEffectiveMilyem,
+        gramHas,
         profitMargin: profitMargin || 0,
         priceTRY,
         priceUSD,
@@ -166,7 +172,7 @@ export class ProductController {
       const { id } = req.params;
       const {
         title, description, category, quantity,
-        images, videoUrl, marketplaces, gramWeight, milyem, profitMargin,
+        images, videoUrl, marketplaces, gramWeight, milyem, effectiveMilyem, profitMargin,
         isB2BEnabled, b2bDiscount
       } = req.body;
 
@@ -201,6 +207,9 @@ export class ProductController {
       const finalProfitMargin = profitMargin !== undefined ? profitMargin : product.profitMargin;
       const finalGramWeight = isCloned ? product.gramWeight : (gramWeight || product.gramWeight);
       const finalMilyem = isCloned ? product.milyem : (milyem || product.milyem);
+      const rawEffective = isCloned ? product.effectiveMilyem : (effectiveMilyem || product.effectiveMilyem);
+      const finalEffectiveMilyem = rawEffective && rawEffective >= finalMilyem ? rawEffective : finalMilyem;
+      const finalGramHas = Math.round(finalGramWeight * (finalEffectiveMilyem / 1000) * 10000) / 10000;
       
       if (isCloned && product.originalProductId) {
          const parent = await Product.findByPk(product.originalProductId);
@@ -219,7 +228,7 @@ export class ProductController {
          finalB2bPrice = 0;
       } else {
         const calcRes = await goldPriceService.calculateProductPrice(
-          Number(finalGramWeight), Number(finalMilyem), Number(finalProfitMargin)
+          Number(finalGramWeight), Number(finalEffectiveMilyem), Number(finalProfitMargin)
         );
         finalPriceTRY = calcRes.priceTRY;
         finalPriceUSD = calcRes.priceUSD;
@@ -243,6 +252,8 @@ export class ProductController {
         category: isCloned ? product.category : (category || product.category),
         gramWeight: finalGramWeight,
         milyem: finalMilyem,
+        effectiveMilyem: finalEffectiveMilyem,
+        gramHas: finalGramHas,
         profitMargin: finalProfitMargin,
         priceTRY: finalPriceTRY,
         priceUSD: finalPriceUSD,

@@ -8,6 +8,10 @@ export interface B2BProduct {
   id: string;
   title: string;
   category: string;
+  gramWeight: number;
+  milyem: number;
+  effectiveMilyem?: number;
+  gramHas?: number;
   priceTRY: number;
   priceUSD: number;
   b2bPrice: number;

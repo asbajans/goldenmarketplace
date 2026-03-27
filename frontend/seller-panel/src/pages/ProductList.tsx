@@ -84,7 +84,28 @@ const ProductList: React.FC = () => {
         },
         { title: 'Kategori', dataIndex: 'category', key: 'category' },
         { title: 'Gram', dataIndex: 'gramWeight', key: 'gramWeight', render: (val: number) => `${val} gr` },
-        { title: 'Milyem', dataIndex: 'milyem', key: 'milyem' },
+        { 
+            title: 'Milyem', 
+            key: 'milyem',
+            render: (_: any, record: Product) => (
+                <div style={{ lineHeight: 1.4 }}>
+                    <div><span style={{ color: '#666', fontSize: 11 }}>Alaşım: </span><strong>{record.milyem}</strong></div>
+                    {record.effectiveMilyem && record.effectiveMilyem !== record.milyem && (
+                        <div><span style={{ color: '#d4a017', fontSize: 11 }}>Efektif: </span><strong style={{ color: '#d4a017' }}>{record.effectiveMilyem}</strong></div>
+                    )}
+                </div>
+            )
+        },
+        { 
+            title: 'Gram Has', 
+            dataIndex: 'gramHas', 
+            key: 'gramHas',
+            render: (val: number) => val ? (
+                <span style={{ color: '#d4a017', fontWeight: 600 }}>
+                    {Number(val).toLocaleString('tr-TR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} gr has
+                </span>
+            ) : '—'
+        },
         { title: 'Fiyat (TL)', dataIndex: 'priceTRY', key: 'priceTRY', render: (val: number) => `${Number(val).toLocaleString('tr-TR')} ₺` },
         { title: 'Miktar', dataIndex: 'quantity', key: 'quantity' },
         {

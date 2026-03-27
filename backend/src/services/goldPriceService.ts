@@ -141,15 +141,17 @@ export class GoldPriceService {
 
     // Update original products first
     for (const product of nonClones) {
+      const usedMilyem = Number(product.effectiveMilyem || product.milyem);
       const { priceTRY } = this.calculatePrice(
         Number(product.gramWeight),
-        Number(product.milyem),
+        usedMilyem,
         Number(product.profitMargin || 0),
         gold.pricePerGramTRY
       );
+      const gramHas = Math.round(Number(product.gramWeight) * (usedMilyem / 1000) * 10000) / 10000;
       const b2bPrice = product.isB2BEnabled ? Math.round(priceTRY * (1 - (product.b2bDiscount || 0) / 100) * 100) / 100 : 0;
       const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
-      await product.update({ priceTRY, b2bPrice, priceUSD });
+      await product.update({ priceTRY, b2bPrice, priceUSD, gramHas });
       updatedCount++;
     }
 

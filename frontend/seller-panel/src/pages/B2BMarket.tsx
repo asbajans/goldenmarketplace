@@ -205,6 +205,23 @@ const B2BMarket: React.FC = () => {
                         </Text>
                       </div>
                     </div>
+                    {(product.gramHas || product.effectiveMilyem) && (
+                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #e8e8e8', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 10, background: '#fafafa', border: '1px solid #d9d9d9', borderRadius: 4, padding: '1px 6px' }}>
+                                Alaşım: <strong>{product.milyem}</strong>
+                            </span>
+                            {product.effectiveMilyem && product.effectiveMilyem !== product.milyem && (
+                                <span style={{ fontSize: 10, background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 4, padding: '1px 6px', color: '#d4a017' }}>
+                                    Efektif: <strong>{product.effectiveMilyem}</strong>
+                                </span>
+                            )}
+                            {product.gramHas && (
+                                <span style={{ fontSize: 10, background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 4, padding: '1px 6px', color: '#d46b08', fontWeight: 700 }}>
+                                    {Number(product.gramHas).toLocaleString('tr-TR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} gr has
+                                </span>
+                            )}
+                        </div>
+                    )}
                   </div>
                 </Card>
               </Col>
