@@ -126,6 +126,7 @@ const seed = async () => {
                 quantity: p.quantity,
                 images: p.images,
                 sku: p.sku,
+                hasVariants: false,
                 isActive: true
             });
         }
