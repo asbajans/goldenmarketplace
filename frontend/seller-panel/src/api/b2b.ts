@@ -18,6 +18,9 @@ export interface B2BProduct {
   b2bDiscount: number;
   images: string[];
   quantity: number;
+  hasVariants?: boolean;
+  variantAttributes?: string[];
+  variants?: any[];
   store: { id: string; name: string };
   myRequestStatus: 'pending' | 'approved' | 'rejected' | null;
 }
@@ -37,8 +40,8 @@ export interface B2BRequest {
 
 export const getB2BProducts = () => client.get<B2BProduct[]>('/b2b/products');
 
-export const createB2BRequest = (productId: string, requestNote?: string) =>
-  client.post('/b2b/requests', { productId, requestNote });
+export const createB2BRequest = (productId: string, variantId?: string, requestNote?: string) =>
+  client.post('/b2b/requests', { productId, variantId, requestNote });
 
 export const getIncomingRequests = () => client.get<B2BRequest[]>('/b2b/requests/incoming');
 

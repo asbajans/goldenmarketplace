@@ -30,6 +30,8 @@ interface ProductAttributes {
   videos?: string[];
   videoUrl?: string;
   marketplaces?: string[];
+  hasVariants: boolean;
+  variantAttributes?: any;
   tags?: string[];
   originalStoreName?: string;
   originalProductId?: string;
@@ -61,6 +63,8 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public videos?: string[];
   public videoUrl?: string;
   public marketplaces?: string[];
+  public hasVariants!: boolean;
+  public variantAttributes?: any;
   public tags?: string[];
   public originalStoreName?: string;
   public originalProductId?: string;
@@ -183,6 +187,17 @@ Product.init(
       type: DataTypes.JSON,
       allowNull: true,
       defaultValue: []
+    },
+    hasVariants: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false
+    },
+    variantAttributes: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: [],
+      comment: 'Array of variant configurations. e.g. [{"name": "Renk", "options": ["Sarı", "Beyaz"]}]'
     },
     tags: {
       type: DataTypes.JSON,

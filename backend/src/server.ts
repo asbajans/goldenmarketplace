@@ -129,6 +129,10 @@ app.listen(PORT, async () => {
 
     // Start Product Sync Worker
     require('./jobs/productSyncJob');
+    
+    // Start Log Cleanup Job
+    const { startLogCleanupJob } = require('./jobs/logCleanupJob');
+    startLogCleanupJob();
   } catch (error) {
     console.error('Failed to init jobs:', error);
   }

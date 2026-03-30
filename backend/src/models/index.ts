@@ -9,6 +9,8 @@ import MarketplaceIntegration from './MarketplaceIntegration';
 import GlobalSetting from './GlobalSetting';
 import ProductMarketplaceListing from './ProductMarketplaceListing';
 import B2BRequest from './B2BRequest';
+import IntegrationLog from './IntegrationLog';
+import ProductVariant from './ProductVariant';
 
 // User <-> Store (One-to-One)
 User.hasOne(Store, { foreignKey: 'userId', as: 'store' });
@@ -26,6 +28,10 @@ Integration.belongsTo(Store, { foreignKey: 'storeId', as: 'store' });
 User.hasMany(Subscription, { foreignKey: 'userId', as: 'subscriptions' });
 Subscription.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
+// Product <-> ProductVariant (One-to-Many)
+Product.hasMany(ProductVariant, { foreignKey: 'productId', as: 'variants' });
+ProductVariant.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+
 // Product <-> ProductMarketplaceListing (One-to-Many)
 Product.hasMany(ProductMarketplaceListing, { foreignKey: 'productId', as: 'marketplaceListings' });
 ProductMarketplaceListing.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
@@ -37,6 +43,8 @@ Store.hasMany(B2BRequest, { foreignKey: 'requesterStoreId', as: 'outgoingB2BRequ
 B2BRequest.belongsTo(Store, { foreignKey: 'requesterStoreId', as: 'requesterStore' });
 Store.hasMany(B2BRequest, { foreignKey: 'ownerStoreId', as: 'incomingB2BRequests' });
 B2BRequest.belongsTo(Store, { foreignKey: 'ownerStoreId', as: 'ownerStore' });
+ProductVariant.hasMany(B2BRequest, { foreignKey: 'variantId', as: 'b2bRequests' });
+B2BRequest.belongsTo(ProductVariant, { foreignKey: 'variantId', as: 'variant' });
 
 // Export all models
 export {
@@ -50,5 +58,7 @@ export {
     MarketplaceIntegration,
     GlobalSetting,
     ProductMarketplaceListing,
-    B2BRequest
+    B2BRequest,
+    IntegrationLog,
+    ProductVariant
 };

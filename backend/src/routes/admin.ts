@@ -40,6 +40,7 @@ router.put('/products/:id', AdminController.updateProductByAdmin);
 
 // --- INTEGRATIONS ---
 router.get('/integrations', AdminController.getIntegrations);
+router.get('/integration-logs', AdminController.getIntegrationLogs);
 
 // --- GLOBAL SETTINGS ---
 router.get('/settings', SettingsController.getSettings);

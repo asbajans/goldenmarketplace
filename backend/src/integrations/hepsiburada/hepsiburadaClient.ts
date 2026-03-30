@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
+import { attachApiLogger } from '../../utils/apiLogger';
 
 export interface HepsiburadaProduct {
     sku: string; // Merchant SKU
@@ -12,7 +13,7 @@ export class HepsiburadaClient {
     private client: AxiosInstance;
     private merchantId: string;
 
-    constructor(username: string, password: string, merchantId: string) {
+    constructor(username: string, password: string, merchantId: string, userId?: string) {
         const credentials = Buffer.from(`${username}:${password}`).toString('base64');
         this.merchantId = merchantId;
         this.client = axios.create({
@@ -23,6 +24,7 @@ export class HepsiburadaClient {
             },
             timeout: 15000
         });
+        attachApiLogger(this.client, userId, 'hepsiburada');
     }
 
     /**

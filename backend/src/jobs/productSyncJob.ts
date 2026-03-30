@@ -15,7 +15,9 @@ import dotenv from 'dotenv';
 import MarketplaceIntegration from '../models/MarketplaceIntegration';
 import ProductMarketplaceListing from '../models/ProductMarketplaceListing';
 import Product from '../models/Product';
-import TrendyolClient, { TrendyolCreateProductItem } from '../integrations/trendyol/trendyolClient';
+import ProductVariant from '../models/ProductVariant';
+import IntegrationLog from '../models/IntegrationLog';
+import TrendyolClient, { TrendyolCreateProductItem, TrendyolPriceUpdateItem } from '../integrations/trendyol/trendyolClient';
 import N11Client, { N11CreateProductItem } from '../integrations/n11/n11Client';
 import HepsiburadaClient from '../integrations/hepsiburada/hepsiburadaClient';
 
@@ -35,7 +37,9 @@ productSyncQueue.process(async (job) => {
     const { productId, userId, trigger } = job.data;
     console.log(`[ProductSync] Product ${productId} | Trigger: ${trigger}`);
 
-    const product = await Product.findByPk(productId);
+    const product: any = await Product.findByPk(productId, {
+        include: [{ model: ProductVariant, as: 'variants' }]
+    });
     if (!product) {
         console.error(`[ProductSync] Product ${productId} not found`);
         return;
@@ -87,6 +91,16 @@ productSyncQueue.process(async (job) => {
                 { status: 'failed', lastError: err.message },
                 { where: { productId: product.id, platform: integration.platform as any } }
             );
+
+            // LOG ERROR TO DB for User/Admin to see
+            await IntegrationLog.create({
+                userId: integration.userId,
+                platform: integration.platform as string,
+                endpoint: 'Sync Manager',
+                requestMethod: 'SYNC',
+                isSuccess: false,
+                errorMessage: `Senkronizasyon Hatası (${integration.platform}): ${err.message}`
+            });
         }
     }
 });
@@ -105,7 +119,7 @@ async function syncToTrendyol(integration: any, product: any, _trigger: string) 
         return;
     }
 
-    const client = new TrendyolClient(apiKey, apiSecret, shopId);
+    const client = new TrendyolClient(apiKey, apiSecret, shopId, integration.userId);
     const listPrice = Math.round(Number(product.priceTRY) * 1.1 * 100) / 100;
     const salePrice = Number(product.priceTRY);
 
@@ -120,7 +134,14 @@ async function syncToTrendyol(integration: any, product: any, _trigger: string) 
         // Validate we have required fields for create
         if (!integration.trendyolCategoryId || !integration.trendyolBrandId) {
             console.warn(`[Trendyol] categoryId or brandId not set in integration settings. Cannot create product.`);
-            console.warn(`[Trendyol] Please set trendyolCategoryId and trendyolBrandId in integration settings.`);
+            await IntegrationLog.create({
+                 userId: integration.userId,
+                 platform: 'trendyol',
+                 endpoint: 'Pre-Sync Validation',
+                 requestMethod: 'SYNC',
+                 isSuccess: false,
+                 errorMessage: `Ürün Gönderilemedi: Kategori veya Marka ID eşleştirmesi eksik (SKU: ${product.sku})`
+            });
             return;
         }
 
@@ -128,23 +149,47 @@ async function syncToTrendyol(integration: any, product: any, _trigger: string) 
             ? product.images.map((url: string) => ({ url }))
             : [{ url: 'https://asb.web.tr/product.jpg' }];
 
-        const item: TrendyolCreateProductItem = {
-            barcode: product.sku,
-            title: product.title,
-            productMainId: product.sku,
-            stockCode: product.sku,
-            description: product.description || product.title,
-            categoryId: integration.trendyolCategoryId,
-            brandId: integration.trendyolBrandId,
-            listPrice,
-            salePrice,
-            vatRate: integration.defaultVatRate || 10,
-            quantity: product.quantity,
-            images
-        };
+        const items: TrendyolCreateProductItem[] = [];
 
-        console.log(`[Trendyol] Creating new product: ${product.sku} - ${product.title}`);
-        const batchRequestId = await client.createProducts([item]);
+        if (product.hasVariants && product.variants && product.variants.length > 0) {
+            for (const variant of product.variants) {
+                const variantSku = variant.sku || `${product.sku}-${variant.id.split('-')[0]}`;
+                const variantDesc = Object.entries(variant.attributes || {}).map(([k,v]) => `${k}: ${v}`).join(', ');
+                
+                items.push({
+                    barcode: variantSku,
+                    title: `${product.title} - ${variantDesc}`,
+                    productMainId: product.sku,
+                    stockCode: variantSku,
+                    description: product.description || product.title,
+                    categoryId: integration.trendyolCategoryId,
+                    brandId: integration.trendyolBrandId,
+                    listPrice: variant.priceTRY > 0 ? Math.round(Number(variant.priceTRY) * 1.1 * 100) / 100 : listPrice,
+                    salePrice: variant.priceTRY > 0 ? Number(variant.priceTRY) : salePrice,
+                    vatRate: integration.defaultVatRate || 10,
+                    quantity: variant.quantity || 0,
+                    images
+                });
+            }
+        } else {
+            items.push({
+                barcode: product.sku,
+                title: product.title,
+                productMainId: product.sku,
+                stockCode: product.sku,
+                description: product.description || product.title,
+                categoryId: integration.trendyolCategoryId,
+                brandId: integration.trendyolBrandId,
+                listPrice,
+                salePrice,
+                vatRate: integration.defaultVatRate || 10,
+                quantity: product.quantity,
+                images
+            });
+        }
+
+        console.log(`[Trendyol] Creating new product(s): Main SKU ${product.sku} - ${product.title}`);
+        const batchRequestId = await client.createProducts(items);
 
         // Save/update listing record
         if (existing) {
@@ -169,12 +214,28 @@ async function syncToTrendyol(integration: any, product: any, _trigger: string) 
     } else {
         // UPDATE existing product price/stock
         console.log(`[Trendyol] Updating existing product (barcode: ${existing.externalCode})`);
-        await client.updatePrices([{
-            barcode: existing.externalCode,
-            listPrice,
-            salePrice,
-            quantity: product.quantity
-        }]);
+        const updateItems: TrendyolPriceUpdateItem[] = [];
+        
+        if (product.hasVariants && product.variants && product.variants.length > 0) {
+            for (const variant of product.variants) {
+                 const variantSku = variant.sku || `${product.sku}-${variant.id.split('-')[0]}`;
+                 updateItems.push({
+                     barcode: variantSku,
+                     listPrice: variant.priceTRY > 0 ? Math.round(Number(variant.priceTRY) * 1.1 * 100) / 100 : listPrice,
+                     salePrice: variant.priceTRY > 0 ? Number(variant.priceTRY) : salePrice,
+                     quantity: variant.quantity || 0
+                 });
+            }
+        } else {
+            updateItems.push({
+                barcode: existing.externalCode,
+                listPrice,
+                salePrice,
+                quantity: product.quantity
+            });
+        }
+
+        await client.updatePrices(updateItems);
         await existing.update({ status: 'active' });
     }
 
@@ -183,15 +244,30 @@ async function syncToTrendyol(integration: any, product: any, _trigger: string) 
 
 // ─── Hepsiburada ─────────────────────────────────────────────────────────────
 async function syncToHepsiburada(integration: any, product: any) {
-    const { apiKey, apiSecret, shopId } = integration;
-    if (!apiKey || !apiSecret || !shopId) return;
+    const { username, password, shopId } = integration; // Hepsiburada uses username/password normally
+    if (!username || !password || !shopId) return;
 
-    const client = new HepsiburadaClient(apiKey, apiSecret, shopId);
-    await client.updatePrices([{
-        sku: product.sku,
-        price: Number(product.priceTRY),
-        stock: product.quantity
-    }]);
+    const client = new HepsiburadaClient(username, password, shopId, integration.userId);
+    const updateItems: any[] = [];
+
+    if (product.hasVariants && product.variants && product.variants.length > 0) {
+        for (const variant of product.variants) {
+            const variantSku = variant.sku || `${product.sku}-${variant.id.split('-')[0]}`;
+            updateItems.push({
+                sku: variantSku,
+                price: Number(variant.priceTRY > 0 ? variant.priceTRY : product.priceTRY),
+                stock: variant.quantity || 0
+            });
+        }
+    } else {
+        updateItems.push({
+            sku: product.sku,
+            price: Number(product.priceTRY),
+            stock: product.quantity
+        });
+    }
+
+    await client.updatePrices(updateItems);
     await integration.update({ lastSyncAt: new Date() });
 }
 
@@ -203,7 +279,7 @@ async function syncToN11(integration: any, product: any, _trigger: string) {
         return;
     }
 
-    const client = new N11Client(apiKey, apiSecret);
+    const client = new N11Client(apiKey, apiSecret, integration.userId);
 
     // Check if already listed
     const existing = await ProductMarketplaceListing.findOne({
@@ -215,6 +291,14 @@ async function syncToN11(integration: any, product: any, _trigger: string) {
     if (shouldCreate) {
         if (!integration.n11CategoryId) {
             console.warn(`[N11] n11CategoryId not set in integration settings. Cannot create product.`);
+            await IntegrationLog.create({
+                 userId: integration.userId,
+                 platform: 'n11',
+                 endpoint: 'Pre-Sync Validation',
+                 requestMethod: 'SYNC',
+                 isSuccess: false,
+                 errorMessage: `Ürün Gönderilemedi: N11 Kategori ID eşleştirmesi eksik (SKU: ${product.sku})`
+            });
             return;
         }
 
@@ -253,11 +337,28 @@ async function syncToN11(integration: any, product: any, _trigger: string) {
     } else {
         // UPDATE price/stock
         console.log(`[N11] Updating existing product (ID: ${existing.externalId})`);
-        await client.updatePrices([{
-            productId: existing.externalId || existing.externalCode,
-            price: Number(product.priceTRY),
-            stock: product.quantity
-        }]);
+        const updateItems: any[] = [];
+        
+        if (product.hasVariants && product.variants && product.variants.length > 0) {
+            for (const variant of product.variants) {
+                 const variantSku = variant.sku || `${product.sku}-${variant.id.split('-')[0]}`;
+                 updateItems.push({
+                     productId: existing.externalId || existing.externalCode,
+                     sku: variantSku,
+                     price: Number(variant.priceTRY > 0 ? variant.priceTRY : product.priceTRY),
+                     stock: variant.quantity || 0
+                 });
+            }
+        } else {
+            updateItems.push({
+                productId: existing.externalId || existing.externalCode,
+                sku: existing.externalCode,
+                price: Number(product.priceTRY),
+                stock: product.quantity
+            });
+        }
+
+        await client.updatePrices(updateItems);
         await existing.update({ status: 'active' });
     }
 

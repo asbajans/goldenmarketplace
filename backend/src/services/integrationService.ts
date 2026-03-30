@@ -79,28 +79,28 @@ class IntegrationService {
 
         if (platform === 'trendyol') {
             if (!integration.apiKey || !integration.shopId) throw new Error('Trendyol API Key veya Satıcı ID eksik');
-            const client = new TrendyolClient(integration.apiKey, integration.apiSecret, integration.shopId);
+            const client = new TrendyolClient(integration.apiKey, integration.apiSecret, integration.shopId, userId);
             const result = await client.verifyConnection(integration.shopId);
             return { status: 'success', message: `Trendyol bağlantısı çalışıyor! Satıcı: ${result.sellerName}` };
         }
 
         if (platform === 'hepsiburada') {
             if (!integration.apiKey || !integration.shopId) throw new Error('Hepsiburada kullanıcı adı veya Merchant ID eksik');
-            const client = new HepsiburadaClient(integration.apiKey, integration.apiSecret, integration.shopId);
+            const client = new HepsiburadaClient(integration.apiKey, integration.apiSecret, integration.shopId, userId);
             const result = await client.verifyConnection();
             return { status: 'success', message: `Hepsiburada bağlantısı çalışıyor! Merchant: ${result.merchantId}` };
         }
 
         if (platform === 'n11') {
             if (!integration.apiKey) throw new Error('N11 API Key eksik');
-            const client = new N11Client(integration.apiKey, integration.apiSecret);
+            const client = new N11Client(integration.apiKey, integration.apiSecret, userId);
             await client.verifyConnection();
             return { status: 'success', message: `N11 bağlantısı çalışıyor!` };
         }
 
         if (platform === 'pazarama') {
             if (!integration.apiKey || !integration.apiSecret) throw new Error('Pazarama Client ID veya API Secret eksik');
-            const client = new PazaramaClient(integration.apiKey, integration.apiSecret);
+            const client = new PazaramaClient(integration.apiKey, integration.apiSecret, userId);
             const result = await client.verifyConnection();
             return { status: 'success', message: `Pazarama bağlantısı çalışıyor! Hesap: ${result.accountName}` };
         }

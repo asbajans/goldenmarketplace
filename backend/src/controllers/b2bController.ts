@@ -5,6 +5,7 @@
 
 import { Request, Response } from 'express';
 import Product from '../models/Product';
+import ProductVariant from '../models/ProductVariant';
 import B2BRequest from '../models/B2BRequest';
 import Store from '../models/Store';
 import goldPriceService from '../services/goldPriceService';
@@ -24,7 +25,8 @@ export class B2BController {
       const products = await Product.findAll({
         where: { isB2BEnabled: true, isActive: true },
         include: [
-          { model: Store, as: 'store', attributes: ['id', ['storeName', 'name']] }
+          { model: Store, as: 'store', attributes: ['id', ['storeName', 'name']] },
+          { model: ProductVariant, as: 'variants' }
         ],
         order: [['createdAt', 'DESC']]
       });
@@ -62,7 +64,7 @@ export class B2BController {
       const store = await Store.findOne({ where: { userId: (req as any).user.id } });
       if (!store) return res.status(403).json({ error: 'Mağaza bulunamadı' });
 
-      const { productId, requestNote } = req.body;
+      const { productId, variantId, requestNote } = req.body;
       if (!productId) return res.status(400).json({ error: 'productId gerekli' });
 
       const product = await Product.findByPk(productId, {
@@ -75,10 +77,18 @@ export class B2BController {
         return res.status(400).json({ error: 'Kendi ürününüzü ekleyemezsiniz' });
       }
 
+      if (variantId) {
+        const variant = await ProductVariant.findByPk(variantId);
+        if (!variant || variant.productId !== productId) {
+          return res.status(404).json({ error: 'Belirtilen varyasyon bulunamadı veya bu ürüne ait değil' });
+        }
+      }
+
       const [request, created] = await B2BRequest.findOrCreate({
-        where: { productId, requesterStoreId: store.id },
+        where: variantId ? { productId, variantId, requesterStoreId: store.id } : { productId, requesterStoreId: store.id },
         defaults: {
           productId,
+          variantId,
           requesterStoreId: store.id,
           ownerStoreId: (product as any).storeId,
           status: 'pending',
@@ -122,6 +132,10 @@ export class B2BController {
             attributes: ['id', 'title', 'priceTRY', 'b2bPrice', 'images', 'category']
           },
           {
+            model: ProductVariant,
+            as: 'variant'
+          },
+          {
             model: Store,
             as: 'requesterStore',
             attributes: ['id', ['storeName', 'name']]
@@ -154,6 +168,10 @@ export class B2BController {
             model: Product,
             as: 'product',
             attributes: ['id', 'title', 'priceTRY', 'b2bPrice', 'b2bDiscount', 'images', 'category']
+          },
+          {
+            model: ProductVariant,
+            as: 'variant'
           },
           {
             model: Store,
@@ -242,17 +260,35 @@ export class B2BController {
       });
       if (!originalProduct) return res.status(404).json({ error: 'Orijinal ürün bulunamadı' });
 
+      let baseB2BPrice = originalProduct.b2bPrice;
+      let gramWeight = originalProduct.gramWeight;
+      let milyem = originalProduct.milyem;
+      
+      let variantDescription = '';
+      if (request.variantId) {
+         const variant = await ProductVariant.findByPk(request.variantId);
+         if (variant) {
+            baseB2BPrice = variant.b2bPrice || originalProduct.b2bPrice;
+            gramWeight = variant.gramWeight;
+            
+            const variantAttributesText = Object.entries(variant.attributes)
+                .map(([k, v]) => `${k}: ${v}`)
+                .join(', ');
+            variantDescription = `\nSeçili Varyasyon Özellikleri: ${variantAttributesText}`;
+         }
+      }
+
       const { profitMargin, marketplaces } = req.body;
       if (profitMargin === undefined) return res.status(400).json({ error: 'Kâr oranı gerekli' });
 
-      const priceTRY = Math.round(originalProduct.b2bPrice * (1 + profitMargin / 100) * 100) / 100;
+      const priceTRY = Math.round(baseB2BPrice * (1 + profitMargin / 100) * 100) / 100;
       const currentGold = await goldPriceService.getCurrentGoldPrice();
       const priceUSD = Math.round((priceTRY / currentGold.usdTryRate) * 100) / 100;
 
       const ownerName = (originalProduct as any).store?.dataValues?.name || 'B2B Tedarikçisi';
-      const b2bDescription = originalProduct.description + `\n\n---\nBu ürün B2B tedarik ağından (${ownerName}) listelenmektedir.`;
+      let b2bDescription = originalProduct.description + variantDescription + `\n\n---\nBu ürün B2B tedarik ağından (${ownerName}) listelenmektedir.`;
       
-      const newSku = `${originalProduct.sku}-B2B-${store.id.substring(0, 4)}`;
+      const newSku = `${originalProduct.sku}-B2B-${store.id.substring(0, 4)}${request.variantId ? '-VAR' : ''}`;
 
       const newProduct = await Product.create({
         storeId: store.id,
@@ -261,8 +297,8 @@ export class B2BController {
         description: b2bDescription,
         category: originalProduct.category,
         sku: newSku,
-        gramWeight: originalProduct.gramWeight,
-        milyem: originalProduct.milyem,
+        gramWeight: gramWeight,
+        milyem: milyem,
         profitMargin: profitMargin,
         priceTRY,
         priceUSD,
@@ -273,6 +309,8 @@ export class B2BController {
         images: originalProduct.images,
         videoUrl: originalProduct.videoUrl,
         marketplaces: marketplaces || [],
+        hasVariants: false,
+        variantAttributes: [],
         tags: [...(originalProduct.tags || []), 'B2B'],
         originalStoreName: ownerName,
         originalProductId: originalProduct.id,

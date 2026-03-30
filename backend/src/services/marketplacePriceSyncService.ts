@@ -66,14 +66,14 @@ class MarketplacePriceSyncService {
     }
 
     async syncForPlatform(integration: MarketplaceIntegration, products: Product[]): Promise<void> {
-        const { platform, apiKey, apiSecret, shopId } = integration;
+        const { platform } = integration;
 
         switch (platform) {
             case 'trendyol':
                 await this.syncTrendyol(integration, products);
                 break;
             case 'hepsiburada':
-                await this.syncHepsiburada(apiKey, apiSecret, shopId!, products);
+                await this.syncHepsiburada(integration, products);
                 break;
             case 'n11':
                 await this.syncN11(integration, products);
@@ -97,7 +97,7 @@ class MarketplacePriceSyncService {
         const { apiKey, apiSecret, shopId } = integration;
         if (!apiKey || !apiSecret || !shopId) return;
 
-        const client = new TrendyolClient(apiKey, apiSecret, shopId);
+        const client = new TrendyolClient(apiKey, apiSecret, shopId, integration.userId);
         const items = [];
 
         for (const product of products) {
@@ -127,8 +127,11 @@ class MarketplacePriceSyncService {
     /**
      * Hepsiburada: update prices for all active products (uses SKU directly)
      */
-    private async syncHepsiburada(username: string, password: string, merchantId: string, products: Product[]): Promise<void> {
-        const client = new HepsiburadaClient(username, password, merchantId);
+    private async syncHepsiburada(integration: MarketplaceIntegration, products: Product[]): Promise<void> {
+        const { apiKey: username, apiSecret: password, shopId: merchantId, userId } = integration;
+        if (!username || !password || !merchantId) return;
+
+        const client = new HepsiburadaClient(username, password, merchantId, userId);
         const items: HepsiburadaProduct[] = products.map(p => ({
             sku: p.sku,
             price: Number(p.priceTRY),
@@ -146,7 +149,7 @@ class MarketplacePriceSyncService {
         const { apiKey, apiSecret } = integration;
         if (!apiKey || !apiSecret) return;
 
-        const client = new N11Client(apiKey, apiSecret);
+        const client = new N11Client(apiKey, apiSecret, integration.userId);
         const items = [];
 
         for (const product of products) {
@@ -178,7 +181,7 @@ class MarketplacePriceSyncService {
         const { apiKey, apiSecret } = integration;
         if (!apiKey || !apiSecret) return;
 
-        const client = new PazaramaClient(apiKey, apiSecret);
+        const client = new PazaramaClient(apiKey, apiSecret, integration.userId);
         const items = [];
 
         for (const product of products) {

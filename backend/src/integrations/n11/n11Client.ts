@@ -1,4 +1,5 @@
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
+import { attachApiLogger } from '../../utils/apiLogger';
 
 export interface N11CreateProductItem {
     title: string;
@@ -13,6 +14,7 @@ export interface N11CreateProductItem {
 
 export interface N11PriceUpdateItem {
     productId: string;       // N11 product ID
+    sku?: string;            // Seller Stock Code
     price: number;
     stock: number;
 }
@@ -20,10 +22,16 @@ export interface N11PriceUpdateItem {
 export class N11Client {
     private appKey: string;
     private appSecret: string;
+    private client: AxiosInstance;
 
-    constructor(appKey: string, appSecret: string) {
+    constructor(appKey: string, appSecret: string, userId?: string) {
         this.appKey = appKey;
         this.appSecret = appSecret;
+        this.client = axios.create({
+            baseURL: 'https://api.n11.com/ws',
+            timeout: 20000
+        });
+        attachApiLogger(this.client, userId, 'n11');
     }
 
     private auth() {
@@ -40,12 +48,11 @@ export class N11Client {
       ${body}
    </soapenv:Body>
 </soapenv:Envelope>`;
-        const response = await axios.post(`https://api.n11.com/ws/${endpoint}`, xml, {
+        const response = await this.client.post(`/${endpoint}`, xml, {
             headers: {
                 'Content-Type': 'text/xml;charset=UTF-8',
                 'SOAPAction': `http://www.n11.com/ws/schemas/${soapAction}`
-            },
-            timeout: 20000
+            }
         });
         return response.data as string;
     }
@@ -134,7 +141,7 @@ export class N11Client {
                 <sch:price>${item.price}</sch:price>
                 <sch:stockItems>
                     <sch:stockItem>
-                        <sch:sellerStockCode>${item.productId}</sch:sellerStockCode>
+                        <sch:sellerStockCode>${item.sku || item.productId}</sch:sellerStockCode>
                         <sch:quantity>${item.stock}</sch:quantity>
                     </sch:stockItem>
                 </sch:stockItems>

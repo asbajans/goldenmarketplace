@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import qs from 'qs';
+import { attachApiLogger } from '../../utils/apiLogger';
 
 export interface PazaramaCreateProductItem {
     name: string;
@@ -35,13 +36,14 @@ export class PazaramaClient {
     private accessToken: string | null = null;
     private tokenExpiresAt: number = 0;
 
-    constructor(clientId: string, clientSecret: string) {
+    constructor(clientId: string, clientSecret: string, userId?: string) {
         this.clientId = clientId;
         this.clientSecret = clientSecret;
         this.client = axios.create({
             baseURL: this.apiBaseUrl,
             timeout: 20000
         });
+        attachApiLogger(this.client, userId, 'pazarama');
 
         // Add request interceptor to attach token
         this.client.interceptors.request.use(async (config) => {

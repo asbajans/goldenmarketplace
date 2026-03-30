@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Card, Row, Col, Tag, Button, Empty, Spin, message,
   Typography, Input, Badge, Tooltip, Avatar, Modal,
-  Drawer, Space
+  Drawer, Space, Select
 } from 'antd';
 import {
   ShopOutlined, TagOutlined, SearchOutlined,
@@ -31,10 +31,11 @@ const B2BMarket: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [requesting, setRequesting] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [noteModal, setNoteModal] = useState<{ visible: boolean; productId: string | null }>({ visible: false, productId: null });
+  const [noteModal, setNoteModal] = useState<{ visible: boolean; productId: string | null; variantId?: string | null }>({ visible: false, productId: null, variantId: null });
   const [noteText, setNoteText] = useState('');
   const [drawerProduct, setDrawerProduct] = useState<B2BProduct | null>(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -62,18 +63,18 @@ const B2BMarket: React.FC = () => {
     }
   };
 
-  const handleAddRequest = (productId: string, e?: React.MouseEvent) => {
+  const handleAddRequest = (productId: string, variantId?: string | null, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    setNoteModal({ visible: true, productId });
+    setNoteModal({ visible: true, productId, variantId });
   };
 
   const handleConfirmRequest = async () => {
-    const { productId } = noteModal;
+    const { productId, variantId } = noteModal;
     if (!productId) return;
     setRequesting(productId);
-    setNoteModal({ visible: false, productId: null });
+    setNoteModal({ visible: false, productId: null, variantId: null });
     try {
-      await createB2BRequest(productId, noteText || undefined);
+      await createB2BRequest(productId, variantId || undefined, noteText || undefined);
       message.success('Talep gönderildi! Ürün sahibinin onayı bekleniyor.');
       setNoteText('');
       fetchProducts();
@@ -92,6 +93,11 @@ const B2BMarket: React.FC = () => {
   const openDetail = (product: B2BProduct) => {
     setDrawerProduct(product);
     setActiveImageIndex(0);
+    if (product.hasVariants && product.variants?.length) {
+      setSelectedVariant(product.variants[0].id);
+    } else {
+      setSelectedVariant(null);
+    }
   };
 
   if (loading) {
@@ -294,10 +300,17 @@ const B2BMarket: React.FC = () => {
                         icon={<PlusCircleOutlined />}
                         block
                         loading={requesting === product.id}
-                        onClick={e => handleAddRequest(product.id, e)}
+                        onClick={e => {
+                          if (product.hasVariants) {
+                             e.stopPropagation();
+                             openDetail(product);
+                          } else {
+                             handleAddRequest(product.id, null, e);
+                          }
+                        }}
                         style={{ background: '#d4a017', borderColor: '#d4a017', borderRadius: 8 }}
                       >
-                        Mağazama Ekle
+                        {product.hasVariants ? 'Varyasyon Seç' : 'Mağazama Ekle'}
                       </Button>
                     </Tooltip>
                   ) : (
@@ -338,7 +351,7 @@ const B2BMarket: React.FC = () => {
               type="primary"
               icon={<PlusCircleOutlined />}
               loading={requesting === drawerProduct.id}
-              onClick={() => handleAddRequest(drawerProduct.id)}
+              onClick={() => handleAddRequest(drawerProduct.id, selectedVariant)}
               style={{ background: '#d4a017', borderColor: '#d4a017' }}
             >
               Mağazama Ekle
@@ -530,6 +543,30 @@ const B2BMarket: React.FC = () => {
               </div>
             </div>
 
+            {drawerProduct.hasVariants && drawerProduct.variants && drawerProduct.variants.length > 0 && (
+               <div style={{ background: '#fff', borderRadius: 12, padding: 16, marginBottom: 20, border: '1px solid #f0f0f0' }}>
+                 <Title level={5} style={{ marginTop: 0, marginBottom: 12 }}>Varyasyon Seçimi</Title>
+                 <Select
+                    style={{ width: '100%' }}
+                    value={selectedVariant}
+                    onChange={v => setSelectedVariant(v)}
+                    options={drawerProduct.variants.map((v: any) => ({
+                       label: Object.entries(v.attributes).map(([ak, av]) => `${ak}: ${av}`).join(' - ') + ` (Stok: ${v.quantity})`,
+                       value: v.id,
+                       disabled: v.quantity <= 0
+                    }))}
+                 />
+                 {selectedVariant && (
+                    <div style={{ marginTop: 12 }}>
+                      <Text type="secondary" style={{ fontSize: 13 }}>Seçili varyasyon liste fiyatı:</Text>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: '#389e0d' }}>
+                        {Number(drawerProduct.variants.find((v:any) => v.id === selectedVariant)?.b2bPrice || drawerProduct.b2bPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                      </div>
+                    </div>
+                 )}
+               </div>
+            )}
+
             {/* Action button at bottom */}
             {!drawerProduct.myRequestStatus ? (
               <Button
@@ -538,8 +575,9 @@ const B2BMarket: React.FC = () => {
                 block
                 size="large"
                 loading={requesting === drawerProduct.id}
-                onClick={() => handleAddRequest(drawerProduct.id)}
+                onClick={() => handleAddRequest(drawerProduct.id, selectedVariant)}
                 style={{ background: '#d4a017', borderColor: '#d4a017', borderRadius: 10, height: 48, fontSize: 15 }}
+                disabled={drawerProduct.hasVariants && !selectedVariant}
               >
                 Mağazama Ekle — Talep Gönder
               </Button>

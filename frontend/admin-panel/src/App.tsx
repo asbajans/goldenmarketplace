@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Layout, Menu, Card, Statistic, Row, Col, Button, type MenuProps, message } from 'antd';
+import { Layout, Menu, Card, Statistic, Row, Col, Button, type MenuProps } from 'antd';
 import {
   DashboardOutlined,
   UserOutlined,
@@ -17,6 +17,7 @@ import ProductsPage from './pages/ProductsPage';
 import CategoriesPage from './pages/CategoriesPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import IntegrationsPage from './pages/IntegrationsPage';
+import IntegrationLogsPage from './pages/IntegrationLogsPage';
 import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import { AdminAPI } from './services/api';
@@ -96,6 +97,11 @@ function App() {
       label: 'Entegrasyonlar'
     },
     {
+      key: 'integration-logs',
+      icon: <SettingOutlined />,
+      label: 'API Logları'
+    },
+    {
       key: 'settings',
       icon: <SettingOutlined />,
       label: 'Sistem Ayarları'
@@ -150,6 +156,9 @@ function App() {
 
       case 'integrations':
         return <IntegrationsPage />;
+
+      case 'integration-logs':
+        return <IntegrationLogsPage />;
 
       case 'settings':
         return <SettingsPage />;

@@ -10,7 +10,7 @@ import {
     PlusOutlined, VideoCameraOutlined,
     DoubleRightOutlined, InfoCircleOutlined,
     DollarOutlined, GoldOutlined, PercentageOutlined,
-    ShopOutlined, CheckCircleOutlined, ThunderboltOutlined
+    ShopOutlined, CheckCircleOutlined, ThunderboltOutlined, MinusCircleOutlined
 } from '@ant-design/icons';
 import { createProduct } from '../api/product';
 import client from '../api/client';
@@ -55,6 +55,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [b2bPrice, setB2bPrice] = useState<number>(0);
     const [gramHas, setGramHas] = useState<number>(0);
     const [isB2BEnabled, setIsB2BEnabled] = useState(false);
+    const [hasVariants, setHasVariants] = useState(false);
     const [tags, setTags] = useState<string[]>([]);
     const [integrations, setIntegrations] = useState<Integration[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -205,7 +206,10 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 marketplaces: values.marketplaces || ['golden'],
                 isB2BEnabled,
                 b2bDiscount: isB2BEnabled ? b2bDiscount : 0,
-                b2bPrice: computedB2bPrice
+                b2bPrice: computedB2bPrice,
+                hasVariants,
+                variantAttributes: hasVariants ? ['Renk', 'Beden', 'Ölçü'] : [],
+                variants: hasVariants ? values.variants : []
             });
 
             message.success('Ürün başarıyla kaydedildi!');
@@ -214,6 +218,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             setPriceUSD(0);
             setB2bPrice(0);
             setIsB2BEnabled(false);
+            setHasVariants(false);
             setTags([]);
             setFileList([]);
             setVideoFile([]);
@@ -251,13 +256,17 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 milyem: 916,
                 profitMargin: 0,
                 marketplaces: ['golden'],
+                hasVariants: false,
                 ...initialValues
             }}
             onFinish={onFinish}
             onValuesChange={(changed, allValues) => {
                 if (changed.gramWeight !== undefined || changed.milyem !== undefined ||
-                    changed.effectiveMilyem !== undefined || changed.profitMargin !== undefined || changed.b2bDiscount !== undefined) {
+                    changed.effectiveMilyem !== undefined || changed.profitMargin !== undefined || changed.b2bDiscount !== undefined || changed.hasVariants !== undefined) {
                     calculateLivePrice(allValues.gramWeight, allValues.milyem, allValues.effectiveMilyem, allValues.profitMargin, allValues.b2bDiscount);
+                    if (changed.hasVariants !== undefined) {
+                        setHasVariants(changed.hasVariants);
+                    }
                 }
             }}
         >
@@ -407,9 +416,13 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                         </Form.Item>
                     </Col>
                     <Col span={6}>
+                        {!hasVariants ? (
                         <Form.Item name="quantity" label="Stok Adedi" rules={[{ required: true }]}>
                             <InputNumber style={{ width: '100%' }} min={0} placeholder="0" disabled={isCloned} />
                         </Form.Item>
+                        ) : (
+                           <div style={{ marginTop: '30px', fontWeight: 'bold' }}>Stok varyasyonlardan hesaplanacak</div>
+                        )}
                     </Col>
                     <Col span={6}>
                         <Form.Item label="Gram Has (Has Altın Eşdeğeri)">
@@ -424,6 +437,53 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 </Row>
 
                 <Divider style={{ margin: '12px 0' }} />
+
+                {/* Varyasyonlar (Variants) */}
+                <div style={{ background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
+                    <Form.Item name="hasVariants" valuePropName="checked" style={{ marginBottom: 0 }}>
+                        <Checkbox disabled={isCloned} style={{ fontWeight: 600 }}>
+                            🎨 Farklı Varyasyonlara Sahip (Örn: Ölçü, Renk vb.)
+                        </Checkbox>
+                    </Form.Item>
+                    
+                    {hasVariants && (
+                        <div style={{ marginTop: 16 }}>
+                            <Form.List name="variants">
+                                {(fields, { add, remove }) => (
+                                    <>
+                                        {fields.map(({ key, name, ...restField }) => (
+                                            <div key={key} style={{ display: 'flex', gap: 16, marginBottom: 8, alignItems: 'flex-start', background: '#fff', padding: 12, borderRadius: 4, border: '1px solid #e8e8e8' }}>
+                                                <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+                                                    <Form.Item {...restField} name={[name, 'attributes', 'Ölçü']} label="Ölçü / Beden" style={{ marginBottom: 0 }}>
+                                                        <Input placeholder="Örn: 18 cm" disabled={isCloned} />
+                                                    </Form.Item>
+                                                    <Form.Item {...restField} name={[name, 'attributes', 'Renk']} label="Renk" style={{ marginBottom: 0 }}>
+                                                        <Input placeholder="Örn: Rose Gold" disabled={isCloned} />
+                                                    </Form.Item>
+                                                    <Form.Item {...restField} name={[name, 'gramWeight']} label="Gram (Farklıysa)" style={{ marginBottom: 0 }}>
+                                                        <InputNumber style={{ width: '100%' }} min={0.01} step={0.01} placeholder="Ana gram (Boş bırakınız)" disabled={isCloned} />
+                                                    </Form.Item>
+                                                    <Form.Item {...restField} name={[name, 'quantity']} label="Varyasyon Stoğu" rules={[{ required: true, message: 'Zorunlu' }]} style={{ marginBottom: 0 }}>
+                                                        <InputNumber style={{ width: '100%' }} min={0} placeholder="Adet" disabled={isCloned} />
+                                                    </Form.Item>
+                                                    <Form.Item {...restField} name={[name, 'sku']} label="Varyasyon SKU" style={{ marginBottom: 0 }}>
+                                                        <Input placeholder="Opsiyonel (Örn: SKU-18)" disabled={isCloned} />
+                                                    </Form.Item>
+                                                </div>
+                                                <MinusCircleOutlined onClick={() => !isCloned && remove(name)} style={{ color: 'red', marginTop: 40, cursor: isCloned ? 'not-allowed' : 'pointer', fontSize: 20 }} />
+                                            </div>
+                                        ))}
+                                        <Form.Item style={{ marginTop: 16, marginBottom: 0 }}>
+                                            <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />} disabled={isCloned || fields.length >= 3}>
+                                                Yeni Varyasyon Ekle (Maksimum 3)
+                                            </Button>
+                                        </Form.Item>
+                                    </>
+                                )}
+                            </Form.List>
+                        </div>
+                    )}
+                </div>
 
                 {/* B2B Section */}
                 <div style={{ background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>

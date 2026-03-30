@@ -6,6 +6,7 @@
 import { Request, Response } from 'express';
 import { Op } from 'sequelize';
 import Product from '../models/Product';
+import ProductVariant from '../models/ProductVariant';
 import Store from '../models/Store';
 import User from '../models/User';
 import SubscriptionPlan from '../models/SubscriptionPlan';
@@ -40,6 +41,7 @@ export class ProductController {
 
       const { count, rows } = await Product.findAndCountAll({
         where,
+        include: [{ model: ProductVariant, as: 'variants' }],
         limit: parseInt(limit as string),
         offset,
         order: [['createdAt', 'DESC']]
@@ -70,7 +72,8 @@ export class ProductController {
       const {
         title, description, category, sku, quantity,
         images, videoUrl, marketplaces, gramWeight, milyem, effectiveMilyem, profitMargin,
-        isB2BEnabled, b2bDiscount
+        isB2BEnabled, b2bDiscount,
+        hasVariants, variantAttributes, variants
       } = req.body;
 
       // Validate required gold fields
@@ -150,9 +153,37 @@ export class ProductController {
         images: Array.isArray(images) ? images : [],
         videoUrl,
         marketplaces: (Array.isArray(marketplaces) && marketplaces.length > 0) ? marketplaces : ['golden'],
+        hasVariants: !!hasVariants,
+        variantAttributes: variantAttributes || [],
         tags,
         isActive: true
       });
+
+      // Handle variants creation
+      let createdVariants: any[] = [];
+      if (hasVariants && Array.isArray(variants) && variants.length > 0) {
+        const variantRecords = await Promise.all(variants.map(async (v: any) => {
+           const vFinalEffectiveMilyem = v.effectiveMilyem && v.effectiveMilyem >= milyem ? v.effectiveMilyem : milyem;
+           const vPriceData = await goldPriceService.calculateProductPrice(v.gramWeight || gramWeight, vFinalEffectiveMilyem, profitMargin || 0);
+           const vB2BPrice = isB2BEnabled ? Math.round(vPriceData.priceTRY * (1 - finalB2bDiscount / 100) * 100) / 100 : 0;
+           return {
+               productId: product.id,
+               sku: v.sku || `${sku}-${Math.floor(Math.random() * 10000)}`,
+               attributes: v.attributes || {},
+               gramWeight: v.gramWeight || gramWeight,
+               quantity: v.quantity || 0,
+               priceTRY: vPriceData.priceTRY,
+               priceUSD: vPriceData.priceUSD,
+               b2bPrice: vB2BPrice,
+               isActive: true
+           };
+        }));
+        createdVariants = await ProductVariant.bulkCreate(variantRecords);
+        
+        // Update product total quantity based on variants
+        const totalQuantity = createdVariants.reduce((sum, v) => sum + v.quantity, 0);
+        await product.update({ quantity: totalQuantity });
+      }
 
       // Trigger marketplace sync (non-blocking - don't fail product creation if queue is down)
       try {
@@ -197,7 +228,8 @@ export class ProductController {
       const {
         title, description, category, quantity,
         images, videoUrl, marketplaces, gramWeight, milyem, effectiveMilyem, profitMargin,
-        isB2BEnabled, b2bDiscount
+        isB2BEnabled, b2bDiscount,
+        hasVariants, variantAttributes, variants
       } = req.body;
 
       const user = (req as any).user;
@@ -269,6 +301,8 @@ export class ProductController {
 
       const finalIsB2BEnabled = isCloned ? false : (isB2BEnabled !== undefined ? !!isB2BEnabled : product.isB2BEnabled);
       const finalB2bDiscount = isCloned ? 0 : (b2bDiscount !== undefined ? b2bDiscount : product.b2bDiscount);
+      const finalHasVariants = isCloned ? false : (hasVariants !== undefined ? !!hasVariants : product.hasVariants);
+      const finalVariantAttributes = isCloned ? [] : (variantAttributes || product.variantAttributes);
 
       await product.update({
         title: isCloned ? product.title : (title || product.title),
@@ -288,8 +322,41 @@ export class ProductController {
         images: isCloned ? product.images : (images || product.images),
         videoUrl: isCloned ? product.videoUrl : (videoUrl !== undefined ? videoUrl : product.videoUrl),
         marketplaces: marketplaces || product.marketplaces,
+        hasVariants: finalHasVariants,
+        variantAttributes: finalVariantAttributes,
         tags: isCloned ? product.tags : tags
       });
+
+      // Handle variants update
+      if (finalHasVariants && Array.isArray(variants)) {
+        await ProductVariant.destroy({ where: { productId: id } });
+        if (variants.length > 0) {
+            const variantRecords = await Promise.all(variants.map(async (v: any) => {
+               const vFinalEffectiveMilyem = v.effectiveMilyem && v.effectiveMilyem >= finalMilyem ? v.effectiveMilyem : finalMilyem;
+               const vPriceData = await goldPriceService.calculateProductPrice(v.gramWeight || finalGramWeight, vFinalEffectiveMilyem, finalProfitMargin);
+               const vB2BPrice = finalIsB2BEnabled ? Math.round(vPriceData.priceTRY * (1 - finalB2bDiscount / 100) * 100) / 100 : 0;
+               return {
+                   productId: product.id,
+                   sku: v.sku || `${product.sku}-${Math.floor(Math.random() * 10000)}`,
+                   attributes: v.attributes || {},
+                   gramWeight: v.gramWeight || finalGramWeight,
+                   quantity: v.quantity || 0,
+                   priceTRY: vPriceData.priceTRY,
+                   priceUSD: vPriceData.priceUSD,
+                   b2bPrice: vB2BPrice,
+                   isActive: true
+               };
+            }));
+            const createdVariants = await ProductVariant.bulkCreate(variantRecords);
+            
+            // Update total quantity
+            finalQuantity = createdVariants.reduce((sum, v) => sum + v.quantity, 0);
+            await product.update({ quantity: finalQuantity });
+        }
+      } else if (!finalHasVariants && product.hasVariants) {
+        // User turned off variants
+        await ProductVariant.destroy({ where: { productId: id } });
+      }
 
       // Trigger marketplace sync (non-blocking)
       try {

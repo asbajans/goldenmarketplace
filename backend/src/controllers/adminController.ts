@@ -5,6 +5,7 @@ import Product from '../models/Product';
 import Category from '../models/Category';
 import SubscriptionPlan from '../models/SubscriptionPlan';
 import Integration from '../models/Integration';
+import IntegrationLog from '../models/IntegrationLog';
 import PasswordService from '../utils/password';
 
 
@@ -283,6 +284,36 @@ export class AdminController {
         } catch (error: any) {
             console.error('Admin Error [getIntegrations]:', error);
             return res.status(500).json({ error: 'Failed to fetch integrations' });
+        }
+    }
+
+    static async getIntegrationLogs(req: Request, res: Response): Promise<Response> {
+        try {
+            const limit = parseInt(req.query.limit as string) || 100;
+            const offset = parseInt(req.query.offset as string) || 0;
+            const { platform, isSuccess, userId } = req.query;
+
+            let where: any = {};
+            if (platform) where.platform = platform;
+            if (isSuccess !== undefined) where.isSuccess = isSuccess === 'true';
+            if (userId) where.userId = userId;
+
+            const { count, rows } = await IntegrationLog.findAndCountAll({
+                where,
+                order: [['createdAt', 'DESC']],
+                limit,
+                offset
+            });
+
+            return res.json({
+                total: count,
+                logs: rows,
+                page: Math.floor(offset / limit) + 1,
+                pages: Math.ceil(count / limit)
+            });
+        } catch (error: any) {
+            console.error('Admin Error [getIntegrationLogs]:', error);
+            return res.status(500).json({ error: 'Failed to fetch integration logs' });
         }
     }
     // --- ALL PRODUCTS (Admin) ---

@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
+import { attachApiLogger } from '../../utils/apiLogger';
 
 export interface TrendyolCreateProductItem {
     barcode: string;          // SKU — unique identifier
@@ -28,7 +29,7 @@ export class TrendyolClient {
     private client: AxiosInstance;
     private sellerId: string;
 
-    constructor(apiKey: string, apiSecret: string, sellerId: string) {
+    constructor(apiKey: string, apiSecret: string, sellerId: string, userId?: string) {
         this.sellerId = sellerId;
         const credentials = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
         this.client = axios.create({
@@ -40,6 +41,8 @@ export class TrendyolClient {
             },
             timeout: 15000
         });
+
+        attachApiLogger(this.client, userId, 'trendyol');
     }
 
     /**
@@ -52,12 +55,12 @@ export class TrendyolClient {
         } catch (error: any) {
             const status = error.response?.status;
             if (status === 401) {
-                throw new Error(`Trendyol kimlik dogrulama hatasi: API Key veya Secret yanlis (401)`);
+                return Promise.reject(new Error(`Trendyol kimlik dogrulama hatasi: API Key veya Secret yanlis (401)`));
             }
             if (status === 403) {
                 return { success: true, sellerName: `Trendyol Satici (${this.sellerId})` };
             }
-            throw new Error(`Trendyol baglanti hatasi: ${error.response?.data?.message || error.message}`);
+            return Promise.reject(new Error(`Trendyol baglanti hatasi: ${error.response?.data?.message || error.message}`));
         }
     }
 

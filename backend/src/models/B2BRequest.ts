@@ -12,6 +12,7 @@ export type B2BRequestStatus = 'pending' | 'approved' | 'rejected';
 interface B2BRequestAttributes {
   id?: string;
   productId: string;
+  variantId?: string;
   requesterStoreId: string;
   ownerStoreId: string;
   status: B2BRequestStatus;
@@ -23,6 +24,7 @@ interface B2BRequestAttributes {
 class B2BRequest extends Model<B2BRequestAttributes> implements B2BRequestAttributes {
   public id!: string;
   public productId!: string;
+  public variantId?: string;
   public requesterStoreId!: string;
   public ownerStoreId!: string;
   public status!: B2BRequestStatus;
@@ -42,6 +44,11 @@ B2BRequest.init(
       type: DataTypes.UUID,
       allowNull: false,
       references: { model: 'products', key: 'id' }
+    },
+    variantId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: { model: 'product_variants', key: 'id' }
     },
     requesterStoreId: {
       type: DataTypes.UUID,
@@ -69,9 +76,10 @@ B2BRequest.init(
     timestamps: true,
     indexes: [
       { fields: ['productId'] },
+      { fields: ['variantId'] },
       { fields: ['requesterStoreId'] },
       { fields: ['ownerStoreId'] },
-      { unique: true, fields: ['productId', 'requesterStoreId'], name: 'unique_b2b_request' }
+      { unique: true, fields: ['productId', 'variantId', 'requesterStoreId'], name: 'unique_b2b_request' }
     ]
   }
 );
