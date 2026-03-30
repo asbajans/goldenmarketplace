@@ -5,11 +5,7 @@
 
 import { Request, Response } from 'express';
 import { Op } from 'sequelize';
-import Product from '../models/Product';
-import ProductVariant from '../models/ProductVariant';
-import Store from '../models/Store';
-import User from '../models/User';
-import SubscriptionPlan from '../models/SubscriptionPlan';
+import { Product, ProductVariant, Store, User, SubscriptionPlan } from '../models';
 import goldPriceService from '../services/goldPriceService';
 import { productSyncQueue } from '../jobs/productSyncJob';
 

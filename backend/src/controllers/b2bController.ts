@@ -4,10 +4,7 @@
  */
 
 import { Request, Response } from 'express';
-import Product from '../models/Product';
-import ProductVariant from '../models/ProductVariant';
-import B2BRequest from '../models/B2BRequest';
-import Store from '../models/Store';
+import { Product, ProductVariant, B2BRequest, Store } from '../models';
 import goldPriceService from '../services/goldPriceService';
 
 export class B2BController {

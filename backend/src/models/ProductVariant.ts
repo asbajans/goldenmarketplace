@@ -89,7 +89,7 @@ ProductVariant.init(
   },
   {
     sequelize,
-    tableName: 'ProductVariants',
+    tableName: 'product_variants',
     timestamps: true,
     indexes: [
       { fields: ['productId'] },

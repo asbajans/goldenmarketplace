@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { RefreshCw, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import { AdminAPI } from '../services/api';
 
 interface IntegrationLog {
     id: string;
@@ -32,21 +32,17 @@ const IntegrationLogsPage: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
-            const token = localStorage.getItem('token');
-            const params = new URLSearchParams({
-                limit: limit.toString(),
-                offset: ((page - 1) * limit).toString()
-            });
+            const params: any = {
+                limit: limit,
+                offset: (page - 1) * limit
+            };
+            if (filterPlatform) params.platform = filterPlatform;
+            if (filterStatus) params.isSuccess = filterStatus;
 
-            if (filterPlatform) params.append('platform', filterPlatform);
-            if (filterStatus) params.append('isSuccess', filterStatus);
+            const data = await AdminAPI.getIntegrationLogs(params);
 
-            const res = await axios.get(`http://localhost:777/api/admin/integration-logs?${params.toString()}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            setLogs(res.data.logs);
-            setTotalPages(res.data.pages || 1);
+            setLogs(data.logs);
+            setTotalPages(data.pages || 1);
         } catch (err: any) {
             setError(err.response?.data?.error || 'Loglar yüklenirken bir hata oluştu.');
         } finally {

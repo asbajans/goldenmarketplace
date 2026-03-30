@@ -100,6 +100,8 @@ export const AdminAPI = {
     setGoldPrice: (pricePerGramTRY: number, usdTryRate?: number) => axios.post(`${API_URL}/gold-price/set`, { pricePerGramTRY, usdTryRate }, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' }
     }).then((res) => res.data),
+    // Integration Logs
+    getIntegrationLogs: (params: any) => api.get('/integration-logs', { params }).then((res) => res.data),
 };
 
 export default api;
