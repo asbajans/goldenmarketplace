@@ -20,4 +20,9 @@ router.delete('/:id', authMiddleware, sellerMiddleware, ProductController.delete
 // Gold price calculation
 router.post('/calculate-gold-price', authMiddleware, ProductController.calculateGoldPrice);
 
+// Store sync settings and sync trigger
+router.get('/store/sync-status', authMiddleware, sellerMiddleware, ProductController.getAutoPriceSyncStatus);
+router.put('/store/sync-status', authMiddleware, sellerMiddleware, ProductController.setAutoPriceSyncStatus);
+router.post('/store/sync-prices', authMiddleware, sellerMiddleware, ProductController.syncStorePrices);
+
 export default router;

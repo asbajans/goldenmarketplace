@@ -448,6 +448,120 @@ export class ProductController {
   }
 
   /**
+   * Get store auto price sync setting
+   */
+  static async getAutoPriceSyncStatus(req: Request, res: Response) {
+      try {
+          const user = (req as any).user;
+          let store;
+          
+          if (user.role === 'admin' && req.query.storeId) {
+             store = await Store.findByPk(req.query.storeId as string);
+          } else {
+             store = await Store.findOne({ where: { userId: user.id } });
+          }
+          
+          if (!store) return res.status(404).json({ error: 'Store not found' });
+          
+          return res.status(200).json({ autoPriceSync: store.autoPriceSync });
+      } catch (error) {
+          console.error('Get auto price sync error:', error);
+          return res.status(500).json({ error: 'Internal error' });
+      }
+  }
+
+  /**
+   * Set store auto price sync setting
+   */
+  static async setAutoPriceSyncStatus(req: Request, res: Response) {
+      try {
+          const user = (req as any).user;
+          const { autoPriceSync } = req.body;
+          
+          let store = await Store.findOne({ where: { userId: user.id } });
+          if (!store) return res.status(404).json({ error: 'Store not found' });
+          
+          await store.update({ autoPriceSync: !!autoPriceSync });
+          
+          return res.status(200).json({ success: true, autoPriceSync: store.autoPriceSync });
+      } catch (error) {
+          console.error('Set auto price sync error:', error);
+          return res.status(500).json({ error: 'Internal error' });
+      }
+  }
+
+  /**
+   * Manual price sync for the store
+   */
+  static async syncStorePrices(req: Request, res: Response) {
+      try {
+          const user = (req as any).user;
+          const store = await Store.findOne({ where: { userId: user.id } });
+          
+          if (!store) return res.status(404).json({ error: 'Store not found' });
+          
+          const gold = await goldPriceService.getCurrentGoldPrice();
+          if (!gold || !gold.pricePerGramTRY) {
+              return res.status(400).json({ error: 'Gücel altın fiyatı bulunamadı.' });
+          }
+
+          const products = await Product.findAll({ where: { storeId: store.id, isActive: true } });
+          let updatedCount = 0;
+
+          // First sync non-clones
+          const nonClones = products.filter(p => !p.originalProductId);
+          for (const product of nonClones) {
+             const usedMilyem = Number(product.effectiveMilyem || product.milyem);
+             const { priceTRY } = goldPriceService.calculatePrice(
+                 Number(product.gramWeight),
+                 usedMilyem,
+                 Number(product.profitMargin || 0),
+                 gold.pricePerGramTRY
+             );
+             const gramHas = Math.round(Number(product.gramWeight) * (usedMilyem / 1000) * 10000) / 10000;
+             const b2bPrice = product.isB2BEnabled ? Math.round(priceTRY * (1 - (product.b2bDiscount || 0) / 100) * 100) / 100 : 0;
+             const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
+             await product.update({ priceTRY, b2bPrice, priceUSD, gramHas });
+             updatedCount++;
+          }
+
+          const clones = products.filter(p => !!p.originalProductId);
+          // Load parents for clones
+          for (const clone of clones) {
+             const parent = await Product.findByPk(clone.originalProductId);
+             if (parent && parent.b2bPrice > 0) {
+                const priceTRY = Math.round(parent.b2bPrice * (1 + (clone.profitMargin || 0) / 100) * 100) / 100;
+                const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
+                await clone.update({ priceTRY, priceUSD });
+                updatedCount++;
+             } else if (parent && parent.priceTRY > 0) {
+                const priceTRY = Math.round(parent.priceTRY * (1 + (clone.profitMargin || 0) / 100) * 100) / 100;
+                const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
+                await clone.update({ priceTRY, priceUSD });
+                updatedCount++;
+             }
+          }
+
+          // Trigger marketplace sync in background
+          try {
+            const marketplacePriceSyncService = require('../services/marketplacePriceSyncService').default;
+            marketplacePriceSyncService.syncUser(user.id);
+          } catch (err) {
+            console.error('[ProductController] Could not trigger marketplace sync:', err);
+          }
+
+          return res.status(200).json({ 
+             success: true, 
+             message: 'Fiyatlar güncel altın kuruna göre başarıyla senkronize edildi.',
+             updatedCount 
+          });
+      } catch (error) {
+          console.error('Sync store prices error:', error);
+          return res.status(500).json({ error: 'Manual sync failed' });
+      }
+  }
+
+  /**
    * Generate tags from title and category
    */
   private static generateTags(title: string, category: string): string[] {

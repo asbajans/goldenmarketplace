@@ -16,6 +16,7 @@ interface StoreAttributes {
   banner?: string;
   rating: number;
   totalProducts: number;
+  autoPriceSync?: boolean;
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -31,6 +32,7 @@ class Store extends Model<StoreAttributes> implements StoreAttributes {
   public banner?: string;
   public rating!: number;
   public totalProducts!: number;
+  public autoPriceSync!: boolean;
   public isActive!: boolean;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -80,6 +82,11 @@ Store.init(
     totalProducts: {
       type: DataTypes.INTEGER,
       defaultValue: 0
+    },
+    autoPriceSync: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+      comment: 'If true, product prices sync automatically with global gold price'
     },
     isActive: {
       type: DataTypes.BOOLEAN,

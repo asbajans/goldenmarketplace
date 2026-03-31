@@ -12,7 +12,7 @@ import {
     DollarOutlined, GoldOutlined, PercentageOutlined,
     ShopOutlined, CheckCircleOutlined, ThunderboltOutlined, MinusCircleOutlined
 } from '@ant-design/icons';
-import { createProduct } from '../api/product';
+import { createProduct, updateProduct } from '../api/product';
 import client from '../api/client';
 
 const { Option } = Select;
@@ -229,13 +229,13 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             const rawVideoFiles = videoFile.map(f => f.originFileObj).filter((f): f is RcFile => !!f);
             const base64Videos: string[] = await Promise.all(rawVideoFiles.map(convertToBase64));
 
-            await createProduct({
+            const productPayload = {
                 ...values,
                 profitMargin: values.profitMargin || 0,
                 quantity: Number(values.quantity || 0),
                 tags,
                 images: allImages,
-                videos: base64Videos,
+                videoUrl: base64Videos[0] || initialValues?.videoUrl,
                 marketplaces: values.marketplaces || ['golden'],
                 marketplaceConfig: values.marketplaceConfig || {},
                 isB2BEnabled,
@@ -244,9 +244,16 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 hasVariants,
                 variantAttributes: hasVariants ? ['Renk', 'Beden', 'Ölçü'] : [],
                 variants: hasVariants ? values.variants : []
-            });
+            };
 
-            message.success('Ürün başarıyla kaydedildi!');
+            if (initialValues?.id) {
+                await updateProduct(initialValues.id, productPayload);
+                message.success('Ürün başarıyla güncellendi!');
+            } else {
+                await createProduct(productPayload);
+                message.success('Ürün başarıyla eklendi!');
+            }
+
             form.resetFields();
             setPriceTRY(0);
             setPriceUSD(0);
@@ -381,7 +388,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 }
             >
                 <Row gutter={16}>
-                    <Col span={6}>
+                    <Col span={8}>
                         <Form.Item
                             name="gramWeight"
                             label="Gram Ağırlığı"
@@ -397,7 +404,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                             />
                         </Form.Item>
                     </Col>
-                    <Col span={4}>
+                    <Col span={8}>
                         <Form.Item
                             name="milyem"
                             label={
@@ -405,19 +412,18 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                                 Alaşım Milyemi <InfoCircleOutlined style={{ color: '#888', fontSize: 11 }} />
                               </Tooltip>
                             }
-                            rules={[{ required: true, message: 'Milyem giriniz' }]}
+                            rules={[{ required: true, message: 'Milyem seçiniz' }]}
                         >
-                            <InputNumber 
-                                placeholder="Örn: 916"
-                                disabled={isCloned} 
-                                style={{ width: '100%' }}
-                                min={1}
-                                max={1000}
-                                step={1}
-                            />
+                            <Select placeholder="Örn: 22 Ayar (916)" disabled={isCloned} style={{ width: '100%' }}>
+                                <Option value={999}>24 Ayar (999 Milyem)</Option>
+                                <Option value={916}>22 Ayar (916 Milyem)</Option>
+                                <Option value={750}>18 Ayar (750 Milyem)</Option>
+                                <Option value={585}>14 Ayar (585 Milyem)</Option>
+                                <Option value={333}>8 Ayar (333 Milyem)</Option>
+                            </Select>
                         </Form.Item>
                     </Col>
-                    <Col span={4}>
+                    <Col span={8}>
                         <Form.Item
                             name="effectiveMilyem"
                             label={
@@ -431,12 +437,14 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                                 disabled={isCloned}
                                 style={{ width: '100%' }}
                                 min={1}
-                                max={1000}
                                 step={1}
                             />
                         </Form.Item>
                     </Col>
-                    <Col span={4}>
+                </Row>
+                
+                <Row gutter={16}>
+                    <Col span={8}>
                         <Form.Item
                             name="profitMargin"
                             label={<><PercentageOutlined /> Kâr Marjı (%)</>}
@@ -452,7 +460,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                             />
                         </Form.Item>
                     </Col>
-                    <Col span={6}>
+                    <Col span={8}>
                         {!hasVariants ? (
                         <Form.Item name="quantity" label="Stok Adedi" rules={[{ required: true }]}>
                             <InputNumber style={{ width: '100%' }} min={0} placeholder="0" disabled={isCloned} />
@@ -461,7 +469,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                            <div style={{ marginTop: '30px', fontWeight: 'bold' }}>Stok varyasyonlardan hesaplanacak</div>
                         )}
                     </Col>
-                    <Col span={6}>
+                    <Col span={8}>
                         <Form.Item label="Gram Has (Has Altın Eşdeğeri)">
                             <div style={{ background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 6, padding: '8px 12px', textAlign: 'center' }}>
                                 <span style={{ fontSize: 18, fontWeight: 700, color: '#d4a017' }}>
@@ -716,7 +724,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
 
             <Form.Item>
                 <Button type="primary" htmlType="submit" loading={loading} block size="large">
-                    Ürünü Yayınla
+                    {initialValues?.id ? 'Ürünü Güncelle' : 'Ürünü Yayınla'}
                 </Button>
             </Form.Item>
         </Form>

@@ -1,15 +1,68 @@
 
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Space, message, Modal, Tabs, Tag } from 'antd';
-import { PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
-import { getProducts, deleteProduct, Product } from '../api/product';
-import AddProduct from './AddProduct'; // We will create this next
+import { Table, Button, Space, message, Modal, Tabs, Tag, Switch, Statistic, Card, Row, Col, Typography } from 'antd';
+import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined, DollarOutlined, GoldOutlined } from '@ant-design/icons';
+import { getProducts, deleteProduct, getAutoSyncStatus, setAutoSyncStatus, triggerManualSync, Product } from '../api/product';
+import client from '../api/client';
+import AddProduct from './AddProduct';
+
+const { Text } = Typography;
 
 const ProductList: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(false);
+    const [syncing, setSyncing] = useState(false);
+    const [autoSync, setAutoSync] = useState(true);
+    const [goldPrice, setGoldPrice] = useState<any>(null);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+    useEffect(() => {
+        fetchProducts();
+        fetchGoldPrice();
+        fetchSyncStatus();
+    }, []);
+
+    const fetchGoldPrice = async () => {
+        try {
+            const res = await client.get('/gold-price/current');
+            setGoldPrice(res.data);
+        } catch (error) {
+            console.error('Failed to fetch gold price', error);
+        }
+    };
+
+    const fetchSyncStatus = async () => {
+        try {
+            const status = await getAutoSyncStatus();
+            setAutoSync(!!status);
+        } catch (error) {
+            console.error('Failed to fetch sync status', error);
+        }
+    };
+
+    const handleSyncStatusChange = async (checked: boolean) => {
+        try {
+            await setAutoSyncStatus(checked);
+            setAutoSync(checked);
+            message.success(checked ? 'Otomatik senkronizasyon açıldı.' : 'Otomatik senkronizasyon kapatıldı.');
+        } catch (error) {
+            message.error('Ayar güncellenemedi.');
+        }
+    };
+
+    const handleManualSync = async () => {
+        setSyncing(true);
+        try {
+            const res = await triggerManualSync();
+            message.success(res.message || 'Fiyatlar başarıyla senkronize edildi.');
+            fetchProducts();
+        } catch (error) {
+            message.error('Senkronizasyon sırasında hata oluştu.');
+        } finally {
+            setSyncing(false);
+        }
+    };
 
     const fetchProducts = async () => {
         setLoading(true);
@@ -27,10 +80,6 @@ const ProductList: React.FC = () => {
             setLoading(false);
         }
     };
-
-    useEffect(() => {
-        fetchProducts();
-    }, []);
 
     const handleDelete = async (id: string) => {
         try {
@@ -151,12 +200,47 @@ const ProductList: React.FC = () => {
 
     return (
         <div>
-            <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-                <h2>Ürünlerim</h2>
-                <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-                    Yeni Ürün Ekle
-                </Button>
-            </div>
+            {/* Header Area with Gold Rates and Sync Settings */}
+            <Row gutter={[16, 16]} style={{ marginBottom: 20 }} align="middle">
+                <Col span={8}>
+                    <h2>Ürünlerim</h2>
+                </Col>
+                <Col span={16} style={{ textAlign: 'right' }}>
+                    <Space size="large" align="center">
+                        {goldPrice && (
+                            <Space size="middle">
+                                <Tag color="gold" style={{ padding: '4px 10px', fontSize: 13, border: '1px solid #d4a017', background: '#fffbe6' }}>
+                                    <GoldOutlined style={{ marginRight: 6 }} />
+                                    24K Gram Has: <strong>{Number(goldPrice.pricePerGramTRY).toLocaleString('tr-TR')} ₺</strong>
+                                </Tag>
+                                <Tag color="blue" style={{ padding: '4px 10px', fontSize: 13, border: '1px solid #91d5ff', background: '#e6f7ff' }}>
+                                    <DollarOutlined style={{ marginRight: 6 }} />
+                                    USD/TRY: <strong>{Number(goldPrice.usdTryRate).toLocaleString('tr-TR')} ₺</strong>
+                                </Tag>
+                            </Space>
+                        )}
+                        
+                        <div style={{ display: 'flex', alignItems: 'center', background: '#f5f5f5', padding: '6px 12px', borderRadius: 6, border: '1px solid #d9d9d9' }}>
+                            <Text style={{ marginRight: 8, fontSize: 12 }}>Oto-Fiyat Senkronu:</Text>
+                            <Switch 
+                                checked={autoSync} 
+                                onChange={handleSyncStatusChange} 
+                                checkedChildren="Açık" 
+                                unCheckedChildren="Kapalı"
+                                size="small"
+                                style={{ background: autoSync ? '#52c41a' : undefined }}
+                            />
+                        </div>
+
+                        <Button type="default" icon={<SyncOutlined spin={syncing} />} onClick={handleManualSync} loading={syncing}>
+                            Fiyatları Senkronize Et
+                        </Button>
+                        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+                            Yeni Ürün Ekle
+                        </Button>
+                    </Space>
+                </Col>
+            </Row>
 
             <Tabs defaultActiveKey="my-products" items={tabItems} />
 

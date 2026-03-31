@@ -133,11 +133,24 @@ export class GoldPriceService {
    */
   private async updateProductPricesInternal(gold: GoldPrice): Promise<number> {
     const Product = require('../models/Product').default;
-    const products = await Product.findAll({ where: { isActive: true } });
+    const Store = require('../models/Store').default;
+    
+    // Include the Store model to check autoPriceSync
+    const products = await Product.findAll({ 
+      where: { isActive: true },
+      include: [{ model: Store, as: 'store', attributes: ['autoPriceSync'] }]
+    });
+    
     let updatedCount = 0;
 
-    const nonClones = products.filter((p: any) => !p.originalProductId);
-    const clones = products.filter((p: any) => !!p.originalProductId);
+    // Filter products: only update if the store has autoPriceSync explicitly true or undefined/null (defaulting to true)
+    const syncableProducts = products.filter((p: any) => {
+       if (p.store && p.store.autoPriceSync === false) return false;
+       return true;
+    });
+
+    const nonClones = syncableProducts.filter((p: any) => !p.originalProductId);
+    const clones = syncableProducts.filter((p: any) => !!p.originalProductId);
 
     // Update original products first
     for (const product of nonClones) {
