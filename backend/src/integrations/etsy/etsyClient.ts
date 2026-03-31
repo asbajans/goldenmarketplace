@@ -196,7 +196,7 @@ export class EtsyClient {
                 }
             });
 
-            const response = await axios.put(`${this.baseUrl}/application/shops/${shopId}/listings/${listingId}`, formData.toString(), {
+            const response = await axios.patch(`${this.baseUrl}/application/shops/${shopId}/listings/${listingId}`, formData.toString(), {
                 headers: {
                     'x-api-key': xApiKey,
                     'Authorization': `Bearer ${accessToken}`,

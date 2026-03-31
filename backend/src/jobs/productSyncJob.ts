@@ -226,7 +226,7 @@ async function syncToEtsy(integration: any, product: any) {
         await IntegrationLog.create({
              userId: integration.userId,
              platform: 'etsy',
-             endpoint: 'PUT /v3/application/shops/{shop_id}/listings/{listing_id}',
+             endpoint: 'PATCH /v3/application/shops/{shop_id}/listings/{listing_id}',
              requestMethod: 'SYNC',
              isSuccess: true,
              requestPayload: updates,
