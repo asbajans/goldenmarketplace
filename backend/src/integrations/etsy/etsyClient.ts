@@ -56,24 +56,29 @@ export class EtsyClient {
                 }
             });
 
-            // Note: v3 '/application/users/me' usually returns user ID, 
-            // We then get the shop associated with the user
             const userId = response.data.user_id;
+            let shopId = null;
 
-            const shopResponse = await axios.get(`${this.baseUrl}/application/users/${userId}/shops`, {
-                headers: {
-                    'x-api-key': apiKey,
-                    'Authorization': `Bearer ${accessToken}`
-                }
-            });
+            try {
+                const shopResponse = await axios.get(`${this.baseUrl}/application/users/${userId}/shops`, {
+                    headers: {
+                        'x-api-key': apiKey,
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+                shopId = shopResponse.data.shop_id || shopResponse.data.id || (shopResponse.data.results && shopResponse.data.results[0]?.shop_id);
+            } catch (shopError: any) {
+                console.warn(`[Etsy] Could not fetch shop for user ${userId}. They might not have an active shop yet. Message: ${shopError.message}`);
+                // Proceed without a shopId so the integration is at least saved
+            }
 
             return {
                 userId,
-                shopId: shopResponse.data.shop_id || shopResponse.data.id || (shopResponse.data.results && shopResponse.data.results[0]?.shop_id)
+                shopId
             };
         } catch (error: any) {
             console.error('Etsy GetMe Error:', error.response?.data || error.message);
-            throw new Error('Failed to fetch user/shop details from Etsy');
+            throw new Error('Failed to fetch user details from Etsy');
         }
     }
 
