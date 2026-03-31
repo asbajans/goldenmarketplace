@@ -64,19 +64,19 @@ export class IntegrationController {
             }
 
             // Retrieve from cache
-            const cachedData = pkceCache.take(state as string) as { userId: string; codeVerifier: string; etsyCategoryId?: string } | undefined;
+            const cachedData = pkceCache.take(state as string) as { userId: string; codeVerifier: string; etsyCategoryId?: string; etsyShippingProfileId?: string } | undefined;
 
             if (!cachedData) {
                 throw new Error('Invalid or expired state parameter');
             }
 
-            const { userId, codeVerifier, etsyCategoryId } = cachedData;
+            const { userId, codeVerifier, etsyCategoryId, etsyShippingProfileId } = cachedData;
 
             const apiBaseUrl = process.env.API_URL || 'https://api.asb.web.tr/api';
             const baseWithApi = apiBaseUrl.endsWith('/api') ? apiBaseUrl : `${apiBaseUrl}/api`;
             const redirectUri = `${baseWithApi}/integrations/etsy/callback`;
 
-            await integrationService.handleEtsyCallback(userId, code as string, codeVerifier, redirectUri, etsyCategoryId);
+            await integrationService.handleEtsyCallback(userId, code as string, codeVerifier, redirectUri, etsyCategoryId, etsyShippingProfileId);
 
             // Redirect back to frontend
             const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -109,11 +109,11 @@ export class IntegrationController {
             const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
             const state = crypto.randomBytes(16).toString('hex');
             
-            const { categoryId } = req.query;
+            const { categoryId, shippingProfileId } = req.query;
 
             // Store state -> verifier mapping in cache
             console.log('Storing PKCE inside node-cache...');
-            pkceCache.set(state, { userId, codeVerifier, etsyCategoryId: categoryId });
+            pkceCache.set(state, { userId, codeVerifier, etsyCategoryId: categoryId, etsyShippingProfileId: shippingProfileId });
 
             const setting = await GlobalSetting.findOne({ where: { key: 'etsy_api_key' } });
             const clientId = setting?.value || '';

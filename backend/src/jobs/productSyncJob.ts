@@ -121,15 +121,15 @@ async function syncToEtsy(integration: any, product: any) {
     const shouldCreate = !existing || existing.status === 'failed';
 
     if (shouldCreate) {
-        if (!integration.etsyCategoryId) {
-            console.warn(`[Etsy] etsyCategoryId not set in integration settings. Cannot create product.`);
+        if (!integration.etsyCategoryId || !integration.etsyShippingProfileId) {
+            console.warn(`[Etsy] etsyCategoryId or etsyShippingProfileId not set in integration settings. Cannot create product.`);
             await IntegrationLog.create({
                  userId: integration.userId,
                  platform: 'etsy',
                  endpoint: 'Pre-Sync Validation',
                  requestMethod: 'SYNC',
                  isSuccess: false,
-                 errorMessage: `Ürün Gönderilemedi: Etsy Kategori ID eşleştirmesi eksik (SKU: ${product.sku})`
+                 errorMessage: `Ürün Gönderilemedi: Etsy Kategori veya Kargo Profil ID eksik (SKU: ${product.sku})`
             });
             return;
         }
@@ -142,6 +142,7 @@ async function syncToEtsy(integration: any, product: any) {
             who_made: 'i_did',
             when_made: 'made_to_order',
             taxonomy_id: integration.etsyCategoryId,
+            shipping_profile_id: integration.etsyShippingProfileId,
             is_supply: false,
             should_auto_renew: false
         };

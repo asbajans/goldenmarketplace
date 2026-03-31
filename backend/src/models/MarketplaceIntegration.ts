@@ -17,6 +17,7 @@ export class MarketplaceIntegration extends Model {
     public lastSyncAt?: Date;
     // Etsy product creation config
     public etsyCategoryId?: number;
+    public etsyShippingProfileId?: number;
     // Trendyol product creation config
     public trendyolCategoryId?: number;
     public trendyolBrandId?: number;
@@ -86,6 +87,11 @@ MarketplaceIntegration.init(
             type: DataTypes.INTEGER,
             allowNull: true,
             comment: 'Etsy taxonomy/category ID required for product creation'
+        },
+        etsyShippingProfileId: {
+            type: DataTypes.BIGINT,
+            allowNull: true,
+            comment: 'Etsy shipping profile ID'
         },
         trendyolCategoryId: {
             type: DataTypes.INTEGER,

@@ -116,7 +116,7 @@ class IntegrationService {
      * Handle Etsy OAuth Callback
      * Exchanges code for token using real EtsyClient
      */
-    async handleEtsyCallback(userId: string, code: string, codeVerifier: string, redirectUri: string, etsyCategoryId?: string) {
+    async handleEtsyCallback(userId: string, code: string, codeVerifier: string, redirectUri: string, etsyCategoryId?: string, etsyShippingProfileId?: string) {
         console.log(`Exchanging Etsy code for user ${userId}`);
 
         // 1. Get tokens
@@ -138,6 +138,7 @@ class IntegrationService {
                 shopId: shopId,
                 isActive: true,
                 etsyCategoryId: etsyCategoryId ? parseInt(etsyCategoryId) : null,
+                etsyShippingProfileId: etsyShippingProfileId ? parseInt(etsyShippingProfileId) : null,
                 lastSyncAt: new Date()
             });
         } else {
@@ -162,6 +163,7 @@ class IntegrationService {
                 shopId: shopId,
                 isActive: true,
                 etsyCategoryId: etsyCategoryId ? parseInt(etsyCategoryId) : null,
+                etsyShippingProfileId: etsyShippingProfileId ? parseInt(etsyShippingProfileId) : null,
                 lastSyncAt: new Date()
             });
         }

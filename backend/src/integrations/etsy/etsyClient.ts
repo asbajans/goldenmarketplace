@@ -10,6 +10,7 @@ export interface EtsyCreateListingPayload {
     who_made: 'i_did' | 'someone_else' | 'collective';
     when_made: string;
     taxonomy_id: number;
+    shipping_profile_id?: number;
     is_supply?: boolean;
     is_customizable?: boolean;
     should_auto_renew?: boolean;
