@@ -119,7 +119,7 @@ export class IntegrationController {
             const apiBaseUrl = process.env.API_URL || 'https://api.asb.web.tr/api';
             const baseWithApi = apiBaseUrl.endsWith('/api') ? apiBaseUrl : `${apiBaseUrl}/api`;
             const redirectUri = `${baseWithApi}/integrations/etsy/callback`;
-            const scopes = 'listings_r listings_w listings_d profile_r email_r transactions_r transactions_w';
+            const scopes = 'shops_r shops_w listings_r listings_w listings_d profile_r email_r transactions_r transactions_w';
 
             if (!clientId) {
                 console.error('Etsy Auth URL Error: ETSY_KEY is empty in Database');
