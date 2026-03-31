@@ -50,7 +50,7 @@ export class EtsyClient {
      */
     async getMe(accessToken: string) {
         const { apiKey, apiSecret } = await this.getApiCredentials();
-        const xApiKey = `${apiKey}.${apiSecret}`;
+        const xApiKey = `${apiKey}:${apiSecret}`;
 
         try {
             const response = await axios.get(`${this.baseUrl}/application/users/me`, {
@@ -91,7 +91,7 @@ export class EtsyClient {
      */
     async verifyConnection(accessToken: string) {
         const { apiKey, apiSecret } = await this.getApiCredentials();
-        const xApiKey = `${apiKey}.${apiSecret}`;
+        const xApiKey = `${apiKey}:${apiSecret}`;
 
         try {
             const response = await axios.get(`${this.baseUrl}/application/users/me`, {
