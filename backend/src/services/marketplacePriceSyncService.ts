@@ -16,6 +16,7 @@ import TrendyolClient from '../integrations/trendyol/trendyolClient';
 import HepsiburadaClient, { HepsiburadaProduct } from '../integrations/hepsiburada/hepsiburadaClient';
 import N11Client from '../integrations/n11/n11Client';
 import PazaramaClient from '../integrations/pazarama/pazaramaClient';
+import EtsyClient from '../integrations/etsy/etsyClient';
 
 class MarketplacePriceSyncService {
 
@@ -82,6 +83,8 @@ class MarketplacePriceSyncService {
                 await this.syncPazarama(integration, products);
                 break;
             case 'etsy':
+                await this.syncEtsy(integration, products);
+                break;
             case 'amazon':
                 console.log(`[${platform}] Price sync skipped (handled separately)`);
                 break;
@@ -203,6 +206,59 @@ class MarketplacePriceSyncService {
             console.log(`[Pazarama] Price sync: updated ${items.length} products.`);
         } else {
             console.log(`[Pazarama] No active listings to update.`);
+        }
+    }
+
+    /**
+     * Etsy: only update products with active listings (known listing ID)
+     */
+    private async syncEtsy(integration: MarketplaceIntegration, products: Product[]): Promise<void> {
+        if (!integration.accessToken || !integration.shopId) {
+            console.log('[Etsy] Missing accessToken or shopId. Skipping.');
+            return;
+        }
+
+        const items = [];
+
+        for (const product of products) {
+            const listing = await ProductMarketplaceListing.findOne({
+                where: { productId: product.id, platform: 'etsy', status: 'active' }
+            });
+            if (!listing) {
+                // Product not yet listed — skip price update (productSyncJob handles create)
+                continue;
+            }
+
+            // Etsy requires USD pricing
+            const priceUSD = Number(product.priceUSD) || Number(product.priceTRY) / 35;
+            
+            items.push({
+                listingId: Number(listing.externalId),
+                price: priceUSD,
+                quantity: product.quantity
+            });
+        }
+
+        if (items.length > 0) {
+            for (const item of items) {
+                try {
+                    await EtsyClient.updateListing(
+                        integration.shopId,
+                        item.listingId,
+                        integration.accessToken,
+                        {
+                            price: item.price,
+                            quantity: item.quantity
+                        }
+                    );
+                } catch (err: any) {
+                    console.warn(`[Etsy] Failed to update listing ${item.listingId}:`, err.message);
+                    // Continue with other listings instead of stopping
+                }
+            }
+            console.log(`[Etsy] Price sync: updated ${items.length} products.`);
+        } else {
+            console.log(`[Etsy] No active listings to update. Create products via seller panel first.`);
         }
     }
 }
