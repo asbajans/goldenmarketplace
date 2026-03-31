@@ -121,15 +121,19 @@ async function syncToEtsy(integration: any, product: any) {
     const shouldCreate = !existing || existing.status === 'failed';
 
     if (shouldCreate) {
-        if (!integration.etsyCategoryId || !integration.etsyShippingProfileId) {
-            console.warn(`[Etsy] etsyCategoryId or etsyShippingProfileId not set in integration settings. Cannot create product.`);
+        // Try to get shippingProfileId from product level first, then fallback to integration settings
+        const productShippingProfileId = product.marketplaceConfig?.etsy?.shippingProfileId;
+        const shippingProfileId = productShippingProfileId || integration.etsyShippingProfileId;
+
+        if (!integration.etsyCategoryId || !shippingProfileId) {
+            console.warn(`[Etsy] etsyCategoryId or shippingProfileId not set. Cannot create product.`);
             await IntegrationLog.create({
                  userId: integration.userId,
                  platform: 'etsy',
                  endpoint: 'Pre-Sync Validation',
                  requestMethod: 'SYNC',
                  isSuccess: false,
-                 errorMessage: `Ürün Gönderilemedi: Etsy Kategori veya Kargo Profil ID eksik (SKU: ${product.sku})`
+                 errorMessage: `Ürün Gönderilemedi: Etsy Kategori veya Kargo Profil ID eksik (SKU: ${product.sku}). Lütfen ürünü düzenleyip Etsy ayarlarını kontrol edin.`
             });
             return;
         }
@@ -142,7 +146,7 @@ async function syncToEtsy(integration: any, product: any) {
             who_made: 'i_did',
             when_made: 'made_to_order',
             taxonomy_id: integration.etsyCategoryId,
-            shipping_profile_id: integration.etsyShippingProfileId,
+            shipping_profile_id: shippingProfileId,
             is_supply: false,
             should_auto_renew: false
         };

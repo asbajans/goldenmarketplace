@@ -121,11 +121,8 @@ const IntegrationSettings: React.FC = () => {
     const handleEtsyConnect = async (values: any) => {
         setConnecting('etsy');
         try {
-            const categoryId = values.etsyCategoryId ? `categoryId=${values.etsyCategoryId}` : '';
-            const shippingProfileId = values.etsyShippingProfileId ? `shippingProfileId=${values.etsyShippingProfileId}` : '';
-            const params = [categoryId, shippingProfileId].filter(Boolean).join('&');
-            const query = params ? `?${params}` : '';
-            const { data } = await client.get(`/integrations/etsy/auth-url${query}`);
+            const categoryId = values.etsyCategoryId ? `?categoryId=${values.etsyCategoryId}` : '';
+            const { data } = await client.get(`/integrations/etsy/auth-url${categoryId}`);
             window.location.href = data.url;
         } catch (error) {
             message.error('Bağlantı başlatılamadı');
@@ -440,7 +437,8 @@ const IntegrationSettings: React.FC = () => {
                 footer={null}
             >
                 <p style={{ marginBottom: 16, color: '#888' }}>
-                    Etsy'de ürünlerinizi listeleyebilmemiz için Taxonomy ID (Kategori ID) ve Shipping Profile ID (Kargo Profil ID) girmeniz gereklidir.
+                    Etsy'de ürünlerinizi listeleyebilmemiz için bir Taxonomy ID (Kategori ID) girmeniz gereklidir.
+                    Örneğin, Takı için "1153" girebilirsiniz.
                 </p>
                 <Form form={etsyForm} layout="vertical" onFinish={handleEtsyConnect}>
                     <Form.Item
@@ -449,13 +447,6 @@ const IntegrationSettings: React.FC = () => {
                         rules={[{ required: true, message: 'Lütfen ürünlerin gönderileceği Etsy kategori ID sini giriniz.' }]}
                     >
                         <InputNumber style={{ width: '100%' }} placeholder="örn: 1153" />
-                    </Form.Item>
-                    <Form.Item
-                        name="etsyShippingProfileId"
-                        label="Etsy Shipping Profile ID (Zorunlu)"
-                        rules={[{ required: true, message: 'Lütfen Etsy kargo profili ID nizi giriniz.' }]}
-                    >
-                        <InputNumber style={{ width: '100%' }} placeholder="örn: 219830500" />
                     </Form.Item>
                     <Form.Item>
                         <Button type="primary" htmlType="submit" loading={connecting === 'etsy'} block>

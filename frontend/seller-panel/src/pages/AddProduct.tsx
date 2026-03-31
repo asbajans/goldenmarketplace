@@ -62,6 +62,9 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [integrationsLoading, setIntegrationsLoading] = useState(true);
     const [fileList, setFileList] = useState<UploadFile[]>([]);
     const [videoFile, setVideoFile] = useState<UploadFile[]>([]);
+    const [selectedMarketplaces, setSelectedMarketplaces] = useState<string[]>(['golden']);
+    const [etsyShippingProfiles, setEtsyShippingProfiles] = useState<any[]>([]);
+    const [fetchingEtsyProfiles, setFetchingEtsyProfiles] = useState(false);
     const isCloned = !!initialValues?.originalStoreName;
 
     useEffect(() => {
@@ -79,7 +82,29 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 } as UploadFile))
             );
         }
+        
+        if (initialValues?.marketplaces) {
+            setSelectedMarketplaces(initialValues.marketplaces);
+        }
     }, []);
+
+    useEffect(() => {
+        if (selectedMarketplaces.includes('etsy') && etsyShippingProfiles.length === 0) {
+            fetchEtsyProfiles();
+        }
+    }, [selectedMarketplaces]);
+
+    const fetchEtsyProfiles = async () => {
+        setFetchingEtsyProfiles(true);
+        try {
+            const { data } = await client.get('/integrations/etsy/shipping-profiles');
+            setEtsyShippingProfiles(data.results || []);
+        } catch (error) {
+            message.error('Etsy kargo profilleri alınamadı');
+        } finally {
+            setFetchingEtsyProfiles(false);
+        }
+    };
 
     const fetchCategories = async () => {
         try {
@@ -204,6 +229,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 images: allImages,
                 videos: base64Videos,
                 marketplaces: values.marketplaces || ['golden'],
+                marketplaceConfig: values.marketplaceConfig || {},
                 isB2BEnabled,
                 b2bDiscount: isB2BEnabled ? b2bDiscount : 0,
                 b2bPrice: computedB2bPrice,
@@ -267,6 +293,9 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                     if (changed.hasVariants !== undefined) {
                         setHasVariants(changed.hasVariants);
                     }
+                }
+                if (changed.marketplaces) {
+                    setSelectedMarketplaces(changed.marketplaces);
                 }
             }}
         >
@@ -619,7 +648,29 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                         </Row>
                     </Checkbox.Group>
                 </Form.Item>
-                <div style={{ marginTop: 8, padding: '8px 12px', background: '#f0f2f5', borderRadius: 4 }}>
+
+                {selectedMarketplaces.includes('etsy') && (
+                    <Card size="small" style={{ marginBottom: 12, border: '1px solid #F56400', background: '#fff9f5' }} title={<span style={{ color: '#F56400' }}>Etsy Ürün Ayarları (Zorunlu)</span>}>
+                        <Form.Item 
+                            name={['marketplaceConfig', 'etsy', 'shippingProfileId']} 
+                            label="Etsy Nakliye Profili (Shipping Profile)"
+                            rules={[{ required: true, message: 'Lütfen bir kargo profili seçin' }]}
+                            style={{ marginBottom: 0 }}
+                        >
+                            <Select
+                                placeholder="Etsy Kargo Profilinizi Seçin"
+                                loading={fetchingEtsyProfiles}
+                                options={etsyShippingProfiles.map(p => ({
+                                    label: `${Math.floor(p.shipping_profile_id)} - ${p.title}`,
+                                    value: p.shipping_profile_id
+                                }))}
+                            />
+                        </Form.Item>
+                        <Text type="secondary" style={{ fontSize: '12px', marginTop: 4, display: 'block' }}>Etsy API'den eşzamanlı çekildi.</Text>
+                    </Card>
+                )}
+                
+                <div style={{ padding: '8px 12px', background: '#f0f2f5', borderRadius: 4 }}>
                     <Text type="secondary" style={{ fontSize: '0.85em' }}>
                         <DoubleRightOutlined /> Altın fiyatı güncellendiğinde bağlı pazaryerlerine otomatik senkronize edilir.
                         Bağlı olmayan platformları <a href="/integrations">Entegrasyonlar</a> sayfasından bağlayabilirsiniz.

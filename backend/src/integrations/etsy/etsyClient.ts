@@ -207,6 +207,27 @@ export class EtsyClient {
             throw new Error(`Failed to update Etsy listing: ${JSON.stringify(error.response?.data || error.message)}`);
         }
     }
+
+    /**
+     * Fetch all shipping profiles for the shop
+     */
+    async getShippingProfiles(shopId: string, accessToken: string) {
+        const { apiKey, apiSecret } = await this.getApiCredentials();
+        const xApiKey = `${apiKey}:${apiSecret}`;
+
+        try {
+            const response = await axios.get(`${this.baseUrl}/application/shops/${shopId}/shipping-profiles`, {
+                headers: {
+                    'x-api-key': xApiKey,
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error(`Etsy getShippingProfiles Error for Shop ${shopId}:`, error.response?.data || error.message);
+            throw new Error(`Failed to fetch Etsy shipping profiles: ${JSON.stringify(error.response?.data || error.message)}`);
+        }
+    }
 }
 
 export default new EtsyClient();

@@ -32,6 +32,7 @@ interface ProductAttributes {
   marketplaces?: string[];
   hasVariants: boolean;
   variantAttributes?: any;
+  marketplaceConfig?: any;
   tags?: string[];
   originalStoreName?: string;
   originalProductId?: string;
@@ -65,6 +66,7 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public marketplaces?: string[];
   public hasVariants!: boolean;
   public variantAttributes?: any;
+  public marketplaceConfig?: any;
   public tags?: string[];
   public originalStoreName?: string;
   public originalProductId?: string;
@@ -198,6 +200,12 @@ Product.init(
       allowNull: true,
       defaultValue: [],
       comment: 'Array of variant configurations. e.g. [{"name": "Renk", "options": ["Sarı", "Beyaz"]}]'
+    },
+    marketplaceConfig: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: {},
+      comment: 'JSON object storing marketplace-specific settings per product, e.g. {"etsy": {"shippingProfileId": "123"}}'
     },
     tags: {
       type: DataTypes.JSON,
