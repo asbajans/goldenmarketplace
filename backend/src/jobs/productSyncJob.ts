@@ -20,6 +20,7 @@ import IntegrationLog from '../models/IntegrationLog';
 import TrendyolClient, { TrendyolCreateProductItem, TrendyolPriceUpdateItem } from '../integrations/trendyol/trendyolClient';
 import N11Client, { N11CreateProductItem } from '../integrations/n11/n11Client';
 import HepsiburadaClient from '../integrations/hepsiburada/hepsiburadaClient';
+import EtsyClient, { EtsyCreateListingPayload } from '../integrations/etsy/etsyClient';
 
 dotenv.config();
 
@@ -105,9 +106,126 @@ productSyncQueue.process(async (job) => {
     }
 });
 
-// ─── Mock Etsy ─────────────────────────────────────────────────────────────
+// ─── Etsy ─────────────────────────────────────────────────────────────
 async function syncToEtsy(integration: any, product: any) {
-    console.log(`[Etsy] Mock sync for "${product.title}"`);
+    if (!integration.accessToken || !integration.shopId) {
+        console.warn('[Etsy] Missing accessToken or shopId. Skipping.');
+        return;
+    }
+
+    // Check if already listed
+    const existing = await ProductMarketplaceListing.findOne({
+        where: { productId: product.id, platform: 'etsy' }
+    });
+
+    const shouldCreate = !existing || existing.status === 'failed';
+
+    if (shouldCreate) {
+        if (!integration.etsyCategoryId) {
+            console.warn(`[Etsy] etsyCategoryId not set in integration settings. Cannot create product.`);
+            await IntegrationLog.create({
+                 userId: integration.userId,
+                 platform: 'etsy',
+                 endpoint: 'Pre-Sync Validation',
+                 requestMethod: 'SYNC',
+                 isSuccess: false,
+                 errorMessage: `Ürün Gönderilemedi: Etsy Kategori ID eşleştirmesi eksik (SKU: ${product.sku})`
+            });
+            return;
+        }
+
+        const payload: EtsyCreateListingPayload = {
+            quantity: product.quantity || 1,
+            title: product.title.substring(0, 140), // Etsy title limit
+            description: product.description || product.title,
+            price: Number(product.priceUSD || product.priceTRY / 35), // Default fallback if no USD price
+            who_made: 'i_did',
+            when_made: 'made_to_order',
+            taxonomy_id: integration.etsyCategoryId,
+            is_supply: false,
+            should_auto_renew: false
+        };
+
+        console.log(`[Etsy] Creating new draft listing: ${product.sku} - ${product.title}`);
+        const result = await EtsyClient.createDraftListing(integration.shopId, integration.accessToken, payload);
+        const listingId = result.listing_id || result.id;
+
+        if (existing) {
+            await existing.update({
+                externalId: String(listingId),
+                externalCode: String(listingId),
+                status: 'pending',
+                lastError: undefined
+            });
+        } else {
+            await ProductMarketplaceListing.create({
+                productId: product.id,
+                platform: 'etsy',
+                externalId: String(listingId),
+                externalCode: String(listingId),
+                status: 'pending'
+            });
+        }
+
+        // Upload images
+        if (Array.isArray(product.images) && product.images.length > 0) {
+            for (const imageUrl of product.images) {
+                try {
+                    await EtsyClient.uploadListingImage(integration.shopId, listingId, integration.accessToken, imageUrl);
+                } catch (imgError: any) {
+                    console.warn(`[Etsy] Failed to upload image ${imageUrl} for listing ${listingId}:`, imgError.message);
+                }
+            }
+        }
+
+        // Publish
+        try {
+            await EtsyClient.updateListing(integration.shopId, listingId, integration.accessToken, { state: 'active' });
+            
+            // Mark as active
+            await ProductMarketplaceListing.update(
+                { status: 'active' },
+                { where: { productId: product.id, platform: 'etsy' } }
+            );
+        } catch (publishErr: any) {
+             console.warn(`[Etsy] Created but failed to publish listing ${listingId}:`, publishErr.message);
+        }
+
+        await IntegrationLog.create({
+             userId: integration.userId,
+             platform: 'etsy',
+             endpoint: 'POST /v3/application/shops/{shop_id}/listings',
+             requestMethod: 'SYNC',
+             isSuccess: true,
+             requestPayload: payload,
+             responsePayload: result
+        });
+        console.log(`[Etsy] Product listing saved. ID: ${listingId}`);
+
+    } else {
+        // UPDATE existing product price/stock
+        console.log(`[Etsy] Updating existing product (ID: ${existing.externalId})`);
+        
+        const updates = {
+            price: Number(product.priceUSD || product.priceTRY / 35),
+            quantity: product.quantity || 1
+        };
+
+        const result = await EtsyClient.updateListing(integration.shopId, Number(existing.externalId), integration.accessToken, updates);
+
+        await IntegrationLog.create({
+             userId: integration.userId,
+             platform: 'etsy',
+             endpoint: 'PUT /v3/application/shops/{shop_id}/listings/{listing_id}',
+             requestMethod: 'SYNC',
+             isSuccess: true,
+             requestPayload: updates,
+             responsePayload: result
+        });
+
+        await existing.update({ status: 'active' });
+    }
+
     await integration.update({ lastSyncAt: new Date() });
 }
 
@@ -211,6 +329,16 @@ async function syncToTrendyol(integration: any, product: any, _trigger: string) 
         }
         console.log(`[Trendyol] Product listing saved. Batch: ${batchRequestId}`);
 
+        await IntegrationLog.create({
+             userId: integration.userId,
+             platform: 'trendyol',
+             endpoint: 'Create Products API',
+             requestMethod: 'SYNC',
+             isSuccess: true,
+             requestPayload: items,
+             responsePayload: { batchRequestId }
+        });
+
     } else {
         // UPDATE existing product price/stock
         console.log(`[Trendyol] Updating existing product (barcode: ${existing.externalCode})`);
@@ -237,6 +365,16 @@ async function syncToTrendyol(integration: any, product: any, _trigger: string) 
 
         await client.updatePrices(updateItems);
         await existing.update({ status: 'active' });
+
+        await IntegrationLog.create({
+             userId: integration.userId,
+             platform: 'trendyol',
+             endpoint: 'Update Prices API',
+             requestMethod: 'SYNC',
+             isSuccess: true,
+             requestPayload: updateItems,
+             responsePayload: { status: 'success' }
+        });
     }
 
     await integration.update({ lastSyncAt: new Date() });
@@ -334,6 +472,16 @@ async function syncToN11(integration: any, product: any, _trigger: string) {
         }
         console.log(`[N11] Product listing saved. ID: ${n11ProductId}`);
 
+        await IntegrationLog.create({
+             userId: integration.userId,
+             platform: 'n11',
+             endpoint: 'Create Product API',
+             requestMethod: 'SYNC',
+             isSuccess: true,
+             requestPayload: item,
+             responsePayload: { n11ProductId }
+        });
+
     } else {
         // UPDATE price/stock
         console.log(`[N11] Updating existing product (ID: ${existing.externalId})`);
@@ -360,6 +508,16 @@ async function syncToN11(integration: any, product: any, _trigger: string) {
 
         await client.updatePrices(updateItems);
         await existing.update({ status: 'active' });
+
+        await IntegrationLog.create({
+             userId: integration.userId,
+             platform: 'n11',
+             endpoint: 'Update Prices API',
+             requestMethod: 'SYNC',
+             isSuccess: true,
+             requestPayload: updateItems,
+             responsePayload: { status: 'success' }
+        });
     }
 
     await integration.update({ lastSyncAt: new Date() });

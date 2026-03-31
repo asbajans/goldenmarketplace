@@ -64,19 +64,19 @@ export class IntegrationController {
             }
 
             // Retrieve from cache
-            const cachedData = pkceCache.take(state as string) as { userId: string; codeVerifier: string } | undefined;
+            const cachedData = pkceCache.take(state as string) as { userId: string; codeVerifier: string; etsyCategoryId?: string } | undefined;
 
             if (!cachedData) {
                 throw new Error('Invalid or expired state parameter');
             }
 
-            const { userId, codeVerifier } = cachedData;
+            const { userId, codeVerifier, etsyCategoryId } = cachedData;
 
             const apiBaseUrl = process.env.API_URL || 'https://api.asb.web.tr/api';
             const baseWithApi = apiBaseUrl.endsWith('/api') ? apiBaseUrl : `${apiBaseUrl}/api`;
             const redirectUri = `${baseWithApi}/integrations/etsy/callback`;
 
-            await integrationService.handleEtsyCallback(userId, code as string, codeVerifier, redirectUri);
+            await integrationService.handleEtsyCallback(userId, code as string, codeVerifier, redirectUri, etsyCategoryId);
 
             // Redirect back to frontend
             const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -108,10 +108,12 @@ export class IntegrationController {
             const codeVerifier = crypto.randomBytes(32).toString('base64url');
             const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
             const state = crypto.randomBytes(16).toString('hex');
+            
+            const { categoryId } = req.query;
 
             // Store state -> verifier mapping in cache
             console.log('Storing PKCE inside node-cache...');
-            pkceCache.set(state, { userId, codeVerifier });
+            pkceCache.set(state, { userId, codeVerifier, etsyCategoryId: categoryId });
 
             const setting = await GlobalSetting.findOne({ where: { key: 'etsy_api_key' } });
             const clientId = setting?.value || '';

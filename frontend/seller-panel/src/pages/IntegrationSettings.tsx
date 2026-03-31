@@ -75,6 +75,8 @@ const IntegrationSettings: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [connecting, setConnecting] = useState<string | null>(null);
     const [isModalVisible, setIsModalVisible] = useState(false);
+    const [isEtsyModalVisible, setIsEtsyModalVisible] = useState(false);
+    const [etsyForm] = Form.useForm();
     const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
     const [form] = Form.useForm();
     const [searchParams] = useSearchParams();
@@ -106,19 +108,25 @@ const IntegrationSettings: React.FC = () => {
 
     const handleConnect = async (platform: string) => {
         if (platform === 'etsy') {
-            setConnecting(platform);
-            try {
-                const { data } = await client.get('/integrations/etsy/auth-url');
-                window.location.href = data.url;
-            } catch (error) {
-                message.error('Bağlantı başlatılamadı');
-                setConnecting(null);
-            }
+            setIsEtsyModalVisible(true);
+            etsyForm.resetFields();
         } else {
             // Open modal for API key based integrations
             setSelectedPlatform(platform);
             setIsModalVisible(true);
             form.resetFields();
+        }
+    };
+
+    const handleEtsyConnect = async (values: any) => {
+        setConnecting('etsy');
+        try {
+            const categoryId = values.etsyCategoryId ? `?categoryId=${values.etsyCategoryId}` : '';
+            const { data } = await client.get(`/integrations/etsy/auth-url${categoryId}`);
+            window.location.href = data.url;
+        } catch (error) {
+            message.error('Bağlantı başlatılamadı');
+            setConnecting(null);
         }
     };
 
@@ -419,6 +427,33 @@ const IntegrationSettings: React.FC = () => {
                         </Form>
                     </>
                 )}
+            </Modal>
+
+            {/* Etsy Explicit Modal */}
+            <Modal
+                title="Etsy Entegrasyonu"
+                open={isEtsyModalVisible}
+                onCancel={() => setIsEtsyModalVisible(false)}
+                footer={null}
+            >
+                <p style={{ marginBottom: 16, color: '#888' }}>
+                    Etsy'de ürünlerinizi listeleyebilmemiz için bir Taxonomy ID (Kategori ID) girmeniz gereklidir.
+                    Örneğin, Takı için "1153" girebilirsiniz.
+                </p>
+                <Form form={etsyForm} layout="vertical" onFinish={handleEtsyConnect}>
+                    <Form.Item
+                        name="etsyCategoryId"
+                        label="Etsy Taxonomy ID (Zorunlu)"
+                        rules={[{ required: true, message: 'Lütfen ürünlerin gönderileceği Etsy kategori ID sini giriniz.' }]}
+                    >
+                        <InputNumber style={{ width: '100%' }} placeholder="örn: 1153" />
+                    </Form.Item>
+                    <Form.Item>
+                        <Button type="primary" htmlType="submit" loading={connecting === 'etsy'} block>
+                            Etsy'ye Yönlendir
+                        </Button>
+                    </Form.Item>
+                </Form>
             </Modal>
         </div>
     );

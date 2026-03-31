@@ -1,5 +1,19 @@
 import axios from 'axios';
+import FormData from 'form-data';
 import { GlobalSetting } from '../../models/GlobalSetting';
+
+export interface EtsyCreateListingPayload {
+    quantity: number;
+    title: string;
+    description: string;
+    price: number;
+    who_made: 'i_did' | 'someone_else' | 'collective';
+    when_made: string;
+    taxonomy_id: number;
+    is_supply?: boolean;
+    is_customizable?: boolean;
+    should_auto_renew?: boolean;
+}
 
 export class EtsyClient {
     private baseUrl = 'https://api.etsy.com/v3';
@@ -104,6 +118,92 @@ export class EtsyClient {
         } catch (error: any) {
             console.error('Etsy Verify Connection Error:', error.response?.data || error.message);
             throw new Error('Failed to verify Etsy connection. Token might be invalid or expired.');
+        }
+    }
+    /**
+     * Create a new draft listing
+     */
+    async createDraftListing(shopId: string, accessToken: string, payload: EtsyCreateListingPayload) {
+        const { apiKey, apiSecret } = await this.getApiCredentials();
+        const xApiKey = `${apiKey}:${apiSecret}`;
+
+        try {
+            // application/x-www-form-urlencoded is needed for Etsy POST requests
+            const formData = new URLSearchParams();
+            Object.entries(payload).forEach(([key, value]) => {
+                if (value !== undefined) {
+                    formData.append(key, String(value));
+                }
+            });
+
+            const response = await axios.post(`${this.baseUrl}/application/shops/${shopId}/listings`, formData.toString(), {
+                headers: {
+                    'x-api-key': xApiKey,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('Etsy createDraftListing Error:', error.response?.data || error.message);
+            throw new Error(`Failed to create Etsy draft listing: ${JSON.stringify(error.response?.data || error.message)}`);
+        }
+    }
+
+    /**
+     * Upload an image to an existing listing
+     */
+    async uploadListingImage(shopId: string, listingId: number, accessToken: string, imageUrl: string) {
+        const { apiKey, apiSecret } = await this.getApiCredentials();
+        const xApiKey = `${apiKey}:${apiSecret}`;
+
+        try {
+            // Fetch the image from URL as stream
+            const imageResponse = await axios.get(imageUrl, { responseType: 'stream' });
+
+            const form = new FormData();
+            form.append('image', imageResponse.data, 'product_image.jpg');
+
+            const response = await axios.post(`${this.baseUrl}/application/shops/${shopId}/listings/${listingId}/images`, form, {
+                headers: {
+                    'x-api-key': xApiKey,
+                    'Authorization': `Bearer ${accessToken}`,
+                    ...form.getHeaders()
+                }
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error(`Etsy uploadListingImage Error for Listing ${listingId}:`, error.response?.data || error.message);
+            throw new Error(`Failed to upload image to Etsy listing: ${JSON.stringify(error.response?.data || error.message)}`);
+        }
+    }
+
+    /**
+     * Update an existing listing properties (e.g. state to active)
+     */
+    async updateListing(shopId: string, listingId: number, accessToken: string, updates: any) {
+        const { apiKey, apiSecret } = await this.getApiCredentials();
+        const xApiKey = `${apiKey}:${apiSecret}`;
+
+        try {
+            const formData = new URLSearchParams();
+            Object.entries(updates).forEach(([key, value]) => {
+                if (value !== undefined) {
+                    formData.append(key, String(value));
+                }
+            });
+
+            const response = await axios.put(`${this.baseUrl}/application/shops/${shopId}/listings/${listingId}`, formData.toString(), {
+                headers: {
+                    'x-api-key': xApiKey,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error(`Etsy updateListing Error for Listing ${listingId}:`, error.response?.data || error.message);
+            throw new Error(`Failed to update Etsy listing: ${JSON.stringify(error.response?.data || error.message)}`);
         }
     }
 }
