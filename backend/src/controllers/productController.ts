@@ -67,7 +67,7 @@ export class ProductController {
     try {
       const {
         title, description, category, sku, quantity,
-        images, videoUrl, marketplaces, gramWeight, milyem, effectiveMilyem, profitMargin,
+        images, videoUrl, marketplaces, marketplaceConfig, gramWeight, milyem, effectiveMilyem, profitMargin,
         isB2BEnabled, b2bDiscount,
         hasVariants, variantAttributes, variants
       } = req.body;
@@ -149,6 +149,7 @@ export class ProductController {
         images: Array.isArray(images) ? images : [],
         videoUrl,
         marketplaces: (Array.isArray(marketplaces) && marketplaces.length > 0) ? marketplaces : ['golden'],
+        marketplaceConfig: marketplaceConfig || {},
         hasVariants: !!hasVariants,
         variantAttributes: variantAttributes || [],
         tags,
@@ -223,7 +224,7 @@ export class ProductController {
       const { id } = req.params;
       const {
         title, description, category, quantity,
-        images, videoUrl, marketplaces, gramWeight, milyem, effectiveMilyem, profitMargin,
+        images, videoUrl, marketplaces, marketplaceConfig, gramWeight, milyem, effectiveMilyem, profitMargin,
         isB2BEnabled, b2bDiscount,
         hasVariants, variantAttributes, variants
       } = req.body;
@@ -318,6 +319,7 @@ export class ProductController {
         images: isCloned ? product.images : (images || product.images),
         videoUrl: isCloned ? product.videoUrl : (videoUrl !== undefined ? videoUrl : product.videoUrl),
         marketplaces: marketplaces || product.marketplaces,
+        marketplaceConfig: marketplaceConfig !== undefined ? marketplaceConfig : product.marketplaceConfig,
         hasVariants: finalHasVariants,
         variantAttributes: finalVariantAttributes,
         tags: isCloned ? product.tags : tags
