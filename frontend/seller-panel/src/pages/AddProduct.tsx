@@ -65,6 +65,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [selectedMarketplaces, setSelectedMarketplaces] = useState<string[]>(['golden']);
     const [etsyShippingProfiles, setEtsyShippingProfiles] = useState<any[]>([]);
     const [etsyReturnPolicies, setEtsyReturnPolicies] = useState<any[]>([]);
+    const [etsyReadinessStates, setEtsyReadinessStates] = useState<any[]>([]);
     const [fetchingEtsyProfiles, setFetchingEtsyProfiles] = useState(false);
     const isCloned = !!initialValues?.originalStoreName;
 
@@ -98,14 +99,16 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const fetchEtsyProfiles = async () => {
         setFetchingEtsyProfiles(true);
         try {
-            const [shippingRes, returnRes] = await Promise.all([
+            const [shippingRes, returnRes, readinessRes] = await Promise.all([
                 client.get('/integrations/etsy/shipping-profiles'),
-                client.get('/integrations/etsy/return-policies')
+                client.get('/integrations/etsy/return-policies'),
+                client.get('/integrations/etsy/readiness-states')
             ]);
             setEtsyShippingProfiles(shippingRes.data.results || []);
             setEtsyReturnPolicies(returnRes.data.results || []);
+            setEtsyReadinessStates(readinessRes.data.results || []);
         } catch (error) {
-            message.error('Etsy kargo veya iade profilleri alınamadı');
+            message.error('Etsy profil verileri alınamadı');
         } finally {
             setFetchingEtsyProfiles(false);
         }
@@ -674,7 +677,6 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                             name={['marketplaceConfig', 'etsy', 'returnPolicyId']} 
                             label="Etsy İade Politikası (Return Policy)"
                             rules={[{ required: true, message: 'Lütfen bir iade politikası seçin' }]}
-                            style={{ marginBottom: 0 }}
                         >
                             <Select
                                 placeholder="Etsy İade Politikanızı Seçin"
@@ -682,6 +684,21 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                                 options={etsyReturnPolicies.map(p => ({
                                     label: `${Math.floor(p.return_policy_id)} - ${p.title}`,
                                     value: p.return_policy_id
+                                }))}
+                            />
+                        </Form.Item>
+                        <Form.Item 
+                            name={['marketplaceConfig', 'etsy', 'readinessStateId']} 
+                            label="Etsy Hazırlık Süresi (Readiness State)"
+                            rules={[{ required: true, message: 'Lütfen bir hazırlık profili seçin' }]}
+                            style={{ marginBottom: 0 }}
+                        >
+                            <Select
+                                placeholder="Etsy Hazırlık Zamanı (Processing Profile) Seçin"
+                                loading={fetchingEtsyProfiles}
+                                options={etsyReadinessStates.map(p => ({
+                                    label: `${Math.floor(p.readiness_state_id)} - ${p.name || 'Özel Süre'}`,
+                                    value: p.readiness_state_id
                                 }))}
                             />
                         </Form.Item>

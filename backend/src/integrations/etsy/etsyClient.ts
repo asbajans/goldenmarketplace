@@ -12,6 +12,7 @@ export interface EtsyCreateListingPayload {
     taxonomy_id: number;
     shipping_profile_id?: number;
     return_policy_id?: number;
+    readiness_state_id?: number;
     is_supply?: boolean;
     is_customizable?: boolean;
     should_auto_renew?: boolean;
@@ -248,6 +249,27 @@ export class EtsyClient {
         } catch (error: any) {
             console.error(`Etsy getReturnPolicies Error for Shop ${shopId}:`, error.response?.data || error.message);
             throw new Error(`Failed to fetch Etsy return policies: ${JSON.stringify(error.response?.data || error.message)}`);
+        }
+    }
+
+    /**
+     * Fetch all readiness state definitions (processing profiles) for the shop
+     */
+    async getReadinessStates(shopId: string, accessToken: string) {
+        const { apiKey, apiSecret } = await this.getApiCredentials();
+        const xApiKey = `${apiKey}:${apiSecret}`;
+
+        try {
+            const response = await axios.get(`${this.baseUrl}/application/shops/${shopId}/readiness-state-definitions`, {
+                headers: {
+                    'x-api-key': xApiKey,
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error(`Etsy getReadinessStates Error for Shop ${shopId}:`, error.response?.data || error.message);
+            throw new Error(`Failed to fetch Etsy readiness states: ${JSON.stringify(error.response?.data || error.message)}`);
         }
     }
 }
