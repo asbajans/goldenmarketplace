@@ -72,8 +72,9 @@ export class IntegrationController {
 
             const { userId, codeVerifier } = cachedData;
 
-            // Reconstruct redirectUri because we need it to be identical to what was sent during AuthUrl request
-            const redirectUri = `${process.env.API_URL || 'http://localhost:777/api'}/integrations/etsy/callback`;
+            const apiBaseUrl = process.env.API_URL || 'https://api.asb.web.tr/api';
+            const baseWithApi = apiBaseUrl.endsWith('/api') ? apiBaseUrl : `${apiBaseUrl}/api`;
+            const redirectUri = `${baseWithApi}/integrations/etsy/callback`;
 
             await integrationService.handleEtsyCallback(userId, code as string, codeVerifier, redirectUri);
 
@@ -116,7 +117,8 @@ export class IntegrationController {
             const clientId = setting?.value || '';
 
             const apiBaseUrl = process.env.API_URL || 'https://api.asb.web.tr/api';
-            const redirectUri = `${apiBaseUrl}/integrations/etsy/callback`;
+            const baseWithApi = apiBaseUrl.endsWith('/api') ? apiBaseUrl : `${apiBaseUrl}/api`;
+            const redirectUri = `${baseWithApi}/integrations/etsy/callback`;
             const scopes = 'listings_r listings_w listings_d profile_r email_r transactions_r transactions_w';
 
             if (!clientId) {
