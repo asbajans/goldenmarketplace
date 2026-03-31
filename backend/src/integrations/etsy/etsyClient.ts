@@ -7,19 +7,22 @@ export class EtsyClient {
     /**
      * Helper to get the Etsy API Key directly from database
      */
-    private async getApiKey(): Promise<string> {
-        const setting = await GlobalSetting.findOne({ where: { key: 'etsy_api_key' } });
-        if (!setting || !setting.value) {
-            throw new Error('Etsy API Key is not configured in Admin Settings.');
+    private async getApiCredentials(): Promise<{ apiKey: string; apiSecret: string }> {
+        const keySetting = await GlobalSetting.findOne({ where: { key: 'etsy_api_key' } });
+        const secretSetting = await GlobalSetting.findOne({ where: { key: 'etsy_api_secret' } });
+        
+        if (!keySetting || !keySetting.value || !secretSetting || !secretSetting.value) {
+            throw new Error('Etsy API Key or Secret is not configured in Admin Settings.');
         }
-        return setting.value;
+        
+        return { apiKey: keySetting.value, apiSecret: secretSetting.value };
     }
 
     /**
      * Exchanges an OAuth authorization code for an access token
      */
     async exchangeCodeForToken(code: string, codeVerifier: string, redirectUri: string) {
-        const apiKey = await this.getApiKey();
+        const { apiKey } = await this.getApiCredentials();
 
         const data = {
             grant_type: 'authorization_code',
@@ -46,12 +49,13 @@ export class EtsyClient {
      * Gets the current user (shop) details using the access token
      */
     async getMe(accessToken: string) {
-        const apiKey = await this.getApiKey();
+        const { apiKey, apiSecret } = await this.getApiCredentials();
+        const xApiKey = `${apiKey}.${apiSecret}`;
 
         try {
             const response = await axios.get(`${this.baseUrl}/application/users/me`, {
                 headers: {
-                    'x-api-key': apiKey,
+                    'x-api-key': xApiKey,
                     'Authorization': `Bearer ${accessToken}`
                 }
             });
@@ -62,7 +66,7 @@ export class EtsyClient {
             try {
                 const shopResponse = await axios.get(`${this.baseUrl}/application/users/${userId}/shops`, {
                     headers: {
-                        'x-api-key': apiKey,
+                        'x-api-key': xApiKey,
                         'Authorization': `Bearer ${accessToken}`
                     }
                 });
@@ -86,12 +90,13 @@ export class EtsyClient {
      * Verify connection using the existing token
      */
     async verifyConnection(accessToken: string) {
-        const apiKey = await this.getApiKey();
+        const { apiKey, apiSecret } = await this.getApiCredentials();
+        const xApiKey = `${apiKey}.${apiSecret}`;
 
         try {
             const response = await axios.get(`${this.baseUrl}/application/users/me`, {
                 headers: {
-                    'x-api-key': apiKey,
+                    'x-api-key': xApiKey,
                     'Authorization': `Bearer ${accessToken}`
                 }
             });
