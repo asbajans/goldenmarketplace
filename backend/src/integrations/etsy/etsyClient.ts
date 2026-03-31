@@ -238,7 +238,7 @@ export class EtsyClient {
         const xApiKey = `${apiKey}:${apiSecret}`;
 
         try {
-            const response = await axios.get(`${this.baseUrl}/application/shops/${shopId}/return-policies`, {
+            const response = await axios.get(`${this.baseUrl}/application/shops/${shopId}/policies/return`, {
                 headers: {
                     'x-api-key': xApiKey,
                     'Authorization': `Bearer ${accessToken}`
