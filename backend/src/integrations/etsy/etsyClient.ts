@@ -11,6 +11,7 @@ export interface EtsyCreateListingPayload {
     when_made: string;
     taxonomy_id: number;
     shipping_profile_id?: number;
+    return_policy_id?: number;
     is_supply?: boolean;
     is_customizable?: boolean;
     should_auto_renew?: boolean;
@@ -226,6 +227,27 @@ export class EtsyClient {
         } catch (error: any) {
             console.error(`Etsy getShippingProfiles Error for Shop ${shopId}:`, error.response?.data || error.message);
             throw new Error(`Failed to fetch Etsy shipping profiles: ${JSON.stringify(error.response?.data || error.message)}`);
+        }
+    }
+
+    /**
+     * Fetch all return policies for the shop
+     */
+    async getReturnPolicies(shopId: string, accessToken: string) {
+        const { apiKey, apiSecret } = await this.getApiCredentials();
+        const xApiKey = `${apiKey}:${apiSecret}`;
+
+        try {
+            const response = await axios.get(`${this.baseUrl}/application/shops/${shopId}/return-policies`, {
+                headers: {
+                    'x-api-key': xApiKey,
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error(`Etsy getReturnPolicies Error for Shop ${shopId}:`, error.response?.data || error.message);
+            throw new Error(`Failed to fetch Etsy return policies: ${JSON.stringify(error.response?.data || error.message)}`);
         }
     }
 }

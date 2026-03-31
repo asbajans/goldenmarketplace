@@ -13,6 +13,7 @@ router.use(authMiddleware);
 router.get('/', IntegrationController.getIntegrations);
 router.get('/etsy/auth-url', IntegrationController.getEtsyAuthUrl);
 router.get('/etsy/shipping-profiles', IntegrationController.getEtsyShippingProfiles);
+router.get('/etsy/return-policies', IntegrationController.getEtsyReturnPolicies);
 router.post('/connect', IntegrationController.connect);
 router.delete('/:platform', IntegrationController.disconnect);
 router.get('/test/:platform', IntegrationController.testConnection);

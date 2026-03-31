@@ -81,6 +81,30 @@ export class IntegrationController {
         }
     }
 
+    /**
+     * Get Etsy Return Policies
+     */
+    static async getEtsyReturnPolicies(req: Request, res: Response) {
+        try {
+            const userId = (req as any).user.id;
+            
+            const integration = await MarketplaceIntegration.findOne({
+                where: { userId, platform: 'etsy', isActive: true }
+            });
+
+            if (!integration || !integration.accessToken || !integration.shopId) {
+                return res.status(400).json({ error: 'Etsy is not connected or missing credentials' });
+            }
+
+            const response = await EtsyClient.getReturnPolicies(integration.shopId, integration.accessToken);
+            // Etsy returns { count, results: [...] }
+            return res.json(response);
+        } catch (error: any) {
+            console.error('Get Etsy Return Policies error:', error);
+            return res.status(500).json({ error: error.message || 'Failed to fetch return policies' });
+        }
+    }
+
     static async etsyCallback(req: Request, res: Response) {
         try {
             const { code, state } = req.query;

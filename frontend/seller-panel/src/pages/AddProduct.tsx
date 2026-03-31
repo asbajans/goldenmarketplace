@@ -64,6 +64,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [videoFile, setVideoFile] = useState<UploadFile[]>([]);
     const [selectedMarketplaces, setSelectedMarketplaces] = useState<string[]>(['golden']);
     const [etsyShippingProfiles, setEtsyShippingProfiles] = useState<any[]>([]);
+    const [etsyReturnPolicies, setEtsyReturnPolicies] = useState<any[]>([]);
     const [fetchingEtsyProfiles, setFetchingEtsyProfiles] = useState(false);
     const isCloned = !!initialValues?.originalStoreName;
 
@@ -97,10 +98,14 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const fetchEtsyProfiles = async () => {
         setFetchingEtsyProfiles(true);
         try {
-            const { data } = await client.get('/integrations/etsy/shipping-profiles');
-            setEtsyShippingProfiles(data.results || []);
+            const [shippingRes, returnRes] = await Promise.all([
+                client.get('/integrations/etsy/shipping-profiles'),
+                client.get('/integrations/etsy/return-policies')
+            ]);
+            setEtsyShippingProfiles(shippingRes.data.results || []);
+            setEtsyReturnPolicies(returnRes.data.results || []);
         } catch (error) {
-            message.error('Etsy kargo profilleri alınamadı');
+            message.error('Etsy kargo veya iade profilleri alınamadı');
         } finally {
             setFetchingEtsyProfiles(false);
         }
@@ -655,7 +660,6 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                             name={['marketplaceConfig', 'etsy', 'shippingProfileId']} 
                             label="Etsy Nakliye Profili (Shipping Profile)"
                             rules={[{ required: true, message: 'Lütfen bir kargo profili seçin' }]}
-                            style={{ marginBottom: 0 }}
                         >
                             <Select
                                 placeholder="Etsy Kargo Profilinizi Seçin"
@@ -663,6 +667,21 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                                 options={etsyShippingProfiles.map(p => ({
                                     label: `${Math.floor(p.shipping_profile_id)} - ${p.title}`,
                                     value: p.shipping_profile_id
+                                }))}
+                            />
+                        </Form.Item>
+                        <Form.Item 
+                            name={['marketplaceConfig', 'etsy', 'returnPolicyId']} 
+                            label="Etsy İade Politikası (Return Policy)"
+                            rules={[{ required: true, message: 'Lütfen bir iade politikası seçin' }]}
+                            style={{ marginBottom: 0 }}
+                        >
+                            <Select
+                                placeholder="Etsy İade Politikanızı Seçin"
+                                loading={fetchingEtsyProfiles}
+                                options={etsyReturnPolicies.map(p => ({
+                                    label: `${Math.floor(p.return_policy_id)} - ${p.title}`,
+                                    value: p.return_policy_id
                                 }))}
                             />
                         </Form.Item>
