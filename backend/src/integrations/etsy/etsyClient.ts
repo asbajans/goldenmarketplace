@@ -184,40 +184,27 @@ export class EtsyClient {
     /**
      * Update an existing listing properties (e.g. state to active, price, quantity)
      * 
-     * For price updates: pass price as a number (e.g., 50.00) or Money object
-     * Money object format: { amount: 5000, divisor: 100, currency_code: 'USD' }
+     * For price updates: pass price as a number (e.g., 50.00)
      */
     async updateListing(shopId: string, listingId: number, accessToken: string, updates: any) {
         const { apiKey, apiSecret } = await this.getApiCredentials();
         const xApiKey = `${apiKey}:${apiSecret}`;
 
         try {
-            // Convert price to Money object format if provided as a number
+            // Keep price as number for form-urlencoded format
             const payload = { ...updates };
-            if (payload.price !== undefined && typeof payload.price === 'number') {
-                console.log(`[Etsy] Converting price ${payload.price} to Money object format`);
-                payload.price = {
-                    amount: Math.round(payload.price * 100), // Convert to cents/pennies
-                    divisor: 100,
-                    currency_code: 'USD'
-                };
-            }
 
             console.log(`[Etsy] PATCH Request Payload:`, JSON.stringify(payload, null, 2));
 
-            // Convert payload to FormData for application/x-www-form-urlencoded
-            const formData = new FormData();
+            // Convert payload to URLSearchParams for application/x-www-form-urlencoded
+            const formData = new URLSearchParams();
             for (const [key, value] of Object.entries(payload)) {
-                if (typeof value === 'object' && value !== null) {
-                    formData.append(key, JSON.stringify(value));
-                } else {
-                    formData.append(key, String(value));
-                }
+                formData.append(key, String(value));
             }
 
             const response = await axios.patch(
                 `${this.baseUrl}/application/shops/${shopId}/listings/${listingId}`,
-                formData,
+                formData.toString(),
                 {
                     headers: {
                         'x-api-key': xApiKey,
