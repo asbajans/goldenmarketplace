@@ -305,11 +305,9 @@ class MarketplacePriceSyncService {
                         ? currentInventory.products.map((product: any) => ({
                             property_values: product.property_values || [],
                             offerings: (product.offerings || []).map((offering: any) => ({
-                                offering_id: offering.offering_id,
                                 quantity: item.quantity,
                                 is_enabled: offering.is_enabled !== undefined ? offering.is_enabled : true,
-                                price: item.price,
-                                readiness_state_id: offering.readiness_state_id
+                                price: item.price
                             }))
                         }))
                         : [
