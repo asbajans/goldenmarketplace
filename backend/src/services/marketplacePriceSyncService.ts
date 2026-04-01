@@ -300,30 +300,40 @@ class MarketplacePriceSyncService {
                     // Get current inventory
                     const currentInventory = await client.getListingInventory(item.listingId, integration.accessToken);
                     
-                    // Update price in inventory
-                    const updatedInventory = { ...currentInventory };
-                    if (updatedInventory.products && updatedInventory.products.length > 0) {
-                        // Update existing products
-                        updatedInventory.products = updatedInventory.products.map((product: any) => ({
-                            ...product,
-                            offerings: product.offerings.map((offering: any) => ({
-                                ...offering,
-                                price: item.price,
-                                quantity: item.quantity
-                            }))
-                        }));
-                    } else {
-                        // Create basic inventory if none exists
-                        updatedInventory.products = [{
-                            property_values: [],
-                            offerings: [{
-                                price: item.price,
+                    // Prepare inventory update payload (Etsy requires no product_id/is_deleted in products[])
+                    const inventoryWithProducts = (currentInventory.products && currentInventory.products.length > 0)
+                        ? currentInventory.products.map((product: any) => ({
+                            property_values: product.property_values || [],
+                            offerings: (product.offerings || []).map((offering: any) => ({
+                                offering_id: offering.offering_id,
                                 quantity: item.quantity,
-                                is_enabled: true
-                            }]
-                        }];
-                    }
-                    
+                                is_enabled: offering.is_enabled !== undefined ? offering.is_enabled : true,
+                                price: item.price,
+                                readiness_state_id: offering.readiness_state_id
+                            }))
+                        }))
+                        : [
+                            {
+                                property_values: [],
+                                offerings: [
+                                    {
+                                        quantity: item.quantity,
+                                        is_enabled: true,
+                                        price: item.price
+                                    }
+                                ]
+                            }
+                        ];
+
+                    const updatedInventory = {
+                        products: inventoryWithProducts,
+                        price_on_property: currentInventory.price_on_property || [],
+                        quantity_on_property: currentInventory.quantity_on_property || [],
+                        sku_on_property: currentInventory.sku_on_property || [],
+                        readiness_state_on_property: currentInventory.readiness_state_on_property || [],
+                        listing: currentInventory.listing || null
+                    };
+
                     const result = await client.updateListingInventory(
                         item.listingId,
                         integration.accessToken,
