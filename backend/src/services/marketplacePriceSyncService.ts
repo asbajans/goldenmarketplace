@@ -300,26 +300,28 @@ class MarketplacePriceSyncService {
                     // Get current inventory
                     const currentInventory = await client.getListingInventory(item.listingId, integration.accessToken);
                     
-                    // Prepare inventory update payload (Etsy requires readiness_state in each offering)
+                    // Prepare inventory update payload per Etsy API docs
                     const inventoryWithProducts = (currentInventory.products && currentInventory.products.length > 0)
                         ? currentInventory.products.map((product: any) => ({
+                            sku: product.sku,
                             property_values: product.property_values || [],
                             offerings: (product.offerings || []).map((offering: any) => ({
+                                price: item.price,
                                 quantity: item.quantity,
                                 is_enabled: offering.is_enabled !== undefined ? offering.is_enabled : true,
-                                price: item.price,
-                                readiness_state: offering.readiness_state || 'active'
+                                readiness_state_id: offering.readiness_state_id || 1
                             }))
                         }))
                         : [
                             {
+                                sku: item.productSku,
                                 property_values: [],
                                 offerings: [
                                     {
+                                        price: item.price,
                                         quantity: item.quantity,
                                         is_enabled: true,
-                                        price: item.price,
-                                        readiness_state: 'active'
+                                        readiness_state_id: 1
                                     }
                                 ]
                             }
