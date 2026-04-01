@@ -295,18 +295,39 @@ class MarketplacePriceSyncService {
 
             for (const item of items) {
                 try {
-                    const updates = {
-                        price: item.price,
-                        quantity: item.quantity
-                    };
-
                     console.log(`[Etsy] Updating listing ${item.listingId} (${item.productSku}): price=${item.price} USD, qty=${item.quantity}`);
                     
-                    const result = await client.updateListing(
-                        integration.shopId,
+                    // Get current inventory
+                    const currentInventory = await client.getListingInventory(item.listingId, integration.accessToken);
+                    
+                    // Update price in inventory
+                    const updatedInventory = { ...currentInventory };
+                    if (updatedInventory.products && updatedInventory.products.length > 0) {
+                        // Update existing products
+                        updatedInventory.products = updatedInventory.products.map((product: any) => ({
+                            ...product,
+                            offerings: product.offerings.map((offering: any) => ({
+                                ...offering,
+                                price: item.price,
+                                quantity: item.quantity
+                            }))
+                        }));
+                    } else {
+                        // Create basic inventory if none exists
+                        updatedInventory.products = [{
+                            property_values: [],
+                            offerings: [{
+                                price: item.price,
+                                quantity: item.quantity,
+                                is_enabled: true
+                            }]
+                        }];
+                    }
+                    
+                    const result = await client.updateListingInventory(
                         item.listingId,
                         integration.accessToken,
-                        updates
+                        updatedInventory
                     );
 
                     console.log(`[Etsy] ✓ Listing ${item.listingId} updated successfully. Response:`, result);
@@ -315,10 +336,10 @@ class MarketplacePriceSyncService {
                     await IntegrationLog.create({
                         userId: integration.userId,
                         platform: 'etsy',
-                        endpoint: 'PATCH /v3/application/shops/{shop_id}/listings/{listing_id}',
+                        endpoint: 'PUT /v3/application/listings/{listing_id}/inventory',
                         requestMethod: 'SYNC',
                         isSuccess: true,
-                        requestPayload: updates,
+                        requestPayload: updatedInventory,
                         responsePayload: result
                     });
 
@@ -330,7 +351,7 @@ class MarketplacePriceSyncService {
                     await IntegrationLog.create({
                         userId: integration.userId,
                         platform: 'etsy',
-                        endpoint: 'PATCH /v3/application/shops/{shop_id}/listings/{listing_id}',
+                        endpoint: 'PUT /v3/application/listings/{listing_id}/inventory',
                         requestMethod: 'SYNC',
                         isSuccess: false,
                         errorMessage: err.message,
