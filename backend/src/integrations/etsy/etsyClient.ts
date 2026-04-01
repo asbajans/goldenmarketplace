@@ -205,14 +205,24 @@ export class EtsyClient {
 
             console.log(`[Etsy] PATCH Request Payload:`, JSON.stringify(payload, null, 2));
 
+            // Convert payload to FormData for application/x-www-form-urlencoded
+            const formData = new FormData();
+            for (const [key, value] of Object.entries(payload)) {
+                if (typeof value === 'object' && value !== null) {
+                    formData.append(key, JSON.stringify(value));
+                } else {
+                    formData.append(key, String(value));
+                }
+            }
+
             const response = await axios.patch(
                 `${this.baseUrl}/application/shops/${shopId}/listings/${listingId}`,
-                payload,
+                formData,
                 {
                     headers: {
                         'x-api-key': xApiKey,
                         'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/x-www-form-urlencoded'
                     }
                 }
             );
