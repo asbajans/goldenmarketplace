@@ -12,6 +12,7 @@ import MarketplaceIntegration from '../models/MarketplaceIntegration';
 import ProductMarketplaceListing from '../models/ProductMarketplaceListing';
 import Product from '../models/Product';
 import Store from '../models/Store';
+import IntegrationLog from '../models/IntegrationLog';
 import TrendyolClient from '../integrations/trendyol/trendyolClient';
 import HepsiburadaClient, { HepsiburadaProduct } from '../integrations/hepsiburada/hepsiburadaClient';
 import N11Client from '../integrations/n11/n11Client';
@@ -63,6 +64,53 @@ class MarketplacePriceSyncService {
         }
 
         console.log(`[MarketplaceSync] Done. Synced: ${stats.synced}, Failed: ${stats.failed}`);
+        return stats;
+    }
+
+    /**
+     * Sync marketplace prices for a specific user (called from seller panel manual sync)
+     */
+    async syncUser(userId: string): Promise<{ synced: number; failed: number; errors: string[] }> {
+        const stats = { synced: 0, failed: 0, errors: [] as string[] };
+        console.log(`[MarketplaceSync] Starting price sync for user ${userId}...`);
+
+        try {
+            const store = await Store.findOne({ where: { userId } });
+            if (!store) {
+                console.log(`[MarketplaceSync] User ${userId} has no store. Skipping.`);
+                return stats;
+            }
+
+            const products = await Product.findAll({ where: { storeId: store.id, isActive: true } });
+            if (!products.length) {
+                console.log(`[MarketplaceSync] User ${userId} has no active products. Skipping.`);
+                return stats;
+            }
+
+            const integrations = await MarketplaceIntegration.findAll({ where: { userId, isActive: true } });
+            if (!integrations.length) {
+                console.log(`[MarketplaceSync] User ${userId} has no active integrations. Skipping.`);
+                return stats;
+            }
+
+            for (const integration of integrations) {
+                try {
+                    await this.syncForPlatform(integration, products);
+                    stats.synced++;
+                    await integration.update({ lastSyncAt: new Date(), lastSyncStatus: 'success', lastSyncMessage: null });
+                } catch (err: any) {
+                    stats.failed++;
+                    const errMsg = `[${integration.platform}] uid=${userId}: ${err.message}`;
+                    stats.errors.push(errMsg);
+                    console.error('[MarketplaceSync]', errMsg);
+                    await integration.update({ lastSyncAt: new Date(), lastSyncStatus: 'error', lastSyncMessage: err.message });
+                }
+            }
+        } catch (err: any) {
+            console.error('[MarketplaceSync] Fatal error:', err.message);
+        }
+
+        console.log(`[MarketplaceSync] Done for user ${userId}. Synced: ${stats.synced}, Failed: ${stats.failed}`);
         return stats;
     }
 
@@ -235,28 +283,69 @@ class MarketplacePriceSyncService {
             items.push({
                 listingId: Number(listing.externalId),
                 price: priceUSD,
-                quantity: product.quantity
+                quantity: product.quantity,
+                productSku: product.sku
             });
         }
 
         if (items.length > 0) {
+            const client = new EtsyClient();
+            let successCount = 0;
+            let failureCount = 0;
+
             for (const item of items) {
                 try {
-                    await EtsyClient.updateListing(
+                    const updates = {
+                        price: item.price,
+                        quantity: item.quantity
+                    };
+
+                    console.log(`[Etsy] Updating listing ${item.listingId} (${item.productSku}): price=${item.price} USD, qty=${item.quantity}`);
+                    
+                    const result = await client.updateListing(
                         integration.shopId,
                         item.listingId,
                         integration.accessToken,
-                        {
+                        updates
+                    );
+
+                    console.log(`[Etsy] ✓ Listing ${item.listingId} updated successfully. Response:`, result);
+                    
+                    // Log successful update to IntegrationLog
+                    await IntegrationLog.create({
+                        userId: integration.userId,
+                        platform: 'etsy',
+                        endpoint: 'PATCH /v3/application/shops/{shop_id}/listings/{listing_id}',
+                        requestMethod: 'SYNC',
+                        isSuccess: true,
+                        requestPayload: updates,
+                        responsePayload: result
+                    });
+
+                    successCount++;
+                } catch (err: any) {
+                    console.error(`[Etsy] ✗ Failed to update listing ${item.listingId} (${item.productSku}):`, err.message);
+                    
+                    // Log failed update to IntegrationLog
+                    await IntegrationLog.create({
+                        userId: integration.userId,
+                        platform: 'etsy',
+                        endpoint: 'PATCH /v3/application/shops/{shop_id}/listings/{listing_id}',
+                        requestMethod: 'SYNC',
+                        isSuccess: false,
+                        errorMessage: err.message,
+                        requestPayload: {
                             price: item.price,
                             quantity: item.quantity
                         }
-                    );
-                } catch (err: any) {
-                    console.warn(`[Etsy] Failed to update listing ${item.listingId}:`, err.message);
+                    });
+
+                    failureCount++;
                     // Continue with other listings instead of stopping
                 }
             }
-            console.log(`[Etsy] Price sync: updated ${items.length} products.`);
+
+            console.log(`[Etsy] Price sync completed: ${successCount}/${items.length} successful, ${failureCount} failed.`);
         } else {
             console.log(`[Etsy] No active listings to update. Create products via seller panel first.`);
         }

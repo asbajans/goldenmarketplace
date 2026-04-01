@@ -274,4 +274,4 @@ export class EtsyClient {
     }
 }
 
-export default new EtsyClient();
+export default EtsyClient;

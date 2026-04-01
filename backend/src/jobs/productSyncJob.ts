@@ -181,7 +181,7 @@ async function syncToEtsy(integration: any, product: any) {
         if (Array.isArray(product.images) && product.images.length > 0) {
             for (const imageUrl of product.images) {
                 try {
-                    await EtsyClient.uploadListingImage(integration.shopId, listingId, integration.accessToken, imageUrl);
+                    await client.uploadListingImage(integration.shopId, listingId, integration.accessToken, imageUrl);
                 } catch (imgError: any) {
                     console.warn(`[Etsy] Failed to upload image ${imageUrl} for listing ${listingId}:`, imgError.message);
                 }
@@ -190,7 +190,7 @@ async function syncToEtsy(integration: any, product: any) {
 
         // Publish
         try {
-            await EtsyClient.updateListing(integration.shopId, listingId, integration.accessToken, { state: 'active' });
+            await client.updateListing(integration.shopId, listingId, integration.accessToken, { state: 'active' });
             
             // Mark as active
             await ProductMarketplaceListing.update(
@@ -214,6 +214,7 @@ async function syncToEtsy(integration: any, product: any) {
 
     } else {
         // UPDATE existing product price/stock
+        const client = new EtsyClient();
         console.log(`[Etsy] Updating existing product (ID: ${existing.externalId})`);
         
         const updates = {
@@ -221,7 +222,7 @@ async function syncToEtsy(integration: any, product: any) {
             quantity: product.quantity || 1
         };
 
-        const result = await EtsyClient.updateListing(integration.shopId, Number(existing.externalId), integration.accessToken, updates);
+        const result = await client.updateListing(integration.shopId, Number(existing.externalId), integration.accessToken, updates);
 
         await IntegrationLog.create({
              userId: integration.userId,
