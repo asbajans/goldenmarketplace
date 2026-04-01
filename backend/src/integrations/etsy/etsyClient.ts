@@ -182,27 +182,42 @@ export class EtsyClient {
     }
 
     /**
-     * Update an existing listing properties (e.g. state to active)
+     * Update an existing listing properties (e.g. state to active, price, quantity)
+     * 
+     * For price updates: pass price as a number (e.g., 50.00) or Money object
+     * Money object format: { amount: 5000, divisor: 100, currency_code: 'USD' }
      */
     async updateListing(shopId: string, listingId: number, accessToken: string, updates: any) {
         const { apiKey, apiSecret } = await this.getApiCredentials();
         const xApiKey = `${apiKey}:${apiSecret}`;
 
         try {
-            const formData = new URLSearchParams();
-            Object.entries(updates).forEach(([key, value]) => {
-                if (value !== undefined) {
-                    formData.append(key, String(value));
-                }
-            });
+            // Convert price to Money object format if provided as a number
+            const payload = { ...updates };
+            if (payload.price !== undefined && typeof payload.price === 'number') {
+                console.log(`[Etsy] Converting price ${payload.price} to Money object format`);
+                payload.price = {
+                    amount: Math.round(payload.price * 100), // Convert to cents/pennies
+                    divisor: 100,
+                    currency_code: 'USD'
+                };
+            }
 
-            const response = await axios.patch(`${this.baseUrl}/application/shops/${shopId}/listings/${listingId}`, formData.toString(), {
-                headers: {
-                    'x-api-key': xApiKey,
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/x-www-form-urlencoded'
+            console.log(`[Etsy] PATCH Request Payload:`, JSON.stringify(payload, null, 2));
+
+            const response = await axios.patch(
+                `${this.baseUrl}/application/shops/${shopId}/listings/${listingId}`,
+                payload,
+                {
+                    headers: {
+                        'x-api-key': xApiKey,
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
                 }
-            });
+            );
+
+            console.log(`[Etsy] PATCH Response Payload:`, JSON.stringify(response.data, null, 2));
             return response.data;
         } catch (error: any) {
             console.error(`Etsy updateListing Error for Listing ${listingId}:`, error.response?.data || error.message);
