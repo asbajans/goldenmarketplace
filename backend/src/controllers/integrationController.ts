@@ -72,7 +72,8 @@ export class IntegrationController {
                 return res.status(400).json({ error: 'Etsy is not connected or missing credentials' });
             }
 
-            const response = await EtsyClient.getShippingProfiles(integration.shopId, integration.accessToken);
+            const client = new EtsyClient();
+            const response = await client.getShippingProfiles(integration.shopId, integration.accessToken);
             // Etsy returns { count, results: [...] }
             return res.json(response);
         } catch (error: any) {
@@ -96,7 +97,8 @@ export class IntegrationController {
                 return res.status(400).json({ error: 'Etsy is not connected or missing credentials' });
             }
 
-            const response = await EtsyClient.getReturnPolicies(integration.shopId, integration.accessToken);
+            const client = new EtsyClient();
+            const response = await client.getReturnPolicies(integration.shopId, integration.accessToken);
             // Etsy returns { count, results: [...] }
             return res.json(response);
         } catch (error: any) {
@@ -120,7 +122,8 @@ export class IntegrationController {
                 return res.status(400).json({ error: 'Etsy is not connected or missing credentials' });
             }
 
-            const response = await EtsyClient.getReadinessStates(integration.shopId, integration.accessToken);
+            const client = new EtsyClient();
+            const response = await client.getReadinessStates(integration.shopId, integration.accessToken);
             // Etsy returns { count, results: [...] }
             return res.json(response);
         } catch (error: any) {

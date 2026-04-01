@@ -157,7 +157,8 @@ async function syncToEtsy(integration: any, product: any) {
         };
 
         console.log(`[Etsy] Creating new draft listing: ${product.sku} - ${product.title}`);
-        const result = await EtsyClient.createDraftListing(integration.shopId, integration.accessToken, payload);
+        const client = new EtsyClient();
+        const result = await client.createDraftListing(integration.shopId, integration.accessToken, payload);
         const listingId = result.listing_id || result.id;
 
         if (existing) {

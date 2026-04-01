@@ -73,7 +73,8 @@ class IntegrationService {
 
         if (platform === 'etsy') {
             if (!integration.accessToken) throw new Error('Etsy access token not found');
-            const data = await EtsyClient.verifyConnection(integration.accessToken);
+            const client = new EtsyClient();
+            const data = await client.verifyConnection(integration.accessToken);
             return { status: 'success', message: 'Etsy bağlantısı çalışıyor!', shopId: data.shop_id };
         }
 
@@ -120,11 +121,12 @@ class IntegrationService {
         console.log(`Exchanging Etsy code for user ${userId}`);
 
         // 1. Get tokens
-        const tokenResponse = await EtsyClient.exchangeCodeForToken(code, codeVerifier, redirectUri);
+        const client = new EtsyClient();
+        const tokenResponse = await client.exchangeCodeForToken(code, codeVerifier, redirectUri);
         const { access_token, refresh_token } = tokenResponse;
 
         // 2. Fetch the shop ID using the access token
-        const me = await EtsyClient.getMe(access_token);
+        const me = await client.getMe(access_token);
         const shopId = String(me.shopId);
 
         // Find or Create Integration
