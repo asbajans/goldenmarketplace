@@ -308,7 +308,7 @@ class MarketplacePriceSyncService {
                                 quantity: item.quantity,
                                 is_enabled: offering.is_enabled !== undefined ? offering.is_enabled : true,
                                 price: item.price,
-                                readiness_state: offering.readiness_state || 'ready_for_sale'
+                                readiness_state: offering.readiness_state || 'ready_to_ship'
                             }))
                         }))
                         : [
@@ -319,7 +319,7 @@ class MarketplacePriceSyncService {
                                         quantity: item.quantity,
                                         is_enabled: true,
                                         price: item.price,
-                                        readiness_state: 'ready_for_sale'
+                                        readiness_state: 'ready_to_ship'
                                     }
                                 ]
                             }
