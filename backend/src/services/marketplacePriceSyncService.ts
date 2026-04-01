@@ -300,14 +300,15 @@ class MarketplacePriceSyncService {
                     // Get current inventory
                     const currentInventory = await client.getListingInventory(item.listingId, integration.accessToken);
                     
-                    // Prepare inventory update payload (Etsy requires no product_id/is_deleted in products[])
+                    // Prepare inventory update payload (Etsy requires readiness_state in each offering)
                     const inventoryWithProducts = (currentInventory.products && currentInventory.products.length > 0)
                         ? currentInventory.products.map((product: any) => ({
                             property_values: product.property_values || [],
                             offerings: (product.offerings || []).map((offering: any) => ({
                                 quantity: item.quantity,
                                 is_enabled: offering.is_enabled !== undefined ? offering.is_enabled : true,
-                                price: item.price
+                                price: item.price,
+                                readiness_state: offering.readiness_state || 'active'
                             }))
                         }))
                         : [
@@ -317,7 +318,8 @@ class MarketplacePriceSyncService {
                                     {
                                         quantity: item.quantity,
                                         is_enabled: true,
-                                        price: item.price
+                                        price: item.price,
+                                        readiness_state: 'active'
                                     }
                                 ]
                             }
