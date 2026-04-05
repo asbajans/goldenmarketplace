@@ -81,15 +81,24 @@ export class B2BController {
         });
       }
 
-      const result = products.map((p: any) => ({
-        ...p.toJSON(),
-        store: {
-          id: p.store?.id,
-          name: p.store?.storeName,
-          slug: p.store?.storeSlug
-        },
-        myRequestStatus: requestMap[p.id] || null
-      }));
+      const result = products.map((p: any) => {
+        const data = p.toJSON();
+        
+        // Prevent massive payload: only send the first image (thumbnail)
+        if (data.images && data.images.length > 0) {
+          data.images = [data.images[0]];
+        }
+
+        return {
+          ...data,
+          store: {
+            id: p.store?.id,
+            name: p.store?.storeName,
+            slug: p.store?.storeSlug
+          },
+          myRequestStatus: requestMap[p.id] || null
+        };
+      });
 
       return res.json({
         data: result,
@@ -150,6 +159,12 @@ export class B2BController {
 
       const result = products.map((p: any) => {
         const data = p.toJSON();
+        
+        // Prevent massive payload: only send the first image (thumbnail)
+        if (data.images && data.images.length > 0) {
+          data.images = [data.images[0]];
+        }
+
         // Double-ensure: strip price/stock for unauthenticated (defense in depth)
         if (!isAuthenticated) {
           delete data.priceTRY;
