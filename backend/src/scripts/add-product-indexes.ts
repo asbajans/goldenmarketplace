@@ -7,7 +7,6 @@
 import sequelize from '../config/database';
 
 async function addIndexes() {
-  const qi = sequelize.getQueryInterface();
   
   const indexes = [
     {
