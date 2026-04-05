@@ -1,6 +1,6 @@
 /**
  * B2B Routes
- * All routes require authentication (seller or admin).
+ * All routes require authentication (seller or admin) EXCEPT the public store page.
  */
 
 import express from 'express';
@@ -9,7 +9,19 @@ import { authMiddleware, sellerMiddleware } from '../middleware/authMiddleware';
 
 const router = express.Router();
 
-// All B2B routes require auth
+// --- PUBLIC route: store page (no auth required, optional token) ---
+// optionalAuth: sets req.user if token present, but doesn't block if absent
+const optionalAuth = (req: any, res: any, next: any) => {
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authMiddleware(req, res, next);
+  }
+  next();
+};
+
+router.get('/store/:storeSlug', optionalAuth, B2BController.getStoreProducts);
+
+// --- Protected routes: require seller/admin auth ---
 router.use(authMiddleware, sellerMiddleware);
 
 // Product discovery

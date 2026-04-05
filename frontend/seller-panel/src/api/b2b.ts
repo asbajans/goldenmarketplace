@@ -21,7 +21,7 @@ export interface B2BProduct {
   hasVariants?: boolean;
   variantAttributes?: string[];
   variants?: any[];
-  store: { id: string; name: string };
+  store: { id: string; name: string; slug?: string };
   myRequestStatus: 'pending' | 'approved' | 'rejected' | null;
 }
 
@@ -38,7 +38,25 @@ export interface B2BRequest {
   ownerStore?: { id: string; name: string };
 }
 
-export const getB2BProducts = () => client.get<B2BProduct[]>('/b2b/products');
+export interface B2BProductsResponse {
+  data: B2BProduct[];
+  pagination: { page: number; limit: number; total: number; pages: number };
+}
+
+export interface StoreProductsResponse {
+  store: { id: string; storeName: string; storeSlug: string; description?: string; logo?: string; rating: number; totalProducts: number };
+  isAuthenticated: boolean;
+  data: Partial<B2BProduct>[];
+  pagination: { page: number; limit: number; total: number; pages: number };
+}
+
+export const getB2BProducts = (params?: {
+  page?: number; limit?: number; search?: string; category?: string; storeId?: string;
+}) => client.get<B2BProductsResponse>('/b2b/products', { params });
+
+export const getStoreProducts = (storeSlug: string, params?: {
+  page?: number; limit?: number;
+}) => client.get<StoreProductsResponse>(`/b2b/store/${storeSlug}`, { params });
 
 export const createB2BRequest = (productId: string, variantId?: string, requestNote?: string) =>
   client.post('/b2b/requests', { productId, variantId, requestNote });

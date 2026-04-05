@@ -68,7 +68,8 @@ export const AdminAPI = {
     assignPlanToUser: (id: string, data: any) => api.put(`/users/${id}/assign-plan`, data).then((res) => res.data),
 
     // Products (All Stores)
-    getAllProducts: () => api.get('/products').then((res) => res.data),
+    getAllProducts: (params?: { page?: number; limit?: number; search?: string; storeId?: string }) =>
+        api.get('/products', { params }).then((res) => res.data),
     updateProduct: (id: string, data: any) => api.put(`/products/${id}`, data).then((res) => res.data),
 
     // Stores

@@ -24,6 +24,7 @@ import SubscriptionSuccess from './pages/SubscriptionSuccess';
 import IntegrationSettings from './pages/IntegrationSettings';
 import B2BMarket from './pages/B2BMarket';
 import B2BRequests from './pages/B2BRequests';
+import StoreStorefront from './pages/StoreStorefront';
 import { getCurrentUser, logout } from './api/auth';
 
 const { Header, Sider, Content } = Layout;
@@ -118,6 +119,8 @@ const App: React.FC = () => {
       <Routes>
         <Route path="/login" element={<Login onLogin={() => setIsAuthenticated(true)} />} />
         <Route path="/register" element={<Register />} />
+        {/* Public store page — accessible without auth */}
+        <Route path="/store/:storeSlug" element={<StoreStorefront />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
@@ -181,6 +184,8 @@ const App: React.FC = () => {
             <Route path="/products/edit/:id" element={<AddProduct onSuccess={() => navigate('/products')} />} />
             <Route path="/b2b/market" element={<B2BMarket />} />
             <Route path="/b2b/requests" element={<B2BRequests />} />
+            {/* Public store page — accessible from shared links */}
+            <Route path="/store/:storeSlug" element={<StoreStorefront />} />
             <Route path="/integrations" element={<IntegrationSettings />} />
             <Route path="/subscription" element={<Subscription />} />
             <Route path="/subscription/success" element={<SubscriptionSuccess />} />

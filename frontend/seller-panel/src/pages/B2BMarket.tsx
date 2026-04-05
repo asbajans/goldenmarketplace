@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Card, Row, Col, Tag, Button, Empty, Spin, message,
   Typography, Input, Badge, Tooltip, Avatar, Modal,
-  Drawer, Space, Select
+  Drawer, Space, Select, Pagination
 } from 'antd';
 import {
   ShopOutlined, TagOutlined, SearchOutlined,
@@ -36,26 +36,39 @@ const B2BMarket: React.FC = () => {
   const [drawerProduct, setDrawerProduct] = useState<B2BProduct | null>(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
+  const [pagination, setPagination] = useState({ page: 1, limit: 24, total: 0, pages: 1 });
+  const [searchInput, setSearchInput] = useState('');
 
   useEffect(() => {
-    fetchProducts();
+    fetchProducts(1);
   }, []);
 
+  // Server-side search with debounce
   useEffect(() => {
-    const q = search.toLowerCase();
-    setFiltered(products.filter(p =>
-      p.title.toLowerCase().includes(q) ||
-      p.category.toLowerCase().includes(q) ||
-      p.store.name.toLowerCase().includes(q)
-    ));
-  }, [search, products]);
+    const timer = setTimeout(() => {
+      setSearch(searchInput);
+      fetchProducts(1, searchInput);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
-  const fetchProducts = async () => {
+  useEffect(() => {
+    setFiltered(products);
+  }, [products]);
+
+  const fetchProducts = async (page = 1, searchTerm?: string) => {
+    setLoading(true);
     try {
-      const { data } = await getB2BProducts();
-      const productsData = Array.isArray(data) ? data : ((data as any)?.data || []);
+      const { data: res } = await getB2BProducts({
+        page,
+        limit: 24,
+        search: (searchTerm ?? search) || undefined
+      });
+      const productsData = Array.isArray(res) ? res : (res?.data || []);
+      const pag = (res as any)?.pagination;
       setProducts(productsData);
       setFiltered(productsData);
+      if (pag) setPagination(pag);
     } catch {
       message.error('B2B ürünler yüklenemedi');
     } finally {
@@ -77,7 +90,7 @@ const B2BMarket: React.FC = () => {
       await createB2BRequest(productId, variantId || undefined, noteText || undefined);
       message.success('Talep gönderildi! Ürün sahibinin onayı bekleniyor.');
       setNoteText('');
-      fetchProducts();
+      fetchProducts(pagination.page);
     } catch (err: any) {
       const msg = err?.response?.data?.error || 'Talep gönderilemedi';
       if (err?.response?.status === 409) {
@@ -129,15 +142,16 @@ const B2BMarket: React.FC = () => {
 
       <Search
         placeholder="Ürün, kategori veya mağaza ara..."
-        value={search}
-        onChange={e => setSearch(e.target.value)}
+        value={searchInput}
+        onChange={e => setSearchInput(e.target.value)}
         allowClear
+        onClear={() => { setSearchInput(''); fetchProducts(1, ''); }}
         prefix={<SearchOutlined />}
         style={{ marginBottom: 24, maxWidth: 420 }}
         size="large"
       />
 
-      {filtered.length === 0 ? (
+      {filtered.length === 0 && !loading ? (
         <Empty description="B2B'ye açık ürün bulunamadı" />
       ) : (
         <Row gutter={[20, 20]}>
@@ -220,7 +234,13 @@ const B2BMarket: React.FC = () => {
                   {/* Store info */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <Avatar size={22} icon={<ShopOutlined />} style={{ background: '#d4a017', flexShrink: 0 }} />
-                    <Text type="secondary" style={{ fontSize: 12, flexShrink: 0 }}>{product.store.name}</Text>
+                    <a
+                      href={product.store.slug ? `/store/${product.store.slug}` : undefined}
+                      onClick={e => e.stopPropagation()}
+                      style={{ fontSize: 12, color: '#595959', flexShrink: 0 }}
+                    >
+                      {product.store.name}
+                    </a>
                     <Tag icon={<TagOutlined />} color="gold" style={{ marginLeft: 'auto', fontSize: 11 }}>{product.category}</Tag>
                   </div>
 
@@ -329,6 +349,20 @@ const B2BMarket: React.FC = () => {
             );
           })}
         </Row>
+      )}
+
+      {/* Pagination */}
+      {pagination.total > pagination.limit && (
+        <div style={{ textAlign: 'center', marginTop: 32 }}>
+          <Pagination
+            current={pagination.page}
+            pageSize={pagination.limit}
+            total={pagination.total}
+            onChange={(page: number) => fetchProducts(page)}
+            showSizeChanger={false}
+            showTotal={(total: number) => `Toplam ${total} ürün`}
+          />
+        </div>
       )}
 
       {/* ── Product Detail Drawer ── */}

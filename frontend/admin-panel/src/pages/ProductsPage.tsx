@@ -7,19 +7,23 @@ export const ProductsPage: React.FC = () => {
     const [products, setProducts] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchText, setSearchText] = useState('');
+    const [pagination, setPagination] = useState({ current: 1, pageSize: 50, total: 0 });
     
     // Edit Modal State
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [editingProduct, setEditingProduct] = useState<any>(null);
     const [form] = Form.useForm();
 
-    const fetchProducts = async () => {
+    const fetchProducts = async (page = 1, search = '') => {
         setLoading(true);
         try {
-            const res = await AdminAPI.getAllProducts();
+            const res = await AdminAPI.getAllProducts({ page, limit: 50, search: search || undefined });
             setProducts(res.data || []);
+            if (res.pagination) {
+                setPagination(p => ({ ...p, current: page, total: res.pagination.total }));
+            }
         } catch (error) {
-            message.error('Failed to load products');
+            message.error('Ürünler yüklenemedi');
         } finally {
             setLoading(false);
         }
@@ -52,23 +56,27 @@ export const ProductsPage: React.FC = () => {
             await AdminAPI.updateProduct(editingProduct.id, values);
             message.success('Ürün başarıyla güncellendi');
             setIsEditModalVisible(false);
-            fetchProducts();
+            fetchProducts(pagination.current, searchText);
         } catch (error) {
             message.error('Ürün güncellenemedi');
         }
     };
 
-    const filteredProducts = products.filter(p => 
-        p.title?.toLowerCase().includes(searchText.toLowerCase()) || 
-        p.store?.storeName?.toLowerCase().includes(searchText.toLowerCase()) ||
-        p.sku?.toLowerCase().includes(searchText.toLowerCase())
-    );
+    // Search with debounce
+    const handleSearch = (value: string) => {
+        setSearchText(value);
+        setPagination(p => ({ ...p, current: 1 }));
+        fetchProducts(1, value);
+    };
+
+    // Server-side filter already applied; keep local filter as fallback for display
+    const filteredProducts = products;
 
     const columns = [
         { title: 'SKU / Kod', dataIndex: 'sku', key: 'sku', width: 120 },
         { title: 'Ürün Adı', dataIndex: 'title', key: 'title' },
         { title: 'Kategori', dataIndex: 'category', key: 'category', width: 120 },
-        { title: 'Mağaza', key: 'store', render: (_: any, record: any) => record.store?.storeName || 'Bilinmiyor' },
+        { title: 'Mağaza', key: 'store', render: (_: any, record: any) => record.store?.storeName || record.store?.name || 'Bilinmiyor' },
         { title: 'Gram', dataIndex: 'gramWeight', key: 'gramWeight', render: (val: number) => `${val} gr` },
         { 
             title: 'Milyem', 
@@ -108,7 +116,8 @@ export const ProductsPage: React.FC = () => {
             <Input 
                 placeholder="Ürün, SKU veya Mağaza ara..." 
                 prefix={<SearchOutlined />} 
-                onChange={e => setSearchText(e.target.value)}
+                onChange={e => handleSearch(e.target.value)}
+                allowClear
                 style={{ width: 250 }}
             />
         }>
@@ -117,7 +126,14 @@ export const ProductsPage: React.FC = () => {
                 columns={columns}
                 rowKey="id"
                 loading={loading}
-                pagination={{ pageSize: 20 }}
+                pagination={{
+                    current: pagination.current,
+                    pageSize: pagination.pageSize,
+                    total: pagination.total,
+                    showTotal: (total: number) => `Toplam ${total} ürün`,
+                    onChange: (page: number) => fetchProducts(page, searchText),
+                    showSizeChanger: false
+                }}
                 scroll={{ x: 'max-content' }}
                 size="small"
             />

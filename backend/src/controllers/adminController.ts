@@ -317,13 +317,53 @@ export class AdminController {
         }
     }
     // --- ALL PRODUCTS (Admin) ---
-    static async getAllProducts(_req: Request, res: Response): Promise<Response> {
+    static async getAllProducts(req: Request, res: Response): Promise<Response> {
         try {
-            const products = await Product.findAll({
-                include: [{ model: Store, as: 'store', attributes: ['id', ['storeName', 'name']] }],
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 50;
+            const offset = (page - 1) * limit;
+            const search = req.query.search as string;
+            const storeId = req.query.storeId as string;
+
+            const where: any = {};
+            if (storeId) where.storeId = storeId;
+            if (search) {
+                const { Op } = require('sequelize');
+                where.title = { [Op.iLike]: `%${search}%` };
+            }
+
+            const { count, rows: products } = await Product.findAndCountAll({
+                where,
+                attributes: [
+                    'id', 'title', 'sku', 'category', 'gramWeight', 'milyem',
+                    'effectiveMilyem', 'gramHas', 'priceTRY', 'priceUSD',
+                    'b2bPrice', 'b2bDiscount', 'isB2BEnabled', 'quantity',
+                    'images', 'isActive', 'profitMargin', 'storeId',
+                    'hasVariants', 'marketplaces', 'createdAt'
+                ],
+                include: [{
+                    model: Store,
+                    as: 'store',
+                    attributes: [
+                        'id',
+                        ['storeName', 'name'],
+                        ['storeName', 'storeName']
+                    ]
+                }],
+                limit,
+                offset,
                 order: [['createdAt', 'DESC']]
             });
-            return res.json({ data: products });
+
+            return res.json({
+                data: products,
+                pagination: {
+                    page,
+                    limit,
+                    total: count,
+                    pages: Math.ceil(count / limit)
+                }
+            });
         } catch (error) {
             console.error('Admin Error [getAllProducts]:', error);
             return res.status(500).json({ error: 'Failed to fetch products' });

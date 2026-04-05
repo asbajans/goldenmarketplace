@@ -10,46 +10,175 @@ import goldPriceService from '../services/goldPriceService';
 export class B2BController {
   /**
    * GET /b2b/products
-   * Returns all B2B-enabled products from all stores (seller & admin only).
-   * Enriched with the requesting seller's current request status per product.
+   * Returns paginated B2B-enabled products (seller & admin only).
+   * Optimized: limited attributes, pagination, no description/tags in list view.
    */
   static async getB2BProducts(req: Request, res: Response) {
     try {
       const user = (req as any).user;
-      const store = user ? await Store.findOne({ where: { userId: user.id } }) : null;
-      const storeId = store ? store.id : null;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 24;
+      const offset = (page - 1) * limit;
+      const search = req.query.search as string;
+      const category = req.query.category as string;
+      const storeId = req.query.storeId as string;
 
-      const products = await Product.findAll({
-        where: { isB2BEnabled: true, isActive: true },
-        include: [
-          { model: Store, as: 'store', attributes: ['id', ['storeName', 'name']] },
-          { model: ProductVariant, as: 'variants' }
+      const store = user ? await Store.findOne({ where: { userId: user.id } }) : null;
+      const myStoreId = store ? store.id : null;
+
+      const where: any = { isB2BEnabled: true, isActive: true };
+      if (category) where.category = category;
+      if (storeId) where.storeId = storeId;
+      if (search) {
+        const { Op } = require('sequelize');
+        where.title = { [Op.iLike]: `%${search}%` };
+      }
+      // Exclude your own products from discovery
+      if (myStoreId) {
+        const { Op } = require('sequelize');
+        where.storeId = { ...(where.storeId ? { [Op.and]: [where.storeId, { [Op.ne]: myStoreId }] } : { [Op.ne]: myStoreId }) };
+      }
+
+      const { count, rows: products } = await Product.findAndCountAll({
+        where,
+        attributes: [
+          'id', 'title', 'category', 'sku', 'gramWeight', 'milyem',
+          'effectiveMilyem', 'gramHas', 'priceTRY', 'priceUSD',
+          'b2bPrice', 'b2bDiscount', 'quantity', 'images', 'videoUrl',
+          'hasVariants', 'variantAttributes', 'storeId', 'createdAt'
         ],
+        include: [
+          {
+            model: Store,
+            as: 'store',
+            attributes: ['id', 'storeName', 'storeSlug']
+          },
+          {
+            model: ProductVariant,
+            as: 'variants',
+            attributes: ['id', 'sku', 'attributes', 'gramWeight', 'quantity', 'priceTRY', 'priceUSD', 'b2bPrice'],
+            required: false
+          }
+        ],
+        limit,
+        offset,
         order: [['createdAt', 'DESC']]
       });
 
-      // If caller has a store, attach their request status per product
+      // Attach request status per product if caller has a store
       let requestMap: Record<string, string> = {};
-      if (storeId) {
+      if (myStoreId && products.length > 0) {
+        const productIds = products.map((p: any) => p.id);
+        const { Op } = require('sequelize');
         const existingRequests = await B2BRequest.findAll({
-          where: { requesterStoreId: storeId }
+          where: { requesterStoreId: myStoreId, productId: { [Op.in]: productIds } },
+          attributes: ['productId', 'status']
         });
-        existingRequests.forEach(r => {
+        existingRequests.forEach((r: any) => {
           requestMap[r.productId] = r.status;
         });
       }
 
       const result = products.map((p: any) => ({
         ...p.toJSON(),
+        store: {
+          id: p.store?.id,
+          name: p.store?.storeName,
+          slug: p.store?.storeSlug
+        },
         myRequestStatus: requestMap[p.id] || null
       }));
 
-      return res.json(result);
+      return res.json({
+        data: result,
+        pagination: {
+          page,
+          limit,
+          total: count,
+          pages: Math.ceil(count / limit)
+        }
+      });
     } catch (error: any) {
       console.error('[B2B] getB2BProducts error:', error);
       return res.status(500).json({ error: 'B2B ürünleri alınamadı' });
     }
   }
+
+  /**
+   * GET /b2b/store/:storeSlug  (PUBLIC — no auth required)
+   * Returns store info and its B2B products.
+   * - Without auth: prices, stock hidden (backend enforced)
+   * - With auth: all fields visible
+   */
+  static async getStoreProducts(req: Request, res: Response) {
+    try {
+      const { storeSlug } = req.params;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 24;
+      const offset = (page - 1) * limit;
+      const isAuthenticated = !!(req as any).user;
+
+      const store = await Store.findOne({
+        where: { storeSlug, isActive: true },
+        attributes: ['id', 'storeName', 'storeSlug', 'description', 'logo', 'banner', 'rating', 'totalProducts']
+      });
+
+      if (!store) {
+        return res.status(404).json({ error: 'Mağaza bulunamadı' });
+      }
+
+      // Define which product attributes to return based on auth status
+      const publicAttributes: string[] = [
+        'id', 'title', 'category', 'gramWeight', 'milyem',
+        'effectiveMilyem', 'images', 'hasVariants', 'createdAt'
+      ];
+      const authAttributes: string[] = [
+        ...publicAttributes,
+        'sku', 'gramHas', 'priceTRY', 'priceUSD',
+        'b2bPrice', 'b2bDiscount', 'quantity', 'isB2BEnabled'
+      ];
+
+      const { count, rows: products } = await Product.findAndCountAll({
+        where: { storeId: store.id, isActive: true, isB2BEnabled: true },
+        attributes: isAuthenticated ? authAttributes : publicAttributes,
+        limit,
+        offset,
+        order: [['createdAt', 'DESC']]
+      });
+
+      const result = products.map((p: any) => {
+        const data = p.toJSON();
+        // Double-ensure: strip price/stock for unauthenticated (defense in depth)
+        if (!isAuthenticated) {
+          delete data.priceTRY;
+          delete data.priceUSD;
+          delete data.b2bPrice;
+          delete data.b2bDiscount;
+          delete data.quantity;
+          delete data.sku;
+          delete data.gramHas;
+          delete data.isB2BEnabled;
+        }
+        return data;
+      });
+
+      return res.json({
+        store: store.toJSON(),
+        isAuthenticated,
+        data: result,
+        pagination: {
+          page,
+          limit,
+          total: count,
+          pages: Math.ceil(count / limit)
+        }
+      });
+    } catch (error: any) {
+      console.error('[B2B] getStoreProducts error:', error);
+      return res.status(500).json({ error: 'Mağaza ürünleri alınamadı' });
+    }
+  }
+
 
   /**
    * POST /b2b/requests
