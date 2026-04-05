@@ -54,7 +54,7 @@ export class SubscriptionController {
             const successUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/seller/subscription/success`;
             const cancelUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/seller/subscription/cancel`;
 
-            const session = await stripeService.createCheckoutSession(customerId, priceId, successUrl, cancelUrl);
+            const session = await stripeService.createCheckoutSession(customerId!, priceId, successUrl, cancelUrl);
             return res.status(200).json({ url: session.url });
 
         } catch (error: any) {
