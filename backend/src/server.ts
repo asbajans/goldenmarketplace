@@ -18,7 +18,7 @@ import sequelize from './config/database';
 
 async function syncAndSeedSettings() {
   try {
-    await sequelize.sync({ alter: true }); // Sync new models
+    await sequelize.sync({ alter: true }); // Sync new models & indexes
 
     // Seed initial GlobalSettings for Etsy keys
     const settingsToSeed = [
@@ -36,6 +36,33 @@ async function syncAndSeedSettings() {
   } catch (error) {
     console.error('[DB] Failed to synchronize GlobalSettings:', error);
   }
+}
+
+/**
+ * Ensures critical performance indexes exist.
+ * CONCURRENTLY = no table lock in production.
+ * IF NOT EXISTS = safe to run on every boot.
+ */
+async function ensurePerformanceIndexes() {
+  const idxStatements = [
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_products_b2b_active ON products ("isB2BEnabled", "isActive", "storeId", "createdAt")`,
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_products_store_active ON products ("storeId", "isActive", "isB2BEnabled")`,
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_products_store_created ON products ("storeId", "createdAt")`,
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_products_original_product ON products ("originalProductId")`,
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_stores_slug ON stores ("storeSlug")`,
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_stores_user ON stores ("userId")`,
+  ];
+  for (const sql of idxStatements) {
+    try {
+      await sequelize.query(sql);
+    } catch (e: any) {
+      // Already exists or non-fatal — ignore
+      if (!e.message?.includes('already exists')) {
+        console.warn('[DB] Index warning:', e.message);
+      }
+    }
+  }
+  console.log('[DB] Performance indexes ensured.');
 }
 
 // Initialize logger
@@ -123,6 +150,8 @@ app.listen(PORT, async () => {
   // Initialize background jobs
   try {
     await syncAndSeedSettings();
+    // Create performance indexes (CONCURRENTLY, no lock, safe to re-run)
+    await ensurePerformanceIndexes();
 
     const { initGoldPriceJob } = require('./jobs/goldPriceJob');
     await initGoldPriceJob();

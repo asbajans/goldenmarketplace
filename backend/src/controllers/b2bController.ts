@@ -4,8 +4,10 @@
  */
 
 import { Request, Response } from 'express';
+import { Op } from 'sequelize';
 import { Product, ProductVariant, B2BRequest, Store } from '../models';
 import goldPriceService from '../services/goldPriceService';
+
 
 export class B2BController {
   /**
@@ -15,28 +17,29 @@ export class B2BController {
    */
   static async getB2BProducts(req: Request, res: Response) {
     try {
-      const user = (req as any).user;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 24;
       const offset = (page - 1) * limit;
       const search = req.query.search as string;
       const category = req.query.category as string;
-      const storeId = req.query.storeId as string;
+      const filterStoreId = req.query.storeId as string;
 
-      const store = user ? await Store.findOne({ where: { userId: user.id } }) : null;
-      const myStoreId = store ? store.id : null;
+      // Use pre-cached store from sellerMiddleware (no extra DB call)
+      const myStore = (req as any).store;
+      const myStoreId = myStore?.id || null;
 
       const where: any = { isB2BEnabled: true, isActive: true };
       if (category) where.category = category;
-      if (storeId) where.storeId = storeId;
+      if (filterStoreId) where.storeId = filterStoreId;
       if (search) {
-        const { Op } = require('sequelize');
         where.title = { [Op.iLike]: `%${search}%` };
       }
-      // Exclude your own products from discovery
+      // Exclude caller's own products from discovery
       if (myStoreId) {
-        const { Op } = require('sequelize');
-        where.storeId = { ...(where.storeId ? { [Op.and]: [where.storeId, { [Op.ne]: myStoreId }] } : { [Op.ne]: myStoreId }) };
+        const storeConstraint = { [Op.ne]: myStoreId };
+        where.storeId = filterStoreId
+          ? { [Op.and]: [filterStoreId, storeConstraint] }
+          : storeConstraint;
       }
 
       const { count, rows: products } = await Product.findAndCountAll({
@@ -69,7 +72,6 @@ export class B2BController {
       let requestMap: Record<string, string> = {};
       if (myStoreId && products.length > 0) {
         const productIds = products.map((p: any) => p.id);
-        const { Op } = require('sequelize');
         const existingRequests = await B2BRequest.findAll({
           where: { requesterStoreId: myStoreId, productId: { [Op.in]: productIds } },
           attributes: ['productId', 'status']
@@ -187,7 +189,8 @@ export class B2BController {
    */
   static async createRequest(req: Request, res: Response) {
     try {
-      const store = await Store.findOne({ where: { userId: (req as any).user.id } });
+      // Use pre-cached store from sellerMiddleware
+      const store = (req as any).store || await Store.findOne({ where: { userId: (req as any).user.id } });
       if (!store) return res.status(403).json({ error: 'Mağaza bulunamadı' });
 
       const { productId, variantId, requestNote } = req.body;

@@ -230,7 +230,29 @@ Product.init(
   {
     sequelize,
     tableName: 'products',
-    timestamps: true
+    timestamps: true,
+    indexes: [
+      // B2B discovery: main query filter
+      {
+        name: 'idx_products_b2b_active',
+        fields: ['isB2BEnabled', 'isActive', 'storeId', 'createdAt']
+      },
+      // Store page query
+      {
+        name: 'idx_products_store_active',
+        fields: ['storeId', 'isActive', 'isB2BEnabled']
+      },
+      // Admin search queries
+      {
+        name: 'idx_products_store_created',
+        fields: ['storeId', 'createdAt']
+      },
+      // Clone sync lookup
+      {
+        name: 'idx_products_original_product',
+        fields: ['originalProductId']
+      }
+    ]
   }
 );
 

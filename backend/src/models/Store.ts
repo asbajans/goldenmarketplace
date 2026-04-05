@@ -96,7 +96,12 @@ Store.init(
   {
     sequelize,
     tableName: 'stores',
-    timestamps: true
+    timestamps: true,
+    indexes: [
+      { name: 'idx_stores_slug', unique: true, fields: ['storeSlug'] },
+      { name: 'idx_stores_user', unique: true, fields: ['userId'] },
+      { name: 'idx_stores_active', fields: ['isActive'] }
+    ]
   }
 );
 
