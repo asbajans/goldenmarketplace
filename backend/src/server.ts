@@ -18,7 +18,17 @@ import sequelize from './config/database';
 
 async function syncAndSeedSettings() {
   try {
-    await sequelize.sync({ alter: true }); // Sync new models & indexes
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    if (!isProduction) {
+      // Development only: sync schema changes automatically
+      await sequelize.sync({ alter: true });
+      console.log('[DB] Schema synced (development mode).');
+    } else {
+      // Production: only verify connection — never ALTER tables on boot
+      await sequelize.authenticate();
+      console.log('[DB] Connection verified (production mode — no schema sync).');
+    }
 
     // Seed initial GlobalSettings for Etsy keys
     const settingsToSeed = [
@@ -40,23 +50,24 @@ async function syncAndSeedSettings() {
 
 /**
  * Ensures critical performance indexes exist.
- * CONCURRENTLY = no table lock in production.
+ * Runs outside any transaction (required for CONCURRENTLY).
  * IF NOT EXISTS = safe to run on every boot.
  */
 async function ensurePerformanceIndexes() {
+  // Non-CONCURRENTLY is fine at startup (table has few rows, instant lock release)
   const idxStatements = [
-    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_products_b2b_active ON products ("isB2BEnabled", "isActive", "storeId", "createdAt")`,
-    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_products_store_active ON products ("storeId", "isActive", "isB2BEnabled")`,
-    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_products_store_created ON products ("storeId", "createdAt")`,
-    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_products_original_product ON products ("originalProductId")`,
-    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_stores_slug ON stores ("storeSlug")`,
-    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_stores_user ON stores ("userId")`,
+    `CREATE INDEX IF NOT EXISTS idx_products_b2b_active ON products ("isB2BEnabled", "isActive", "storeId", "createdAt")`,
+    `CREATE INDEX IF NOT EXISTS idx_products_store_b2b ON products ("storeId", "isActive", "isB2BEnabled")`,
+    `CREATE INDEX IF NOT EXISTS idx_products_store_created ON products ("storeId", "createdAt")`,
+    `CREATE INDEX IF NOT EXISTS idx_products_original ON products ("originalProductId")`,
+    `CREATE INDEX IF NOT EXISTS idx_stores_slug ON stores ("storeSlug")`,
+    `CREATE INDEX IF NOT EXISTS idx_stores_user ON stores ("userId")`,
   ];
   for (const sql of idxStatements) {
     try {
-      await sequelize.query(sql);
+      // transaction: null is REQUIRED — CREATE INDEX cannot run inside a transaction
+      await sequelize.query(sql, { raw: true, transaction: null as any });
     } catch (e: any) {
-      // Already exists or non-fatal — ignore
       if (!e.message?.includes('already exists')) {
         console.warn('[DB] Index warning:', e.message);
       }
