@@ -3,16 +3,15 @@
  * Handle payment processing and subscription management
  */
 
-import Stripe from 'stripe';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const StripeConstructor = require('stripe');
-const stripe: Stripe = new StripeConstructor(process.env.STRIPE_SECRET_KEY || '', {
+const StripeLib = require('stripe');
+const stripe = new StripeLib(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2023-10-16'
-});
+}) as InstanceType<typeof StripeLib>;
 
 // SubscriptionPlan removed (unused) to avoid TS unused-type errors
 
