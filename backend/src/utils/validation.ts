@@ -11,7 +11,9 @@ export const schemas = {
     password: Joi.string().min(8).required(),
     firstName: Joi.string().required(),
     lastName: Joi.string().required(),
-    userType: Joi.string().valid('seller', 'customer', 'admin')
+    userType: Joi.string().valid('seller', 'customer', 'admin'),
+    phone: Joi.string().allow('', null),
+    storeName: Joi.string().allow('', null)
   }),
 
   login: Joi.object({

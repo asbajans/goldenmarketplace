@@ -112,6 +112,7 @@ export const UsersPage: React.FC = () => {
     const columns = [
         { title: 'Ad Soyad', key: 'name', render: (_: any, record: any) => `${record.firstName} ${record.lastName}` },
         { title: 'E-posta', dataIndex: 'email', key: 'email' },
+        { title: 'Telefon', dataIndex: 'phone', key: 'phone', render: (phone: string) => phone || '-' },
         {
             title: 'Tip',
             dataIndex: 'userType',
@@ -189,6 +190,9 @@ export const UsersPage: React.FC = () => {
                     </Space>
                     <Form.Item name="email" label="E-posta" rules={[{ required: true, type: 'email' }]}>
                         <Input />
+                    </Form.Item>
+                    <Form.Item name="phone" label="Telefon Numarası">
+                        <Input placeholder="05XX XXX XX XX" />
                     </Form.Item>
                     {!editingUser && (
                         <Form.Item name="password" label="Şifre" rules={[{ required: true, min: 6 }]}>
