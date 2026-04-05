@@ -143,10 +143,47 @@ services:
     networks:
       - golden-network
 
+  # MinIO S3 Server
+  minio:
+    image: minio/minio:latest
+    container_name: golden-minio
+    restart: always
+    ports:
+      - "9100:9000" # API Port (s3.asb.web.tr)
+      - "9101:9001" # Web UI Port (s3panel.asb.web.tr)
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: golden123456
+    volumes:
+      - minio_data:/data
+    networks:
+      - golden-network
+    command: server /data --console-address ":9001"
+
+  # MinIO Initialization (Creates default bucket and makes it public)
+  minio-init:
+    image: minio/mc:latest
+    container_name: golden-minio-init
+    depends_on:
+      - minio
+    networks:
+      - golden-network
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for MinIO...' &&
+      sleep 5 &&
+      /usr/bin/mc alias set myminio http://minio:9000 admin golden123456 &&
+      /usr/bin/mc mb myminio/golden-bucket --ignore-existing &&
+      /usr/bin/mc anonymous set download myminio/golden-bucket &&
+      echo 'golden-bucket is ready and public.'
+      "
+
 volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  minio_data:
     driver: local
 
 networks:
