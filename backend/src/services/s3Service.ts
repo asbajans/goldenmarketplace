@@ -1,5 +1,5 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 
 // Uses internal docker networking locally (minio:9000),
 // or the public endpoint if specified in production.
@@ -52,7 +52,7 @@ export const s3Service = {
         buffer = Buffer.from(base64String, 'base64');
       }
 
-      const fileName = `${folder}/${uuidv4()}${extension}`;
+      const fileName = `${folder}/${crypto.randomUUID()}${extension}`;
 
       const command = new PutObjectCommand({
         Bucket: BUCKET_NAME,
