@@ -7,6 +7,7 @@ import { Request, Response } from 'express';
 import { Op } from 'sequelize';
 import { Product, ProductVariant, Store, User, SubscriptionPlan } from '../models';
 import goldPriceService from '../services/goldPriceService';
+import { s3Service } from '../services/s3Service';
 import { productSyncQueue } from '../jobs/productSyncJob';
 
 export class ProductController {
@@ -146,7 +147,7 @@ export class ProductController {
         b2bDiscount: finalB2bDiscount,
         b2bPrice,
         quantity: quantity || 0,
-        images: Array.isArray(images) ? images : [],
+        images: Array.isArray(images) ? await Promise.all(images.map((img: string) => s3Service.uploadBase64Image(img, `products/${store.storeSlug}`))) : [],
         videoUrl,
         marketplaces: (Array.isArray(marketplaces) && marketplaces.length > 0) ? marketplaces : ['golden'],
         marketplaceConfig: marketplaceConfig || {},
@@ -316,7 +317,7 @@ export class ProductController {
         b2bDiscount: finalB2bDiscount,
         b2bPrice: finalB2bPrice,
         quantity: finalQuantity,
-        images: isCloned ? product.images : (images || product.images),
+        images: isCloned ? product.images : (Array.isArray(images) ? await Promise.all(images.map((img: string) => s3Service.uploadBase64Image(img, `products/${product.storeId}`))) : product.images),
         videoUrl: isCloned ? product.videoUrl : (videoUrl !== undefined ? videoUrl : product.videoUrl),
         marketplaces: marketplaces || product.marketplaces,
         marketplaceConfig: marketplaceConfig !== undefined ? marketplaceConfig : product.marketplaceConfig,

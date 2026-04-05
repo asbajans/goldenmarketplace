@@ -83,11 +83,6 @@ export class B2BController {
 
       const result = products.map((p: any) => {
         const data = p.toJSON();
-        
-        // Prevent massive payload: only send the first image (thumbnail)
-        if (data.images && data.images.length > 0) {
-          data.images = [data.images[0]];
-        }
 
         return {
           ...data,
@@ -159,11 +154,6 @@ export class B2BController {
 
       const result = products.map((p: any) => {
         const data = p.toJSON();
-        
-        // Prevent massive payload: only send the first image (thumbnail)
-        if (data.images && data.images.length > 0) {
-          data.images = [data.images[0]];
-        }
 
         // Double-ensure: strip price/stock for unauthenticated (defense in depth)
         if (!isAuthenticated) {
