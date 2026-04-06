@@ -59,6 +59,9 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [tags, setTags] = useState<string[]>([]);
     const [integrations, setIntegrations] = useState<Integration[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [variationTemplates, setVariationTemplates] = useState<any[]>([]);
+    const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
+    const [selectedOptions, setSelectedOptions] = useState<Record<string, string[]>>({});
     const [integrationsLoading, setIntegrationsLoading] = useState(true);
     const [fileList, setFileList] = useState<UploadFile[]>([]);
     const [videoFile, setVideoFile] = useState<UploadFile[]>([]);
@@ -74,6 +77,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         fetchGoldPrice();
         fetchIntegrations();
         fetchCategories();
+        fetchVariations();
         // Pre-populate image previews when editing
         if (initialValues?.images && Array.isArray(initialValues.images) && initialValues.images.length > 0) {
             setFileList(
@@ -131,6 +135,15 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             setCategories(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Failed to fetch categories:', error);
+        }
+    };
+
+    const fetchVariations = async () => {
+        try {
+            const { data } = await client.get('/variations');
+            setVariationTemplates(Array.isArray(data) ? data : []);
+        } catch (error) {
+            console.error('Failed to fetch variations:', error);
         }
     };
 
@@ -217,6 +230,60 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         const combined = `${title} ${category}`.toLowerCase();
         const words = combined.split(/[\s,.-]+/).filter(w => w.length > 2);
         setTags(Array.from(new Set(words)));
+    };
+
+    const generateVariantMatrix = useCallback((templates: string[], options: Record<string, string[]>) => {
+        const activeTemplates = variationTemplates.filter(t => templates.includes(t.id));
+        if (activeTemplates.length === 0) {
+            form.setFieldsValue({ variants: [] });
+            return;
+        }
+
+        let matrix: any[] = [{}];
+        activeTemplates.forEach(t => {
+            const checked = options[t.id] || [];
+            if (checked.length === 0) return;
+            
+            const newMatrix: any[] = [];
+            matrix.forEach(existingRow => {
+                checked.forEach(optVal => {
+                    newMatrix.push({
+                        ...existingRow,
+                        [t.name]: optVal
+                    });
+                });
+            });
+            matrix = newMatrix;
+        });
+
+        if (matrix.length === 1 && Object.keys(matrix[0]).length === 0) {
+            form.setFieldsValue({ variants: [] });
+            return;
+        }
+
+        const existingVariants = form.getFieldValue('variants') || [];
+        const newVariants = matrix.map(combo => {
+            const matchingExisting = existingVariants.find((ev: any) => JSON.stringify(ev?.attributes) === JSON.stringify(combo));
+            return {
+                attributes: combo,
+                gramWeight: matchingExisting?.gramWeight,
+                quantity: matchingExisting?.quantity || 1,
+                sku: matchingExisting?.sku || ''
+            };
+        });
+
+        form.setFieldsValue({ variants: newVariants });
+    }, [variationTemplates, form]);
+
+    const handleTemplateSelect = (selectedIds: string[]) => {
+        setSelectedTemplates(selectedIds);
+        generateVariantMatrix(selectedIds, selectedOptions);
+    };
+
+    const handleOptionCheck = (templateId: string, checkedValues: any[]) => {
+        const newOptions = { ...selectedOptions, [templateId]: checkedValues };
+        setSelectedOptions(newOptions);
+        generateVariantMatrix(selectedTemplates, newOptions);
     };
 
     const onFinish = async (values: any) => {
@@ -497,45 +564,76 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 {/* Varyasyonlar (Variants) */}
                 <div style={{ background: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
                     <Form.Item name="hasVariants" valuePropName="checked" style={{ marginBottom: 0 }}>
-                        <Checkbox disabled={isCloned} style={{ fontWeight: 600 }}>
+                        <Checkbox disabled={isCloned} onChange={e => setHasVariants(e.target.checked)} style={{ fontWeight: 600 }}>
                             🎨 Farklı Varyasyonlara Sahip (Örn: Ölçü, Renk vb.)
                         </Checkbox>
                     </Form.Item>
                     
-                    {hasVariants && (
+                    {hasVariants && !isCloned && (
                         <div style={{ marginTop: 16 }}>
-                            <Form.List name="variants">
-                                {(fields, { add, remove }) => (
-                                    <>
-                                        {fields.map(({ key, name, ...restField }) => (
-                                            <div key={key} style={{ display: 'flex', gap: 16, marginBottom: 8, alignItems: 'flex-start', background: '#fff', padding: 12, borderRadius: 4, border: '1px solid #e8e8e8' }}>
-                                                <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-                                                    <Form.Item {...restField} name={[name, 'attributes', 'Ölçü']} label="Ölçü / Beden" style={{ marginBottom: 0 }}>
-                                                        <Input placeholder="Örn: 18 cm" disabled={isCloned} />
-                                                    </Form.Item>
-                                                    <Form.Item {...restField} name={[name, 'attributes', 'Renk']} label="Renk" style={{ marginBottom: 0 }}>
-                                                        <Input placeholder="Örn: Rose Gold" disabled={isCloned} />
-                                                    </Form.Item>
-                                                    <Form.Item {...restField} name={[name, 'gramWeight']} label="Gram (Farklıysa)" style={{ marginBottom: 0 }}>
-                                                        <InputNumber style={{ width: '100%' }} min={0.01} step={0.01} placeholder="Ana gram (Boş bırakınız)" disabled={isCloned} />
-                                                    </Form.Item>
-                                                    <Form.Item {...restField} name={[name, 'quantity']} label="Varyasyon Stoğu" rules={[{ required: true, message: 'Zorunlu' }]} style={{ marginBottom: 0 }}>
-                                                        <InputNumber style={{ width: '100%' }} min={0} placeholder="Adet" disabled={isCloned} />
-                                                    </Form.Item>
-                                                    <Form.Item {...restField} name={[name, 'sku']} label="Varyasyon SKU" style={{ marginBottom: 0 }}>
-                                                        <Input placeholder="Opsiyonel (Örn: SKU-18)" disabled={isCloned} />
-                                                    </Form.Item>
-                                                </div>
-                                                <MinusCircleOutlined onClick={() => !isCloned && remove(name)} style={{ color: 'red', marginTop: 40, cursor: isCloned ? 'not-allowed' : 'pointer', fontSize: 20 }} />
+                            <div style={{ marginBottom: 16, padding: 12, background: '#e6f7ff', border: '1px solid #91d5ff', borderRadius: 4 }}>
+                                <Typography.Text strong style={{ display: 'block', marginBottom: 8 }}>Varyasyon Şablonlarını Seçin (Maksimum 2 Adet)</Typography.Text>
+                                <Select
+                                    mode="multiple"
+                                    allowClear
+                                    style={{ width: '100%' }}
+                                    placeholder="Lütfen şablon seçin (Örn: Zincir Uzunluğu, Renk)"
+                                    value={selectedTemplates}
+                                    onChange={handleTemplateSelect}
+                                    options={variationTemplates.map(t => ({ label: t.name, value: t.id }))}
+                                />
+
+                                {selectedTemplates.map(templateId => {
+                                    const template = variationTemplates.find(t => t.id === templateId);
+                                    if (!template) return null;
+                                    return (
+                                        <div key={template.id} style={{ marginTop: 12 }}>
+                                            <Typography.Text strong>{template.name} Seçenekleri (Aktif Etmek İstediklerinizi İşaretleyin):</Typography.Text>
+                                            <div style={{ marginTop: 8 }}>
+                                                <Checkbox.Group 
+                                                    options={template.options.map((opt: any) => ({ label: opt.value, value: opt.value }))}
+                                                    value={selectedOptions[template.id] || []}
+                                                    onChange={checkedValues => handleOptionCheck(template.id, checkedValues)}
+                                                />
                                             </div>
-                                        ))}
-                                        <Form.Item style={{ marginTop: 16, marginBottom: 0 }}>
-                                            <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />} disabled={isCloned || fields.length >= 3}>
-                                                Yeni Varyasyon Ekle (Maksimum 3)
-                                            </Button>
-                                        </Form.Item>
-                                    </>
-                                )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <Form.List name="variants">
+                                {(fields, { remove }) => {
+                                    if (fields.length === 0) return null;
+                                    return (
+                                        <div style={{ overflowX: 'auto' }}>
+                                            <Typography.Text strong style={{ display: 'block', marginBottom: 8 }}>Belirlenen Varyasyon Matrisi</Typography.Text>
+                                            {fields.map(({ key, name, ...restField }) => {
+                                                const variantData = form.getFieldValue(['variants', name]) || {};
+                                                const attrLabels = Object.values(variantData.attributes || {}).join(' | ');
+                                                
+                                                return (
+                                                    <div key={key} style={{ display: 'flex', gap: 16, marginBottom: 8, alignItems: 'center', background: '#fff', padding: 12, borderRadius: 4, border: '1px solid #e8e8e8' }}>
+                                                        <div style={{ flex: '0 0 150px', fontWeight: 'bold' }}>
+                                                            {attrLabels || 'Bilinmiyor'}
+                                                        </div>
+                                                        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                                                            <Form.Item {...restField} name={[name, 'gramWeight']} label="Gram (Özel Ücretli)" style={{ marginBottom: 0 }}>
+                                                                <InputNumber style={{ width: '100%' }} min={0.01} step={0.01} placeholder="Örn: 2.50" />
+                                                            </Form.Item>
+                                                            <Form.Item {...restField} name={[name, 'quantity']} label="Stok" rules={[{ required: true, message: 'Zorunlu' }]} style={{ marginBottom: 0 }}>
+                                                                <InputNumber style={{ width: '100%' }} min={0} placeholder="Adet" />
+                                                            </Form.Item>
+                                                            <Form.Item {...restField} name={[name, 'sku']} label="SKU (İsteğe Bağlı)" style={{ marginBottom: 0 }}>
+                                                                <Input placeholder="Varyant SKU'su" />
+                                                            </Form.Item>
+                                                        </div>
+                                                        <MinusCircleOutlined onClick={() => remove(name)} style={{ color: 'red', cursor: 'pointer', fontSize: 20 }} />
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                }}
                             </Form.List>
                         </div>
                     )}

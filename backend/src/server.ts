@@ -129,6 +129,7 @@ app.use('/api/feed', require('./routes/feed').default || require('./routes/feed'
 app.use('/api/categories', require('./routes/categories').default || require('./routes/categories'));
 app.use('/api/admin', require('./routes/admin').default || require('./routes/admin'));
 app.use('/api/b2b', require('./routes/b2b').default || require('./routes/b2b'));
+app.use('/api/variations', require('./routes/variations').default || require('./routes/variations'));
 
 // Error handling middleware
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

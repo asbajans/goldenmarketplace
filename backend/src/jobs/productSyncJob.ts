@@ -192,6 +192,69 @@ async function syncToEtsy(integration: any, product: any) {
             }
         }
 
+        // Push variants to inventory if there are any
+        if (product.hasVariants && Array.isArray(product.variants) && product.variants.length > 0) {
+             try {
+                 const propertyNames = Object.keys(product.variants[0].attributes || {});
+                 if (propertyNames.length > 0) {
+                     const propMap: Record<string, number> = {};
+                     propertyNames.forEach((name, idx) => {
+                         if (idx < 2) propMap[name] = 513 + idx; // Max 2 properties
+                     });
+
+                     const productsList = product.variants.map((v: any) => {
+                         const property_values = Object.keys(v.attributes).map((name, idx) => {
+                             if (idx >= 2) return null;
+                             return {
+                                 property_id: propMap[name],
+                                 property_name: name,
+                                 values: [v.attributes[name]]
+                             };
+                         }).filter(Boolean);
+
+                         return {
+                             sku: v.sku,
+                             property_values,
+                             offerings: [{
+                                 price: Number(v.priceUSD) || Number(v.priceTRY) / 35,
+                                 quantity: v.quantity || 0,
+                                 is_enabled: true,
+                                 readiness_state_id: readinessStateId || 1
+                             }]
+                         };
+                     });
+
+                     const inventoryPayload: any = {
+                         products: productsList,
+                         price_on_property: [513],
+                         quantity_on_property: [513],
+                         sku_on_property: [513],
+                         readiness_state_on_property: [513]
+                     };
+
+                     if (propMap[propertyNames[1]]) {
+                         inventoryPayload.price_on_property.push(514);
+                         inventoryPayload.quantity_on_property.push(514);
+                         inventoryPayload.sku_on_property.push(514);
+                         inventoryPayload.readiness_state_on_property.push(514);
+                     }
+
+                     await client.updateListingInventory(listingId, integration.accessToken, inventoryPayload);
+                     console.log(`[Etsy] Pushed variants as inventory to listing ${listingId}`);
+                 }
+             } catch (invErr: any) {
+                 console.warn(`[Etsy] Failed to push variants to listing ${listingId}:`, invErr.message);
+                 await IntegrationLog.create({
+                     userId: integration.userId,
+                     platform: 'etsy',
+                     endpoint: 'PUT /v3/application/listings/{listing_id}/inventory',
+                     requestMethod: 'SYNC',
+                     isSuccess: false,
+                     errorMessage: `Varyasyonlar Etsy'ye aktarılamadı: ` + invErr.message
+                 });
+             }
+        }
+
         // Publish
         try {
             await client.updateListing(integration.shopId, listingId, integration.accessToken, { state: 'active' });

@@ -11,6 +11,8 @@ import ProductMarketplaceListing from './ProductMarketplaceListing';
 import B2BRequest from './B2BRequest';
 import IntegrationLog from './IntegrationLog';
 import ProductVariant from './ProductVariant';
+import Variation from './Variation';
+import VariationOption from './VariationOption';
 
 // User <-> Store (One-to-One)
 User.hasOne(Store, { foreignKey: 'userId', as: 'store' });
@@ -46,6 +48,14 @@ B2BRequest.belongsTo(Store, { foreignKey: 'ownerStoreId', as: 'ownerStore' });
 ProductVariant.hasMany(B2BRequest, { foreignKey: 'variantId', as: 'b2bRequests' });
 B2BRequest.belongsTo(ProductVariant, { foreignKey: 'variantId', as: 'variant' });
 
+// Variation <-> VariationOption (One-to-Many)
+Variation.hasMany(VariationOption, { foreignKey: 'variationId', as: 'options' });
+VariationOption.belongsTo(Variation, { foreignKey: 'variationId', as: 'variation' });
+
+// User <-> Variation (One-to-Many)
+User.hasMany(Variation, { foreignKey: 'userId', as: 'variations' });
+Variation.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
 // Export all models
 export {
     User,
@@ -60,5 +70,7 @@ export {
     ProductMarketplaceListing,
     B2BRequest,
     IntegrationLog,
-    ProductVariant
+    ProductVariant,
+    Variation,
+    VariationOption
 };

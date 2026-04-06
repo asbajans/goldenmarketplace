@@ -9,9 +9,10 @@ import {
   PlusCircleOutlined,
   LogoutOutlined,
   CreditCardOutlined,
-  SyncOutlined,
   CompassOutlined,
-  FileTextOutlined
+  FileTextOutlined,
+  AppstoreOutlined,
+  SyncOutlined
 } from '@ant-design/icons';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
@@ -25,6 +26,7 @@ import IntegrationSettings from './pages/IntegrationSettings';
 import B2BMarket from './pages/B2BMarket';
 import B2BRequests from './pages/B2BRequests';
 import StoreStorefront from './pages/StoreStorefront';
+import Variations from './pages/Variations';
 import { getCurrentUser, logout } from './api/auth';
 
 const { Header, Sider, Content } = Layout;
@@ -79,6 +81,12 @@ const App: React.FC = () => {
       icon: <PlusCircleOutlined />,
       label: 'Ürün Ekle',
       onClick: () => navigate('/products/add')
+    },
+    {
+      key: '/variations',
+      icon: <AppstoreOutlined />,
+      label: 'Varyasyonlar',
+      onClick: () => navigate('/variations')
     },
     {
       key: '/b2b/market',
@@ -184,6 +192,7 @@ const App: React.FC = () => {
             <Route path="/products/edit/:id" element={<AddProduct onSuccess={() => navigate('/products')} />} />
             <Route path="/b2b/market" element={<B2BMarket />} />
             <Route path="/b2b/requests" element={<B2BRequests />} />
+            <Route path="/variations" element={<Variations />} />
             {/* Public store page — accessible from shared links */}
             <Route path="/store/:storeSlug" element={<StoreStorefront />} />
             <Route path="/integrations" element={<IntegrationSettings />} />

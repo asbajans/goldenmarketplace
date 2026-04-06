@@ -11,6 +11,7 @@
 import MarketplaceIntegration from '../models/MarketplaceIntegration';
 import ProductMarketplaceListing from '../models/ProductMarketplaceListing';
 import Product from '../models/Product';
+import ProductVariant from '../models/ProductVariant';
 import Store from '../models/Store';
 import IntegrationLog from '../models/IntegrationLog';
 import TrendyolClient from '../integrations/trendyol/trendyolClient';
@@ -42,7 +43,10 @@ class MarketplacePriceSyncService {
                 const store = await Store.findOne({ where: { userId } });
                 if (!store) continue;
 
-                const products = await Product.findAll({ where: { storeId: store.id, isActive: true } });
+                const products = await Product.findAll({ 
+                    where: { storeId: store.id, isActive: true },
+                    include: [{ model: ProductVariant, as: 'variants' }]
+                });
                 if (!products.length) continue;
 
                 for (const integration of userIntegrations) {
@@ -81,7 +85,10 @@ class MarketplacePriceSyncService {
                 return stats;
             }
 
-            const products = await Product.findAll({ where: { storeId: store.id, isActive: true } });
+            const products = await Product.findAll({ 
+                where: { storeId: store.id, isActive: true },
+                include: [{ model: ProductVariant, as: 'variants' }]
+            });
             if (!products.length) {
                 console.log(`[MarketplaceSync] User ${userId} has no active products. Skipping.`);
                 return stats;
@@ -284,7 +291,8 @@ class MarketplacePriceSyncService {
                 listingId: Number(listing.externalId),
                 price: priceUSD,
                 quantity: product.quantity,
-                productSku: product.sku
+                productSku: product.sku,
+                variants: (product as any).variants || []
             });
         }
 
@@ -302,16 +310,27 @@ class MarketplacePriceSyncService {
                     
                     // Prepare inventory update payload per Etsy API docs
                     const inventoryWithProducts = (currentInventory.products && currentInventory.products.length > 0)
-                        ? currentInventory.products.map((product: any) => ({
-                            sku: product.sku,
-                            property_values: product.property_values || [],
-                            offerings: (product.offerings || []).map((offering: any) => ({
-                                price: item.price,
-                                quantity: item.quantity,
-                                is_enabled: offering.is_enabled !== undefined ? offering.is_enabled : true,
-                                readiness_state_id: offering.readiness_state_id || 1
-                            }))
-                        }))
+                        ? currentInventory.products.map((etsyProd: any) => {
+                            const localVariant = item.variants.find((v: any) => v.sku === etsyProd.sku);
+                            let targetPrice = item.price;
+                            let targetQty = item.quantity;
+                            
+                            if (localVariant) {
+                                targetPrice = Number(localVariant.priceUSD) || Number(localVariant.priceTRY) / 35;
+                                targetQty = localVariant.quantity || 0;
+                            }
+
+                            return {
+                                sku: etsyProd.sku,
+                                property_values: etsyProd.property_values || [],
+                                offerings: (etsyProd.offerings || []).map((offering: any) => ({
+                                    price: targetPrice,
+                                    quantity: targetQty,
+                                    is_enabled: offering.is_enabled !== undefined ? offering.is_enabled : true,
+                                    readiness_state_id: offering.readiness_state_id || 1
+                                }))
+                            };
+                        })
                         : [
                             {
                                 sku: item.productSku,

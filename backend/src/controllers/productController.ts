@@ -526,6 +526,30 @@ export class ProductController {
              updatedCount++;
           }
 
+          // Sync Variants for non-clones
+          const nonCloneVariantIds = nonClones.map(p => p.id);
+          if (nonCloneVariantIds.length > 0) {
+              const variants = await ProductVariant.findAll({
+                  where: { productId: { [Op.in]: nonCloneVariantIds } }
+              });
+              
+              for (const variant of variants) {
+                  const prod = nonClones.find(p => p.id === variant.productId);
+                  if (!prod) continue;
+
+                  const usedMilyem = Number(prod.effectiveMilyem || prod.milyem);
+                  const { priceTRY } = goldPriceService.calculatePrice(
+                      Number(variant.gramWeight || prod.gramWeight),
+                      usedMilyem,
+                      Number(prod.profitMargin || 0),
+                      gold.pricePerGramTRY
+                  );
+                  const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
+                  const b2bPrice = prod.isB2BEnabled ? Math.round(priceTRY * (1 - (prod.b2bDiscount || 0) / 100) * 100) / 100 : 0;
+                  await variant.update({ priceTRY, priceUSD, b2bPrice });
+              }
+          }
+
           const clones = products.filter(p => !!p.originalProductId);
           // Load parents for clones
           for (const clone of clones) {
@@ -540,6 +564,38 @@ export class ProductController {
                 const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
                 await clone.update({ priceTRY, priceUSD });
                 updatedCount++;
+             }
+          }
+          
+          // Sync Variants for clones
+          const cloneVariantIds = clones.map(p => p.id);
+          if (cloneVariantIds.length > 0) {
+             const variants = await ProductVariant.findAll({
+                  where: { productId: { [Op.in]: cloneVariantIds } }
+             });
+             for (const variant of variants) {
+                  const clone = clones.find(p => p.id === variant.productId);
+                  if (!clone) continue;
+
+                  const parent = await Product.findByPk(clone.originalProductId);
+                  if (!parent) continue;
+
+                  let clonedVariant = await ProductVariant.findOne({ where: { productId: parent.id, sku: variant.sku } });
+                  // Try matching by attributes if sku doesn't match perfectly
+                  if (!clonedVariant) {
+                      const allParentVariants = await ProductVariant.findAll({ where: { productId: parent.id } });
+                      clonedVariant = allParentVariants.find(v => JSON.stringify(v.attributes) === JSON.stringify(variant.attributes)) || null;
+                  }
+
+                  if (clonedVariant) {
+                       const priceTRY = Math.round(clonedVariant.priceTRY * (1 + (clone.profitMargin || 0) / 100) * 100) / 100;
+                       const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
+                       await variant.update({ priceTRY, priceUSD });
+                  } else {
+                       const priceTRY = Math.round(parent.priceTRY * (1 + (clone.profitMargin || 0) / 100) * 100) / 100;
+                       const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
+                       await variant.update({ priceTRY, priceUSD });
+                  }
              }
           }
 
