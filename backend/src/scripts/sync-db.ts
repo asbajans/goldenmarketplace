@@ -1,9 +1,6 @@
 
 import sequelize from '../config/database';
-import User from '../models/User';
-import Store from '../models/Store';
-import Product from '../models/Product';
-// Import other models if any
+import '../models';
 
 const syncDb = async () => {
     try {
@@ -11,7 +8,7 @@ const syncDb = async () => {
         console.log('Database connected.');
 
         // Sync models - alter table to add columns without dropping
-        console.log(`Syncing models for: ${User.name}, ${Store.name}, ${Product.name}`);
+        console.log(`Syncing all models...`);
         await sequelize.sync({ alter: true });
         console.log('Database synced successfully.');
 
