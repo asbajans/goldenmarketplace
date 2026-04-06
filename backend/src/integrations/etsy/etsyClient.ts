@@ -286,6 +286,26 @@ export class EtsyClient {
     }
 
     /**
+     * Fetch seller taxonomy nodes from Etsy API
+     */
+    async getSellerTaxonomyNodes() {
+        // According to Etsy docs, this is a public endpoint but requires API key
+        const { apiKey } = await this.getApiCredentials();
+
+        try {
+            const response = await axios.get(`${this.baseUrl}/application/seller-taxonomy/nodes`, {
+                headers: {
+                    'x-api-key': apiKey
+                }
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error(`Etsy getSellerTaxonomyNodes Error:`, error.response?.data || error.message);
+            throw new Error(`Failed to fetch Etsy seller taxonomy nodes: ${JSON.stringify(error.response?.data || error.message)}`);
+        }
+    }
+
+    /**
      * Get listing inventory
      */
     async getListingInventory(listingId: number, accessToken: string) {

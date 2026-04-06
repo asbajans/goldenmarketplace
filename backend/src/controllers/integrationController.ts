@@ -132,6 +132,20 @@ export class IntegrationController {
         }
     }
 
+    /**
+     * Get Etsy Seller Taxonomy Nodes
+     */
+    static async getEtsySellerTaxonomyNodes(_req: Request, res: Response) {
+        try {
+            const client = new EtsyClient();
+            const response = await client.getSellerTaxonomyNodes();
+            return res.json(response);
+        } catch (error: any) {
+            console.error('Get Etsy Seller Taxonomy Nodes error:', error);
+            return res.status(500).json({ error: error.message || 'Failed to fetch seller taxonomy nodes' });
+        }
+    }
+
     static async etsyCallback(req: Request, res: Response) {
         try {
             const { code, state } = req.query;

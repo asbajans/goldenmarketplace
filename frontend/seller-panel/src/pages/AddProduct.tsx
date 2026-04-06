@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Form, Input, Button, InputNumber, message, Upload,
+    Form, Input, Button, InputNumber, message, Upload, TreeSelect,
     Select, Checkbox, Space, Card, Tag, Typography, Statistic, Row, Col, Divider, Spin, Tooltip
 } from 'antd';
 import type { UploadFile, UploadChangeParam } from 'antd/es/upload';
@@ -66,6 +66,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [etsyShippingProfiles, setEtsyShippingProfiles] = useState<any[]>([]);
     const [etsyReturnPolicies, setEtsyReturnPolicies] = useState<any[]>([]);
     const [etsyReadinessStates, setEtsyReadinessStates] = useState<any[]>([]);
+    const [etsyTaxonomyNodes, setEtsyTaxonomyNodes] = useState<any[]>([]);
     const [fetchingEtsyProfiles, setFetchingEtsyProfiles] = useState(false);
     const isCloned = !!initialValues?.originalStoreName;
 
@@ -99,14 +100,24 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const fetchEtsyProfiles = async () => {
         setFetchingEtsyProfiles(true);
         try {
-            const [shippingRes, returnRes, readinessRes] = await Promise.all([
+            const [shippingRes, returnRes, readinessRes, taxonomyRes] = await Promise.all([
                 client.get('/integrations/etsy/shipping-profiles'),
                 client.get('/integrations/etsy/return-policies'),
-                client.get('/integrations/etsy/readiness-states')
+                client.get('/integrations/etsy/readiness-states'),
+                client.get('/integrations/etsy/seller-taxonomy-nodes')
             ]);
             setEtsyShippingProfiles(shippingRes.data.results || []);
             setEtsyReturnPolicies(returnRes.data.results || []);
             setEtsyReadinessStates(readinessRes.data.results || []);
+
+            const transformNodes = (nodes: any[]): any[] => {
+                return nodes.map((node) => ({
+                    title: node.name,
+                    value: node.id,
+                    children: node.children && node.children.length > 0 ? transformNodes(node.children) : undefined,
+                }));
+            };
+            setEtsyTaxonomyNodes(transformNodes(taxonomyRes.data.results || []));
         } catch (error) {
             message.error('Etsy profil verileri alınamadı');
         } finally {
@@ -667,6 +678,23 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
 
                 {selectedMarketplaces.includes('etsy') && (
                     <Card size="small" style={{ marginBottom: 12, border: '1px solid #F56400', background: '#fff9f5' }} title={<span style={{ color: '#F56400' }}>Etsy Ürün Ayarları (Zorunlu)</span>}>
+                        <Form.Item 
+                            name={['marketplaceConfig', 'etsy', 'categoryId']} 
+                            label="Etsy Kategori (Taxonomy)"
+                            rules={[{ required: true, message: 'Lütfen bir kategori seçin' }]}
+                        >
+                            <TreeSelect
+                                showSearch
+                                style={{ width: '100%' }}
+                                dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
+                                placeholder="Etsy Kategori Seçin"
+                                allowClear
+                                treeDefaultExpandAll={false}
+                                treeData={etsyTaxonomyNodes}
+                                loading={fetchingEtsyProfiles}
+                                treeNodeFilterProp="title"
+                            />
+                        </Form.Item>
                         <Form.Item 
                             name={['marketplaceConfig', 'etsy', 'shippingProfileId']} 
                             label="Etsy Nakliye Profili (Shipping Profile)"

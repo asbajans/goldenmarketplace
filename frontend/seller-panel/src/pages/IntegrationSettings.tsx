@@ -437,16 +437,16 @@ const IntegrationSettings: React.FC = () => {
                 footer={null}
             >
                 <p style={{ marginBottom: 16, color: '#888' }}>
-                    Etsy'de ürünlerinizi listeleyebilmemiz için bir Taxonomy ID (Kategori ID) girmeniz gereklidir.
-                    Örneğin, Takı için "1153" girebilirsiniz.
+                    Etsy'de ürünlerinizi listeleyebilmemiz için varsayılan bir Taxonomy ID (Kategori ID) girebilirsiniz.
+                    Bu değer ürün eklerken değiştirilebilir. Örneğin, Takı için "1153" girebilirsiniz (Opsiyonel).
                 </p>
                 <Form form={etsyForm} layout="vertical" onFinish={handleEtsyConnect}>
                     <Form.Item
                         name="etsyCategoryId"
-                        label="Etsy Taxonomy ID (Zorunlu)"
-                        rules={[{ required: true, message: 'Lütfen ürünlerin gönderileceği Etsy kategori ID sini giriniz.' }]}
+                        label="Etsy Taxonomy ID (Varsayılan)"
+                        rules={[]}
                     >
-                        <InputNumber style={{ width: '100%' }} placeholder="örn: 1153" />
+                        <InputNumber style={{ width: '100%' }} placeholder="örn: 1153 (Opsiyonel)" />
                     </Form.Item>
                     <Form.Item>
                         <Button type="primary" htmlType="submit" loading={connecting === 'etsy'} block>

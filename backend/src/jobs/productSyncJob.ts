@@ -127,8 +127,11 @@ async function syncToEtsy(integration: any, product: any) {
 
         const returnPolicyId = product.marketplaceConfig?.etsy?.returnPolicyId;
         const readinessStateId = product.marketplaceConfig?.etsy?.readinessStateId;
+        
+        const productCategoryId = product.marketplaceConfig?.etsy?.categoryId;
+        const categoryId = productCategoryId || integration.etsyCategoryId;
 
-        if (!integration.etsyCategoryId || !shippingProfileId || !returnPolicyId || !readinessStateId) {
+        if (!categoryId || !shippingProfileId || !returnPolicyId || !readinessStateId) {
             console.warn(`[Etsy] Missing configuration (categoryId, shippingProfile, returnPolicy, or readinessState). Cannot create product.`);
             await IntegrationLog.create({
                  userId: integration.userId,
@@ -148,7 +151,7 @@ async function syncToEtsy(integration: any, product: any) {
             price: Number(product.priceUSD || product.priceTRY / 35), // Default fallback if no USD price
             who_made: 'i_did',
             when_made: 'made_to_order',
-            taxonomy_id: integration.etsyCategoryId,
+            taxonomy_id: categoryId,
             shipping_profile_id: shippingProfileId,
             return_policy_id: returnPolicyId,
             readiness_state_id: readinessStateId,
