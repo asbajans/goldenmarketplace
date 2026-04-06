@@ -290,12 +290,13 @@ export class EtsyClient {
      */
     async getSellerTaxonomyNodes() {
         // According to Etsy docs, this is a public endpoint but requires API key
-        const { apiKey } = await this.getApiCredentials();
+        const { apiKey, apiSecret } = await this.getApiCredentials();
+        const xApiKey = `${apiKey}:${apiSecret}`;
 
         try {
             const response = await axios.get(`${this.baseUrl}/application/seller-taxonomy/nodes`, {
                 headers: {
-                    'x-api-key': apiKey
+                    'x-api-key': xApiKey
                 }
             });
             return response.data;
