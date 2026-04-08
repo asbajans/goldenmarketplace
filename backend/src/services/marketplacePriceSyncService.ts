@@ -322,7 +322,12 @@ class MarketplacePriceSyncService {
 
                             return {
                                 sku: etsyProd.sku,
-                                property_values: etsyProd.property_values || [],
+                                property_values: (etsyProd.property_values || []).map((pv: any) => ({
+                                    property_id: pv.property_id,
+                                    property_name: pv.property_name,
+                                    value_ids: pv.value_ids,
+                                    values: pv.values
+                                })),
                                 offerings: (etsyProd.offerings || []).map((offering: any) => ({
                                     price: targetPrice,
                                     quantity: targetQty,
