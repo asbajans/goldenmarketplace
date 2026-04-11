@@ -20,6 +20,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import ProductList from './pages/ProductList';
 import AddProduct from './pages/AddProduct';
+import BulkUpload from './pages/BulkUpload';
 import Subscription from './pages/Subscription';
 import SubscriptionSuccess from './pages/SubscriptionSuccess';
 import IntegrationSettings from './pages/IntegrationSettings';
@@ -81,6 +82,12 @@ const App: React.FC = () => {
       icon: <PlusCircleOutlined />,
       label: 'Ürün Ekle',
       onClick: () => navigate('/products/add')
+    },
+    {
+      key: '/products/bulk',
+      icon: <PlusCircleOutlined />,
+      label: 'Toplu Yükleme',
+      onClick: () => navigate('/products/bulk')
     },
     {
       key: '/variations',
@@ -189,6 +196,7 @@ const App: React.FC = () => {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/products" element={<ProductList />} />
             <Route path="/products/add" element={<AddProduct onSuccess={() => navigate('/products')} />} />
+            <Route path="/products/bulk" element={<BulkUpload />} />
             <Route path="/products/edit/:id" element={<AddProduct onSuccess={() => navigate('/products')} />} />
             <Route path="/b2b/market" element={<B2BMarket />} />
             <Route path="/b2b/requests" element={<B2BRequests />} />

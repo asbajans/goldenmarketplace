@@ -3,11 +3,14 @@
  */
 
 import express from 'express';
+import multer from 'multer';
 import ProductController from '../controllers/productController';
+import productBulkController from '../controllers/productBulkController';
 import { authMiddleware, sellerMiddleware } from '../middleware/authMiddleware';
 import { validateRequest, schemas } from '../utils/validation';
 
 const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage() });
 
 // Use authMiddleware so we always know the user. If they are seller, productController restricts fetch.
 router.get('/', authMiddleware, ProductController.getProducts);
@@ -24,5 +27,9 @@ router.post('/calculate-gold-price', authMiddleware, ProductController.calculate
 router.get('/store/sync-status', authMiddleware, sellerMiddleware, ProductController.getAutoPriceSyncStatus);
 router.put('/store/sync-status', authMiddleware, sellerMiddleware, ProductController.setAutoPriceSyncStatus);
 router.post('/store/sync-prices', authMiddleware, sellerMiddleware, ProductController.syncStorePrices);
+
+// Bulk Upload
+router.post('/bulk-parse', authMiddleware, sellerMiddleware, upload.single('file'), productBulkController.parseBulkFile);
+router.post('/bulk-import', authMiddleware, sellerMiddleware, productBulkController.importBulkProducts);
 
 export default router;

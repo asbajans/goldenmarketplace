@@ -16,6 +16,7 @@ export interface EtsyCreateListingPayload {
     is_supply?: boolean;
     is_customizable?: boolean;
     should_auto_renew?: boolean;
+    tags?: string[];
 }
 
 export class EtsyClient {
@@ -135,7 +136,11 @@ export class EtsyClient {
             const formData = new URLSearchParams();
             Object.entries(payload).forEach(([key, value]) => {
                 if (value !== undefined) {
-                    formData.append(key, String(value));
+                    if (Array.isArray(value)) {
+                        value.forEach(v => formData.append(key, String(v)));
+                    } else {
+                        formData.append(key, String(value));
+                    }
                 }
             });
 

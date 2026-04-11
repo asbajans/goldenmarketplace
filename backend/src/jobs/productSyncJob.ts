@@ -144,6 +144,11 @@ async function syncToEtsy(integration: any, product: any) {
             return;
         }
 
+        let etsyTags = undefined;
+        if (Array.isArray(product.tags) && product.tags.length > 0) {
+            etsyTags = product.tags.map((t: string) => String(t).substring(0, 20)).slice(0, 13);
+        }
+
         const payload: EtsyCreateListingPayload = {
             quantity: product.quantity || 1,
             title: product.title.substring(0, 140), // Etsy title limit
@@ -156,7 +161,8 @@ async function syncToEtsy(integration: any, product: any) {
             return_policy_id: returnPolicyId,
             readiness_state_id: readinessStateId,
             is_supply: false,
-            should_auto_renew: false
+            should_auto_renew: false,
+            tags: etsyTags
         };
 
         console.log(`[Etsy] Creating new draft listing: ${product.sku} - ${product.title}`);
