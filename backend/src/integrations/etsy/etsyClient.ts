@@ -137,7 +137,7 @@ export class EtsyClient {
             Object.entries(payload).forEach(([key, value]) => {
                 if (value !== undefined) {
                     if (Array.isArray(value)) {
-                        value.forEach(v => formData.append(key, String(v)));
+                        formData.append(key, value.join(','));
                     } else {
                         formData.append(key, String(value));
                     }
@@ -204,7 +204,11 @@ export class EtsyClient {
             // Convert payload to URLSearchParams for application/x-www-form-urlencoded
             const formData = new URLSearchParams();
             for (const [key, value] of Object.entries(payload)) {
-                formData.append(key, String(value));
+                if (Array.isArray(value)) {
+                    formData.append(key, value.join(','));
+                } else {
+                    formData.append(key, String(value));
+                }
             }
 
             const response = await axios.patch(
