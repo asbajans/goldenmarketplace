@@ -166,7 +166,7 @@ async function syncToEtsy(integration: any, product: any) {
         };
 
         console.log(`[Etsy] Creating new draft listing: ${product.sku} - ${product.title}`);
-        const client = new EtsyClient();
+        const client = new EtsyClient(integration);
         const result = await client.createDraftListing(integration.shopId, integration.accessToken, payload);
         const listingId = result.listing_id || result.id;
 
@@ -287,7 +287,7 @@ async function syncToEtsy(integration: any, product: any) {
 
     } else {
         // UPDATE existing product price/stock
-        const client = new EtsyClient();
+        const client = new EtsyClient(integration);
         console.log(`[Etsy] Updating existing product (ID: ${existing.externalId})`);
         
         const updates = {

@@ -297,7 +297,7 @@ class MarketplacePriceSyncService {
         }
 
         if (items.length > 0) {
-            const client = new EtsyClient();
+            const client = new EtsyClient(integration);
             let successCount = 0;
             let failureCount = 0;
 

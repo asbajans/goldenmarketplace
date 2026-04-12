@@ -73,7 +73,7 @@ class IntegrationService {
 
         if (platform === 'etsy') {
             if (!integration.accessToken) throw new Error('Etsy access token not found');
-            const client = new EtsyClient();
+            const client = new EtsyClient(integration);
             const data = await client.verifyConnection(integration.accessToken);
             return { status: 'success', message: 'Etsy bağlantısı çalışıyor!', shopId: data.shop_id };
         }

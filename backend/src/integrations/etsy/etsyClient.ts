@@ -21,6 +21,11 @@ export interface EtsyCreateListingPayload {
 
 export class EtsyClient {
     private baseUrl = 'https://api.etsy.com/v3';
+    private integrationInstance?: any;
+
+    constructor(integrationInstance?: any) {
+        this.integrationInstance = integrationInstance;
+    }
 
     /**
      * Helper to get the Etsy API Key directly from database
@@ -60,6 +65,63 @@ export class EtsyClient {
         } catch (error: any) {
             console.error('Etsy Token Exchange Error:', error.response?.data || error.message);
             throw new Error('Failed to exchange Etsy authorization code for token');
+        }
+    }
+
+    /**
+     * Refresh OAuth access token
+     */
+    async refreshAccessToken(refreshToken: string) {
+        const { apiKey } = await this.getApiCredentials();
+        const data = {
+            grant_type: 'refresh_token',
+            client_id: apiKey,
+            refresh_token: refreshToken
+        };
+
+        try {
+            const response = await axios.post(`${this.baseUrl}/public/oauth/token`, data, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('Etsy Token Refresh Error:', error.response?.data || error.message);
+            throw new Error('Failed to refresh Etsy token');
+        }
+    }
+
+    /**
+     * Wrapper to automatically catch 401 Unauthorized and refresh the token 
+     * if the integrationInstance and refreshToken are available.
+     */
+    private async withTokenRefresh<T>(originalToken: string, operation: (token: string) => Promise<T>): Promise<T> {
+        try {
+            return await operation(originalToken);
+        } catch (error: any) {
+            const isUnauthorized = error.response?.status === 401 || (error.response?.data && String(error.response.data).toLowerCase().includes('token'));
+            if (isUnauthorized && this.integrationInstance && this.integrationInstance.refreshToken) {
+                console.log(`[Etsy] 401 Unauthorized detected. Trying to auto-refresh token...`);
+                try {
+                    const newTokens = await this.refreshAccessToken(this.integrationInstance.refreshToken);
+                    
+                    // Automatically update model instances if available
+                    this.integrationInstance.accessToken = newTokens.access_token;
+                    this.integrationInstance.refreshToken = newTokens.refresh_token;
+                    if (typeof this.integrationInstance.save === 'function') {
+                        await this.integrationInstance.save();
+                    }
+                    
+                    console.log(`[Etsy] Token refreshed and saved successfully. Retrying operation.`);
+                    return await operation(newTokens.access_token);
+                } catch (refreshErr: any) {
+                    console.error('[Etsy] Auto-refresh failed. Need manual reconnect.', refreshErr.message);
+                    // Don't throw refreshErr, throw the original 401 so callers handle it normally
+                    throw error;
+                }
+            }
+            throw error;
         }
     }
 
@@ -108,82 +170,88 @@ export class EtsyClient {
      * Verify connection using the existing token
      */
     async verifyConnection(accessToken: string) {
-        const { apiKey, apiSecret } = await this.getApiCredentials();
-        const xApiKey = `${apiKey}:${apiSecret}`;
+        return this.withTokenRefresh(accessToken, async (validToken: string) => {
+            const { apiKey, apiSecret } = await this.getApiCredentials();
+            const xApiKey = `${apiKey}:${apiSecret}`;
 
-        try {
-            const response = await axios.get(`${this.baseUrl}/application/users/me`, {
-                headers: {
-                    'x-api-key': xApiKey,
-                    'Authorization': `Bearer ${accessToken}`
-                }
-            });
-            return response.data;
-        } catch (error: any) {
-            console.error('Etsy Verify Connection Error:', error.response?.data || error.message);
-            throw new Error('Failed to verify Etsy connection. Token might be invalid or expired.');
-        }
+            try {
+                const response = await axios.get(`${this.baseUrl}/application/users/me`, {
+                    headers: {
+                        'x-api-key': xApiKey,
+                        'Authorization': `Bearer ${validToken}`
+                    }
+                });
+                return response.data;
+            } catch (error: any) {
+                console.error('Etsy Verify Connection Error:', error.response?.data || error.message);
+                throw error;
+            }
+        });
     }
     /**
      * Create a new draft listing
      */
     async createDraftListing(shopId: string, accessToken: string, payload: EtsyCreateListingPayload) {
-        const { apiKey, apiSecret } = await this.getApiCredentials();
-        const xApiKey = `${apiKey}:${apiSecret}`;
+        return this.withTokenRefresh(accessToken, async (validToken: string) => {
+            const { apiKey, apiSecret } = await this.getApiCredentials();
+            const xApiKey = `${apiKey}:${apiSecret}`;
 
-        try {
-            // application/x-www-form-urlencoded is needed for Etsy POST requests
-            const formData = new URLSearchParams();
-            Object.entries(payload).forEach(([key, value]) => {
-                if (value !== undefined) {
-                    if (Array.isArray(value)) {
-                        formData.append(key, value.join(','));
-                    } else {
-                        formData.append(key, String(value));
+            try {
+                // application/x-www-form-urlencoded is needed for Etsy POST requests
+                const formData = new URLSearchParams();
+                Object.entries(payload).forEach(([key, value]) => {
+                    if (value !== undefined) {
+                        if (Array.isArray(value)) {
+                            formData.append(key, value.join(','));
+                        } else {
+                            formData.append(key, String(value));
+                        }
                     }
-                }
-            });
+                });
 
-            const response = await axios.post(`${this.baseUrl}/application/shops/${shopId}/listings`, formData.toString(), {
-                headers: {
-                    'x-api-key': xApiKey,
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
-            });
-            return response.data;
-        } catch (error: any) {
-            console.error('Etsy createDraftListing Error:', error.response?.data || error.message);
-            throw new Error(`Failed to create Etsy draft listing: ${JSON.stringify(error.response?.data || error.message)}`);
-        }
+                const response = await axios.post(`${this.baseUrl}/application/shops/${shopId}/listings`, formData.toString(), {
+                    headers: {
+                        'x-api-key': xApiKey,
+                        'Authorization': `Bearer ${validToken}`,
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    }
+                });
+                return response.data;
+            } catch (error: any) {
+                console.error('Etsy createDraftListing Error:', error.response?.data || error.message);
+                throw error;
+            }
+        });
     }
 
     /**
      * Upload an image to an existing listing
      */
     async uploadListingImage(shopId: string, listingId: number, accessToken: string, imageUrl: string) {
-        const { apiKey, apiSecret } = await this.getApiCredentials();
-        const xApiKey = `${apiKey}:${apiSecret}`;
+        return this.withTokenRefresh(accessToken, async (validToken: string) => {
+            const { apiKey, apiSecret } = await this.getApiCredentials();
+            const xApiKey = `${apiKey}:${apiSecret}`;
 
-        try {
-            // Fetch the image from URL as stream
-            const imageResponse = await axios.get(imageUrl, { responseType: 'stream' });
+            try {
+                // Fetch the image from URL as stream
+                const imageResponse = await axios.get(imageUrl, { responseType: 'stream' });
 
-            const form = new FormData();
-            form.append('image', imageResponse.data, 'product_image.jpg');
+                const form = new FormData();
+                form.append('image', imageResponse.data, 'product_image.jpg');
 
-            const response = await axios.post(`${this.baseUrl}/application/shops/${shopId}/listings/${listingId}/images`, form, {
-                headers: {
-                    'x-api-key': xApiKey,
-                    'Authorization': `Bearer ${accessToken}`,
-                    ...form.getHeaders()
-                }
-            });
-            return response.data;
-        } catch (error: any) {
-            console.error(`Etsy uploadListingImage Error for Listing ${listingId}:`, error.response?.data || error.message);
-            throw new Error(`Failed to upload image to Etsy listing: ${JSON.stringify(error.response?.data || error.message)}`);
-        }
+                const response = await axios.post(`${this.baseUrl}/application/shops/${shopId}/listings/${listingId}/images`, form, {
+                    headers: {
+                        'x-api-key': xApiKey,
+                        'Authorization': `Bearer ${validToken}`,
+                        ...form.getHeaders()
+                    }
+                });
+                return response.data;
+            } catch (error: any) {
+                console.error(`Etsy uploadListingImage Error for Listing ${listingId}:`, error.response?.data || error.message);
+                throw error;
+            }
+        });
     }
 
     /**
@@ -192,106 +260,114 @@ export class EtsyClient {
      * For price updates: pass price as a number (e.g., 50.00)
      */
     async updateListing(shopId: string, listingId: number, accessToken: string, updates: any) {
-        const { apiKey, apiSecret } = await this.getApiCredentials();
-        const xApiKey = `${apiKey}:${apiSecret}`;
+        return this.withTokenRefresh(accessToken, async (validToken: string) => {
+            const { apiKey, apiSecret } = await this.getApiCredentials();
+            const xApiKey = `${apiKey}:${apiSecret}`;
 
-        try {
-            // Keep price as number for form-urlencoded format
-            const payload = { ...updates };
+            try {
+                // Keep price as number for form-urlencoded format
+                const payload = { ...updates };
 
-            console.log(`[Etsy] PATCH Request Payload:`, JSON.stringify(payload, null, 2));
+                console.log(`[Etsy] PATCH Request Payload:`, JSON.stringify(payload, null, 2));
 
-            // Convert payload to URLSearchParams for application/x-www-form-urlencoded
-            const formData = new URLSearchParams();
-            for (const [key, value] of Object.entries(payload)) {
-                if (Array.isArray(value)) {
-                    formData.append(key, value.join(','));
-                } else {
-                    formData.append(key, String(value));
-                }
-            }
-
-            const response = await axios.patch(
-                `${this.baseUrl}/application/shops/${shopId}/listings/${listingId}`,
-                formData.toString(),
-                {
-                    headers: {
-                        'x-api-key': xApiKey,
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/x-www-form-urlencoded'
+                // Convert payload to URLSearchParams for application/x-www-form-urlencoded
+                const formData = new URLSearchParams();
+                for (const [key, value] of Object.entries(payload)) {
+                    if (Array.isArray(value)) {
+                        formData.append(key, value.join(','));
+                    } else {
+                        formData.append(key, String(value));
                     }
                 }
-            );
 
-            console.log(`[Etsy] PATCH Response Payload:`, JSON.stringify(response.data, null, 2));
-            return response.data;
-        } catch (error: any) {
-            console.error(`Etsy updateListing Error for Listing ${listingId}:`, error.response?.data || error.message);
-            throw new Error(`Failed to update Etsy listing: ${JSON.stringify(error.response?.data || error.message)}`);
-        }
+                const response = await axios.patch(
+                    `${this.baseUrl}/application/shops/${shopId}/listings/${listingId}`,
+                    formData.toString(),
+                    {
+                        headers: {
+                            'x-api-key': xApiKey,
+                            'Authorization': `Bearer ${validToken}`,
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        }
+                    }
+                );
+
+                console.log(`[Etsy] PATCH Response Payload:`, JSON.stringify(response.data, null, 2));
+                return response.data;
+            } catch (error: any) {
+                console.error(`Etsy updateListing Error for Listing ${listingId}:`, error.response?.data || error.message);
+                throw error;
+            }
+        });
     }
 
     /**
      * Fetch all return policies for the shop
      */
     async getReturnPolicies(shopId: string, accessToken: string) {
-        const { apiKey, apiSecret } = await this.getApiCredentials();
-        const xApiKey = `${apiKey}:${apiSecret}`;
+        return this.withTokenRefresh(accessToken, async (validToken: string) => {
+            const { apiKey, apiSecret } = await this.getApiCredentials();
+            const xApiKey = `${apiKey}:${apiSecret}`;
 
-        try {
-            const response = await axios.get(`${this.baseUrl}/application/shops/${shopId}/policies/return`, {
-                headers: {
-                    'x-api-key': xApiKey,
-                    'Authorization': `Bearer ${accessToken}`
-                }
-            });
-            return response.data;
-        } catch (error: any) {
-            console.error(`Etsy getReturnPolicies Error for Shop ${shopId}:`, error.response?.data || error.message);
-            throw new Error(`Failed to fetch Etsy return policies: ${JSON.stringify(error.response?.data || error.message)}`);
-        }
+            try {
+                const response = await axios.get(`${this.baseUrl}/application/shops/${shopId}/policies/return`, {
+                    headers: {
+                        'x-api-key': xApiKey,
+                        'Authorization': `Bearer ${validToken}`
+                    }
+                });
+                return response.data;
+            } catch (error: any) {
+                console.error(`Etsy getReturnPolicies Error for Shop ${shopId}:`, error.response?.data || error.message);
+                throw error;
+            }
+        });
     }
 
     /**
      * Fetch all shipping profiles for the shop
      */
     async getShippingProfiles(shopId: string, accessToken: string) {
-        const { apiKey, apiSecret } = await this.getApiCredentials();
-        const xApiKey = `${apiKey}:${apiSecret}`;
+        return this.withTokenRefresh(accessToken, async (validToken: string) => {
+            const { apiKey, apiSecret } = await this.getApiCredentials();
+            const xApiKey = `${apiKey}:${apiSecret}`;
 
-        try {
-            const response = await axios.get(`${this.baseUrl}/application/shops/${shopId}/shipping-profiles`, {
-                headers: {
-                    'x-api-key': xApiKey,
-                    'Authorization': `Bearer ${accessToken}`
-                }
-            });
-            return response.data;
-        } catch (error: any) {
-            console.error(`Etsy getShippingProfiles Error for Shop ${shopId}:`, error.response?.data || error.message);
-            throw new Error(`Failed to fetch Etsy shipping profiles: ${JSON.stringify(error.response?.data || error.message)}`);
-        }
+            try {
+                const response = await axios.get(`${this.baseUrl}/application/shops/${shopId}/shipping-profiles`, {
+                    headers: {
+                        'x-api-key': xApiKey,
+                        'Authorization': `Bearer ${validToken}`
+                    }
+                });
+                return response.data;
+            } catch (error: any) {
+                console.error(`Etsy getShippingProfiles Error for Shop ${shopId}:`, error.response?.data || error.message);
+                throw error;
+            }
+        });
     }
 
     /**
      * Fetch all readiness state definitions (processing profiles) for the shop
      */
     async getReadinessStates(shopId: string, accessToken: string) {
-        const { apiKey, apiSecret } = await this.getApiCredentials();
-        const xApiKey = `${apiKey}:${apiSecret}`;
+        return this.withTokenRefresh(accessToken, async (validToken: string) => {
+            const { apiKey, apiSecret } = await this.getApiCredentials();
+            const xApiKey = `${apiKey}:${apiSecret}`;
 
-        try {
-            const response = await axios.get(`${this.baseUrl}/application/shops/${shopId}/readiness-state-definitions`, {
-                headers: {
-                    'x-api-key': xApiKey,
-                    'Authorization': `Bearer ${accessToken}`
-                }
-            });
-            return response.data;
-        } catch (error: any) {
-            console.error(`Etsy getReadinessStates Error for Shop ${shopId}:`, error.response?.data || error.message);
-            throw new Error(`Failed to fetch Etsy readiness states: ${JSON.stringify(error.response?.data || error.message)}`);
-        }
+            try {
+                const response = await axios.get(`${this.baseUrl}/application/shops/${shopId}/readiness-state-definitions`, {
+                    headers: {
+                        'x-api-key': xApiKey,
+                        'Authorization': `Bearer ${validToken}`
+                    }
+                });
+                return response.data;
+            } catch (error: any) {
+                console.error(`Etsy getReadinessStates Error for Shop ${shopId}:`, error.response?.data || error.message);
+                throw error;
+            }
+        });
     }
 
     /**
@@ -319,54 +395,58 @@ export class EtsyClient {
      * Get listing inventory
      */
     async getListingInventory(listingId: number, accessToken: string) {
-        const { apiKey, apiSecret } = await this.getApiCredentials();
-        const xApiKey = `${apiKey}:${apiSecret}`;
+        return this.withTokenRefresh(accessToken, async (validToken: string) => {
+            const { apiKey, apiSecret } = await this.getApiCredentials();
+            const xApiKey = `${apiKey}:${apiSecret}`;
 
-        try {
-            const response = await axios.get(
-                `${this.baseUrl}/application/listings/${listingId}/inventory`,
-                {
-                    headers: {
-                        'x-api-key': xApiKey,
-                        'Authorization': `Bearer ${accessToken}`
+            try {
+                const response = await axios.get(
+                    `${this.baseUrl}/application/listings/${listingId}/inventory`,
+                    {
+                        headers: {
+                            'x-api-key': xApiKey,
+                            'Authorization': `Bearer ${validToken}`
+                        }
                     }
-                }
-            );
-            return response.data;
-        } catch (error: any) {
-            console.error(`Etsy getListingInventory Error for Listing ${listingId}:`, error.response?.data || error.message);
-            throw new Error(`Failed to get Etsy listing inventory: ${JSON.stringify(error.response?.data || error.message)}`);
-        }
+                );
+                return response.data;
+            } catch (error: any) {
+                console.error(`Etsy getListingInventory Error for Listing ${listingId}:`, error.response?.data || error.message);
+                throw error;
+            }
+        });
     }
 
     /**
      * Update listing inventory (price, quantity, etc.)
      */
     async updateListingInventory(listingId: number, accessToken: string, inventoryData: any) {
-        const { apiKey, apiSecret } = await this.getApiCredentials();
-        const xApiKey = `${apiKey}:${apiSecret}`;
+        return this.withTokenRefresh(accessToken, async (validToken: string) => {
+            const { apiKey, apiSecret } = await this.getApiCredentials();
+            const xApiKey = `${apiKey}:${apiSecret}`;
 
-        try {
-            console.log(`[Etsy] PUT Inventory Request Payload:`, JSON.stringify(inventoryData, null, 2));
+            try {
+                console.log(`[Etsy] PUT Inventory Request Payload:`, JSON.stringify(inventoryData, null, 2));
 
-            const response = await axios.put(
-                `${this.baseUrl}/application/listings/${listingId}/inventory`,
-                inventoryData,
-                {
-                    headers: {
-                        'x-api-key': xApiKey,
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
+                const response = await axios.put(
+                    `${this.baseUrl}/application/listings/${listingId}/inventory`,
+                    inventoryData,
+                    {
+                        headers: {
+                            'x-api-key': xApiKey,
+                            'Authorization': `Bearer ${validToken}`,
+                            'Content-Type': 'application/json'
+                        }
                     }
-                }
-            );
+                );
 
-            console.log(`[Etsy] PUT Inventory Response Payload:`, JSON.stringify(response.data, null, 2));
-            return response.data;
-        } catch (error: any) {
-            console.error(`Etsy updateListingInventory Error for Listing ${listingId}:`, error.response?.data || error.message);
-            throw new Error(`Failed to update Etsy listing inventory: ${JSON.stringify(error.response?.data || error.message)}`);
-        }
+                console.log(`[Etsy] PUT Inventory Response Payload:`, JSON.stringify(response.data, null, 2));
+                return response.data;
+            } catch (error: any) {
+                console.error(`Etsy updateListingInventory Error for Listing ${listingId}:`, error.response?.data || error.message);
+                throw error;
+            }
+        });
     }
 }
 
