@@ -6,5 +6,8 @@ const router = express.Router();
 // Public B2C Marketplace Routes
 router.get('/products', MarketplaceController.getProducts);
 router.get('/products/:slug', MarketplaceController.getProductBySlug);
+router.get('/stores', MarketplaceController.getStores);
+router.get('/stores/:storeSlug', MarketplaceController.getStoreBySlug);
+router.get('/categories', MarketplaceController.getCategories);
 
 export default router;
