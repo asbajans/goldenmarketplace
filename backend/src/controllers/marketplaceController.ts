@@ -20,7 +20,7 @@ export class MarketplaceController {
         isActive: true,
         marketplaces: Sequelize.where(
           Sequelize.cast(Sequelize.col('marketplaces'), 'text'),
-          { [Op.like]: '%"golden"%' }
+          { [Op.iLike]: '%golden%' }
         )
       };
       
