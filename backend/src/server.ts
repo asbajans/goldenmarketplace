@@ -36,7 +36,10 @@ async function syncAndSeedSettings() {
     // Seed initial GlobalSettings for Etsy keys
     const settingsToSeed = [
       { key: 'etsy_api_key', value: '', description: 'Etsy Master Application Key (Client ID)', isPublic: false },
-      { key: 'etsy_api_secret', value: '', description: 'Etsy Master Application Shared Secret', isPublic: false }
+      { key: 'etsy_api_secret', value: '', description: 'Etsy Master Application Shared Secret', isPublic: false },
+      { key: 'ai_provider', value: 'openai', description: 'AI Provider (openai, openrouter, gemini)', isPublic: true },
+      { key: 'ai_api_key', value: '', description: 'AI Provider API Key', isPublic: false },
+      { key: 'ai_model', value: 'gpt-4o-mini', description: 'AI Model (e.g. gpt-4o-mini, gemini-pro)', isPublic: true }
     ];
 
     for (const setting of settingsToSeed) {
@@ -132,6 +135,7 @@ app.use('/api/feed', require('./routes/feed').default || require('./routes/feed'
 app.use('/api/categories', require('./routes/categories').default || require('./routes/categories'));
 app.use('/api/admin', require('./routes/admin').default || require('./routes/admin'));
 app.use('/api/b2b', require('./routes/b2b').default || require('./routes/b2b'));
+app.use('/api/marketplace', require('./routes/marketplace').default || require('./routes/marketplace'));
 app.use('/api/variations', require('./routes/variations').default || require('./routes/variations'));
 
 // Error handling middleware

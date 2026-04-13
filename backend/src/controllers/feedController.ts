@@ -6,16 +6,31 @@
 import { Request, Response } from 'express';
 import Product from '../models/Product';
 
+import Store from '../models/Store';
+
 export class FeedController {
     /**
      * Google Shopping XML Feed
-     * Endpoint: GET /api/feed/google.xml
+     * Endpoint: GET /api/feed/google/:storeSlug.xml
      */
-    static async googleShoppingFeed(_req: Request, res: Response) {
+    static async googleShoppingFeed(req: Request, res: Response) {
         try {
+            const { storeSlug } = req.params;
+            let whereClause: any = { isActive: true };
+            let storeName = 'Golden Marketplace';
+            
+            if (storeSlug) {
+                const store = await Store.findOne({ where: { storeSlug, isActive: true } });
+                if (!store) {
+                    return res.status(404).send('Store not found');
+                }
+                whereClause.storeId = store.id;
+                storeName = store.storeName;
+            }
+
             const products = await Product.findAll({
-                where: { isActive: true },
-                limit: 500
+                where: whereClause,
+                limit: 1000
             });
 
             const siteUrl = process.env.SITE_URL || 'https://asb.web.tr';
@@ -43,7 +58,7 @@ export class FeedController {
     <g:price>${product.priceTRY} TRY</g:price>
     <g:availability>${product.quantity > 0 ? 'in_stock' : 'out_of_stock'}</g:availability>
     <g:condition>new</g:condition>
-    <g:brand>Golden Marketplace</g:brand>
+    <g:brand><![CDATA[${storeName}]]></g:brand>
     <g:product_type><![CDATA[${product.category || 'Mücevher'}]]></g:product_type>
     <g:google_product_category>188</g:google_product_category>
     <g:identifier_exists>false</g:identifier_exists>
@@ -55,22 +70,36 @@ export class FeedController {
 </rss>`;
 
             res.set('Content-Type', 'application/xml');
-            res.send(xml);
+            return res.send(xml);
         } catch (error) {
             console.error('Google Feed Error:', error);
-            res.status(500).json({ error: 'Failed to generate feed' });
+            return res.status(500).json({ error: 'Failed to generate feed' });
         }
     }
 
     /**
-     * Facebook Product Catalog Feed (JSON)
-     * Endpoint: GET /api/feed/facebook.json
+     * Facebook Product Catalog Feed (JSON/XML)
+     * Endpoint: GET /api/feed/facebook/:storeSlug.json
+     * (Also covers /instagram/:storeSlug.json)
      */
-    static async facebookCatalogFeed(_req: Request, res: Response) {
+    static async facebookCatalogFeed(req: Request, res: Response) {
         try {
+            const { storeSlug } = req.params;
+            let whereClause: any = { isActive: true };
+            let storeName = 'Golden Marketplace';
+            
+            if (storeSlug) {
+                const store = await Store.findOne({ where: { storeSlug, isActive: true } });
+                if (!store) {
+                    return res.status(404).json({ error: 'Store not found' });
+                }
+                whereClause.storeId = store.id;
+                storeName = store.storeName;
+            }
+
             const products = await Product.findAll({
-                where: { isActive: true },
-                limit: 500
+                where: whereClause,
+                limit: 1000
             });
 
             const siteUrl = process.env.SITE_URL || 'https://asb.web.tr';
@@ -86,14 +115,14 @@ export class FeedController {
                 image_link: product.images && product.images.length > 0
                     ? product.images[0]
                     : `${siteUrl}/images/placeholder.jpg`,
-                brand: 'Golden Marketplace',
+                brand: storeName,
                 google_product_category: '188'
             }));
 
-            res.json(catalog);
+            return res.json(catalog);
         } catch (error) {
             console.error('Facebook Feed Error:', error);
-            res.status(500).json({ error: 'Failed to generate feed' });
+            return res.status(500).json({ error: 'Failed to generate feed' });
         }
     }
 
