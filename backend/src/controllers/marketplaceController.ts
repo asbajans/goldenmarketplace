@@ -15,7 +15,12 @@ export class MarketplaceController {
       const offset = (page - 1) * limit;
       const search = req.query.search as string;
 
-      const where: any = { isActive: true };
+      const where: any = { 
+        isActive: true,
+        marketplaces: {
+          [Op.contains]: ['Golden Marketplace']
+        }
+      };
       
       if (search) {
         where.title = { [Op.iLike]: `%${search}%` };
