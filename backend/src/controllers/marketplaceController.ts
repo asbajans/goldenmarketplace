@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Product, Store, ProductVariant } from '../models';
-import { Op } from 'sequelize';
+import { Op, Sequelize } from 'sequelize';
 
 export class MarketplaceController {
   
@@ -15,11 +15,13 @@ export class MarketplaceController {
       const offset = (page - 1) * limit;
       const search = req.query.search as string;
 
+      // Cast JSON to text for safe LIKE query across Postgres/SQLite
       const where: any = { 
         isActive: true,
-        marketplaces: {
-          [Op.contains]: ['Golden Marketplace']
-        }
+        marketplaces: Sequelize.where(
+          Sequelize.cast(Sequelize.col('marketplaces'), 'text'),
+          { [Op.like]: '%"Golden Marketplace"%' }
+        )
       };
       
       if (search) {
