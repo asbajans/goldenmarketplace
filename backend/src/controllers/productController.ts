@@ -32,6 +32,8 @@ export class ProductController {
       if (category) where.category = category;
       if (search) {
         where.title = { [Op.substring]: String(search) };
+        // Make search case-insensitive for PostgreSQL
+        where.title = { [Op.iLike]: `%${search}%` };
       }
       // Filter by marketplaces
       if (marketplaces) {

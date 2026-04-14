@@ -208,34 +208,36 @@ const ProductList: React.FC = () => {
                      <h2>Ürünlerim</h2>
                  </Col>
                  <Col span={16} style={{ textAlign: 'right' }}>
-                     <Space size="large" align="center">
-                         {/* Search Input */}
-                         <Input.Search
-                           placeholder="Ürün ara..."
-                           value={searchTerm}
-                           onChange={e => setSearchTerm(e.target.value)}
-                           onPressEnter={() => fetchProducts(searchTerm, selectedMarketplaces)}
-                           style={{ width: 200 }}
-                         />
-                         
-                         {/* Marketplace Filters */}
-                         <Space direction="vertical" style={{ width: 200 }}>
-                           <Checkbox.Group
-                             options={[
-                               { label: 'Kendi Ürünlerim', value: 'own' },
-                               { label: 'B2B Ürünler', value: 'b2b' },
-                               { label: 'Etsy', value: 'etsy' },
-                               { label: 'Trendyol', value: 'trendyol' },
-                               { label: 'Hepsiburada', value: 'hepsiburada' },
-                               { label: 'Amazon', value: 'amazon' }
-                             ]}
-                             value={selectedMarketplaces}
-                             onChange={e => {
-                               setSelectedMarketplaces(e.target.value);
-                               fetchProducts(searchTerm, e.target.value);
-                             }}
-                           />
-                         </Space>
+                     <Space size="large" align="center" style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'flex-end' }}>
+                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '280px' }}>
+                             {/* Search Input */}
+                             <Input.Search
+                               placeholder="Ürün ara..."
+                               value={searchTerm}
+                               onChange={e => setSearchTerm(e.target.value)}
+                               onPressEnter={() => fetchProducts(searchTerm, selectedMarketplaces)}
+                               style={{ width: 220 }}
+                             />
+                             
+                             {/* Marketplace Filters */}
+                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                               <Checkbox.Group
+                                 options={[
+                                   { label: 'Kendi Ürünlerim', value: 'own' },
+                                   { label: 'B2B Ürünler', value: 'b2b' },
+                                   { label: 'Etsy', value: 'etsy' },
+                                   { label: 'Trendyol', value: 'trendyol' },
+                                   { label: 'Hepsiburada', value: 'hepsiburada' },
+                                   { label: 'Amazon', value: 'amazon' }
+                                 ]}
+                                 value={selectedMarketplaces}
+                                 onChange={values => {
+                                   setSelectedMarketplaces(values);
+                                   fetchProducts(searchTerm, values);
+                                 }}
+                               />
+                             </div>
+                         </div>
                          
                          {goldPrice && (
                              <Space size="middle">
