@@ -1,12 +1,14 @@
 import { Request, Response } from 'express';
 import { Product, Store, ProductVariant } from '../models';
-import { Op, Sequelize } from 'sequelize';
+import { Op, Sequelize, WhereOptions } from 'sequelize';
 
-// Reusable golden marketplace filter
-const goldenFilter = Sequelize.where(
-  Sequelize.cast(Sequelize.col('marketplaces'), 'text'),
-  { [Op.iLike]: '%golden%' }
-);
+// Reusable golden marketplace filter as a raw SQL literal condition.
+// Using Op.and with a Sequelize.literal keeps it compatible with WhereOptions.
+const goldenFilter: WhereOptions = {
+  [Op.and]: Sequelize.literal(
+    `CAST("marketplaces" AS text) ILIKE '%golden%'`
+  )
+};
 
 export class MarketplaceController {
   
@@ -23,9 +25,9 @@ export class MarketplaceController {
       const category = req.query.category as string;
       const storeSlug = req.query.storeSlug as string;
 
-      const where: any = { 
+      const where: WhereOptions = {
         isActive: true,
-        marketplaces: goldenFilter
+        ...goldenFilter
       };
       
       if (search) where.title = { [Op.iLike]: `%${search}%` };
@@ -145,7 +147,7 @@ export class MarketplaceController {
         where: {
           storeId: (store as any).id,
           isActive: true,
-          marketplaces: goldenFilter
+          ...goldenFilter
         },
         attributes: ['id', 'title', 'slug', 'category', 'priceTRY', 'priceUSD', 'images', 'createdAt'],
         limit,
@@ -168,12 +170,12 @@ export class MarketplaceController {
    * GET /api/marketplace/categories
    * Returns distinct categories from active golden products.
    */
-  static async getCategories(req: Request, res: Response) {
+  static async getCategories(_req: Request, res: Response) {
     try {
       const results = await Product.findAll({
         where: {
           isActive: true,
-          marketplaces: goldenFilter
+          ...goldenFilter
         },
         attributes: [
           [Sequelize.fn('DISTINCT', Sequelize.col('category')), 'category'],
