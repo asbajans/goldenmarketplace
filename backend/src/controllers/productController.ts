@@ -37,7 +37,12 @@ export class ProductController {
       }
       // Filter by marketplaces - only apply filter if marketplaces array is provided and not empty
       if (marketplaces && Array.isArray(marketplaces) && marketplaces.length > 0) {
-        where.marketplaces = { [Op.overlap]: marketplaces };
+        // Normalize marketplace values for comparison
+        const normalizedMarketplaces = marketplaces.map(m => 
+          m === 'goldenmarketplace' ? 'golden' : m
+        );
+        
+        where.marketplaces = { [Op.overlap]: normalizedMarketplaces };
       }
 
       const offset = (parseInt(page as string) - 1) * parseInt(limit as string);

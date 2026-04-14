@@ -174,10 +174,19 @@ const ProductList: React.FC = () => {
     ];
 
     // Count products by marketplace presence for accurate filtering
+    const goldenMarketplaceProducts = products.filter(p => {
+      // Products with no marketplaces array or empty array are considered Golden Marketplace only
+      if (!p.marketplaces || p.marketplaces.length === 0) return true;
+      
+      // Check if product is in golden marketplace (either 'golden' or 'goldenmarketplace')
+      return p.marketplaces.some(m => ['golden', 'goldenmarketplace'].includes(m.toLowerCase()));
+    });
     const etsyProducts = products.filter(p => p.marketplaces?.includes('etsy'));
     const trendyolProducts = products.filter(p => p.marketplaces?.includes('trendyol'));
-    const hepsiburadaProducts = products.filter(p => p.marketplaces?.includes('hepsiburada'));
     const amazonProducts = products.filter(p => p.marketplaces?.includes('amazon'));
+    const n11Products = products.filter(p => p.marketplaces?.includes('n11'));
+    const hepsiburadaProducts = products.filter(p => p.marketplaces?.includes('hepsiburada'));
+    const pazaramaProducts = products.filter(p => p.marketplaces?.includes('pazarama'));
     
     // Original classification remains for tabs
     const myProducts = products.filter(p => !p.originalProductId && !p.originalStoreName);
@@ -232,10 +241,13 @@ const ProductList: React.FC = () => {
                               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                 <Checkbox.Group
                                   options={[
+                                    { label: 'Golden Marketplace', value: 'golden' },
                                     { label: 'Etsy', value: 'etsy' },
                                     { label: 'Trendyol', value: 'trendyol' },
+                                    { label: 'Amazon', value: 'amazon' },
+                                    { label: 'N11', value: 'n11' },
                                     { label: 'Hepsiburada', value: 'hepsiburada' },
-                                    { label: 'Amazon', value: 'amazon' }
+                                    { label: 'Pazarama', value: 'pazarama' }
                                   ]}
                                   value={selectedMarketplaces}
                                   onChange={values => {
