@@ -24,6 +24,9 @@ export class MarketplaceController {
       const search = req.query.search as string;
       const category = req.query.category as string;
       const storeSlug = req.query.storeSlug as string;
+      const sort = req.query.sort as string;
+      const minPrice = req.query.minPrice ? parseFloat(req.query.minPrice as string) : null;
+      const maxPrice = req.query.maxPrice ? parseFloat(req.query.maxPrice as string) : null;
 
       const where: WhereOptions = {
         isActive: true,
@@ -32,6 +35,16 @@ export class MarketplaceController {
       
       if (search) where.title = { [Op.iLike]: `%${search}%` };
       if (category) where.category = { [Op.iLike]: `%${category}%` };
+      if (minPrice !== null || maxPrice !== null) {
+        where.priceTRY = {};
+        if (minPrice !== null) (where.priceTRY as any)[Op.gte] = minPrice;
+        if (maxPrice !== null) (where.priceTRY as any)[Op.lte] = maxPrice;
+      }
+
+      let order: any[] = [['createdAt', 'DESC']];
+      if (sort === 'price_asc') order = [['priceTRY', 'ASC']];
+      else if (sort === 'price_desc') order = [['priceTRY', 'DESC']];
+      else if (sort === 'popular') order = [['createdAt', 'DESC']];
 
       const includeStore: any = {
         model: Store,
@@ -49,7 +62,7 @@ export class MarketplaceController {
         include: [includeStore],
         limit,
         offset,
-        order: [['createdAt', 'DESC']]
+        order
       });
 
       return res.json({
