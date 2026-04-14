@@ -23,8 +23,12 @@ export interface Product {
     isActive: boolean;
 }
 
-export const getProducts = async () => {
-    const response = await client.get('/products');
+export const getProducts = async (search?: string, marketplaces?: string[]) => {
+    const params: any = {};
+    if (search) params.search = search;
+    if (marketplaces && marketplaces.length > 0) params.marketplaces = marketplaces.join(',');
+    
+    const response = await client.get('/products', { params });
     return response.data.data;
 };
 

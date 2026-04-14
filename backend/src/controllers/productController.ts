@@ -16,7 +16,7 @@ export class ProductController {
    */
   static async getProducts(req: Request, res: Response) {
     try {
-      const { storeId, category, page = 1, limit = 20, search } = req.query;
+      const { storeId, category, page = 1, limit = 20, search, marketplaces } = req.query;
 
       const where: any = { isActive: true };
 
@@ -32,6 +32,11 @@ export class ProductController {
       if (category) where.category = category;
       if (search) {
         where.title = { [Op.substring]: String(search) };
+      }
+      // Filter by marketplaces
+      if (marketplaces) {
+        const marketplaceArray = Array.isArray(marketplaces) ? marketplaces : [marketplaces];
+        where.marketplaces = { [Op.overlap]: marketplaceArray };
       }
 
       const offset = (parseInt(page as string) - 1) * parseInt(limit as string);

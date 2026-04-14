@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Space, message, Modal, Tabs, Tag, Switch, Statistic, Card, Row, Col, Typography } from 'antd';
-import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined, DollarOutlined, GoldOutlined } from '@ant-design/icons';
+import { Table, Button, Space, message, Modal, Tabs, Tag, Switch, Statistic, Card, Row, Col, Typography, Input, Checkbox } from 'antd';
+import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined, DollarOutlined, GoldOutlined, SearchOutlined } from '@ant-design/icons';
 import { getProducts, deleteProduct, getAutoSyncStatus, setAutoSyncStatus, triggerManualSync, Product } from '../api/product';
 import client from '../api/client';
 import AddProduct from './AddProduct';
@@ -16,12 +16,14 @@ const ProductList: React.FC = () => {
     const [goldPrice, setGoldPrice] = useState<any>(null);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedMarketplaces, setSelectedMarketplaces] = useState<string[]>([]);
 
     useEffect(() => {
-        fetchProducts();
+        fetchProducts(searchTerm, selectedMarketplaces);
         fetchGoldPrice();
         fetchSyncStatus();
-    }, []);
+    }, [searchTerm, selectedMarketplaces]);
 
     const fetchGoldPrice = async () => {
         try {
@@ -64,10 +66,10 @@ const ProductList: React.FC = () => {
         }
     };
 
-    const fetchProducts = async () => {
+    const fetchProducts = async (search?: string, marketplaces?: string[]) => {
         setLoading(true);
         try {
-            const data = await getProducts();
+            const data = await getProducts(search, marketplaces);
             // data might be array or { data: [] } depending on backend response format
             // In productController: res.status(200).json({ data: rows, pagination: ... })
             // In getProducts: return response.data.data
@@ -200,47 +202,75 @@ const ProductList: React.FC = () => {
 
     return (
         <div>
-            {/* Header Area with Gold Rates and Sync Settings */}
-            <Row gutter={[16, 16]} style={{ marginBottom: 20 }} align="middle">
-                <Col span={8}>
-                    <h2>Ürünlerim</h2>
-                </Col>
-                <Col span={16} style={{ textAlign: 'right' }}>
-                    <Space size="large" align="center">
-                        {goldPrice && (
-                            <Space size="middle">
-                                <Tag color="gold" style={{ padding: '4px 10px', fontSize: 13, border: '1px solid #d4a017', background: '#fffbe6' }}>
-                                    <GoldOutlined style={{ marginRight: 6 }} />
-                                    24K Gram Has: <strong>{Number(goldPrice.pricePerGramTRY).toLocaleString('tr-TR')} ₺</strong>
-                                </Tag>
-                                <Tag color="blue" style={{ padding: '4px 10px', fontSize: 13, border: '1px solid #91d5ff', background: '#e6f7ff' }}>
-                                    <DollarOutlined style={{ marginRight: 6 }} />
-                                    USD/TRY: <strong>{Number(goldPrice.usdTryRate).toLocaleString('tr-TR')} ₺</strong>
-                                </Tag>
-                            </Space>
-                        )}
-                        
-                        <div style={{ display: 'flex', alignItems: 'center', background: '#f5f5f5', padding: '6px 12px', borderRadius: 6, border: '1px solid #d9d9d9' }}>
-                            <Text style={{ marginRight: 8, fontSize: 12 }}>Oto-Fiyat Senkronu:</Text>
-                            <Switch 
-                                checked={autoSync} 
-                                onChange={handleSyncStatusChange} 
-                                checkedChildren="Açık" 
-                                unCheckedChildren="Kapalı"
-                                size="small"
-                                style={{ background: autoSync ? '#52c41a' : undefined }}
-                            />
-                        </div>
+             {/* Header Area with Gold Rates, Sync Settings, Search and Filters */}
+             <Row gutter={[16, 16]} style={{ marginBottom: 20 }} align="middle">
+                 <Col span={8}>
+                     <h2>Ürünlerim</h2>
+                 </Col>
+                 <Col span={16} style={{ textAlign: 'right' }}>
+                     <Space size="large" align="center">
+                         {/* Search Input */}
+                         <Input.Search
+                           placeholder="Ürün ara..."
+                           value={searchTerm}
+                           onChange={e => setSearchTerm(e.target.value)}
+                           onPressEnter={() => fetchProducts(searchTerm, selectedMarketplaces)}
+                           style={{ width: 200 }}
+                         />
+                         
+                         {/* Marketplace Filters */}
+                         <Space direction="vertical" style={{ width: 200 }}>
+                           <Checkbox.Group
+                             options={[
+                               { label: 'Kendi Ürünlerim', value: 'own' },
+                               { label: 'B2B Ürünler', value: 'b2b' },
+                               { label: 'Etsy', value: 'etsy' },
+                               { label: 'Trendyol', value: 'trendyol' },
+                               { label: 'Hepsiburada', value: 'hepsiburada' },
+                               { label: 'Amazon', value: 'amazon' }
+                             ]}
+                             value={selectedMarketplaces}
+                             onChange={e => {
+                               setSelectedMarketplaces(e.target.value);
+                               fetchProducts(searchTerm, e.target.value);
+                             }}
+                           />
+                         </Space>
+                         
+                         {goldPrice && (
+                             <Space size="middle">
+                                 <Tag color="gold" style={{ padding: '4px 10px', fontSize: 13, border: '1px solid #d4a017', background: '#fffbe6' }}>
+                                     <GoldOutlined style={{ marginRight: 6 }} />
+                                     24K Gram Has: <strong>{Number(goldPrice.pricePerGramTRY).toLocaleString('tr-TR')} ₺</strong>
+                                 </Tag>
+                                 <Tag color="blue" style={{ padding: '4px 10px', fontSize: 13, border: '1px solid #91d5ff', background: '#e6f7ff' }}>
+                                     <DollarOutlined style={{ marginRight: 6 }} />
+                                     USD/TRY: <strong>{Number(goldPrice.usdTryRate).toLocaleString('tr-TR')} ₺</strong>
+                                 </Tag>
+                             </Space>
+                         )}
+                         
+                         <div style={{ display: 'flex', alignItems: 'center', background: '#f5f5f5', padding: '6px 12px', borderRadius: 6, border: '1px solid #d9d9d9' }}>
+                             <Text style={{ marginRight: 8, fontSize: 12 }}>Oto-Fiyat Senkronu:</Text>
+                             <Switch 
+                                 checked={autoSync} 
+                                 onChange={handleSyncStatusChange} 
+                                 checkedChildren="Açık" 
+                                 unCheckedChildren="Kapalı"
+                                 size="small"
+                                 style={{ background: autoSync ? '#52c41a' : undefined }}
+                             />
+                         </div>
 
-                        <Button type="default" icon={<SyncOutlined spin={syncing} />} onClick={handleManualSync} loading={syncing}>
-                            Fiyatları Senkronize Et
-                        </Button>
-                        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-                            Yeni Ürün Ekle
-                        </Button>
-                    </Space>
-                </Col>
-            </Row>
+                         <Button type="default" icon={<SyncOutlined spin={syncing} />} onClick={handleManualSync} loading={syncing}>
+                             Fiyatları Senkronize Et
+                         </Button>
+                         <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+                             Yeni Ürün Ekle
+                         </Button>
+                     </Space>
+                 </Col>
+             </Row>
 
             <Tabs defaultActiveKey="my-products" items={tabItems} />
 
