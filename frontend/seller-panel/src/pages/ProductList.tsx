@@ -69,7 +69,9 @@ const ProductList: React.FC = () => {
     const fetchProducts = async (search?: string, marketplaces?: string[]) => {
         setLoading(true);
         try {
-            const data = await getProducts(search, marketplaces);
+            // Only pass marketplaces if at least one is selected
+            const marketplaceParams = marketplaces && marketplaces.length > 0 ? marketplaces : undefined;
+            const data = await getProducts(search, marketplaceParams);
             // data might be array or { data: [] } depending on backend response format
             // In productController: res.status(200).json({ data: rows, pagination: ... })
             // In getProducts: return response.data.data
@@ -171,6 +173,13 @@ const ProductList: React.FC = () => {
         }
     ];
 
+    // Count products by marketplace presence for accurate filtering
+    const etsyProducts = products.filter(p => p.marketplaces?.includes('etsy'));
+    const trendyolProducts = products.filter(p => p.marketplaces?.includes('trendyol'));
+    const hepsiburadaProducts = products.filter(p => p.marketplaces?.includes('hepsiburada'));
+    const amazonProducts = products.filter(p => p.marketplaces?.includes('amazon'));
+    
+    // Original classification remains for tabs
     const myProducts = products.filter(p => !p.originalProductId && !p.originalStoreName);
     const b2bProducts = products.filter(p => p.originalProductId || p.originalStoreName);
 
@@ -203,41 +212,39 @@ const ProductList: React.FC = () => {
     return (
         <div>
              {/* Header Area with Gold Rates, Sync Settings, Search and Filters */}
-             <Row gutter={[16, 16]} style={{ marginBottom: 20 }} align="middle">
-                 <Col span={8}>
-                     <h2>Ürünlerim</h2>
-                 </Col>
-                 <Col span={16} style={{ textAlign: 'right' }}>
-                     <Space size="large" align="center" style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'flex-end' }}>
-                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '280px' }}>
-                             {/* Search Input */}
-                             <Input.Search
-                               placeholder="Ürün ara..."
-                               value={searchTerm}
-                               onChange={e => setSearchTerm(e.target.value)}
-                               onPressEnter={() => fetchProducts(searchTerm, selectedMarketplaces)}
-                               style={{ width: 220 }}
-                             />
-                             
-                             {/* Marketplace Filters */}
-                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                               <Checkbox.Group
-                                 options={[
-                                   { label: 'Kendi Ürünlerim', value: 'own' },
-                                   { label: 'B2B Ürünler', value: 'b2b' },
-                                   { label: 'Etsy', value: 'etsy' },
-                                   { label: 'Trendyol', value: 'trendyol' },
-                                   { label: 'Hepsiburada', value: 'hepsiburada' },
-                                   { label: 'Amazon', value: 'amazon' }
-                                 ]}
-                                 value={selectedMarketplaces}
-                                 onChange={values => {
-                                   setSelectedMarketplaces(values);
-                                   fetchProducts(searchTerm, values);
-                                 }}
-                               />
-                             </div>
-                         </div>
+              <Row gutter={[16, 16]} style={{ marginBottom: 20 }} align="middle">
+                  <Col span={8}>
+                      <h2>Tüm Ürünler</h2>
+                  </Col>
+                  <Col span={16} style={{ textAlign: 'right' }}>
+                      <Space size="large" align="center" style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'flex-end' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '280px' }}>
+                              {/* Search Input */}
+                              <Input.Search
+                                placeholder="Ürün ara..."
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                onPressEnter={() => fetchProducts(searchTerm, selectedMarketplaces)}
+                                style={{ width: 220 }}
+                              />
+                              
+                              {/* Marketplace Filters */}
+                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                <Checkbox.Group
+                                  options={[
+                                    { label: 'Etsy', value: 'etsy' },
+                                    { label: 'Trendyol', value: 'trendyol' },
+                                    { label: 'Hepsiburada', value: 'hepsiburada' },
+                                    { label: 'Amazon', value: 'amazon' }
+                                  ]}
+                                  value={selectedMarketplaces}
+                                  onChange={values => {
+                                    setSelectedMarketplaces(values);
+                                    fetchProducts(searchTerm, values);
+                                  }}
+                                />
+                              </div>
+                          </div>
                          
                          {goldPrice && (
                              <Space size="middle">

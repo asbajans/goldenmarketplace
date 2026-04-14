@@ -35,10 +35,9 @@ export class ProductController {
         // Make search case-insensitive for PostgreSQL
         where.title = { [Op.iLike]: `%${search}%` };
       }
-      // Filter by marketplaces
-      if (marketplaces) {
-        const marketplaceArray = Array.isArray(marketplaces) ? marketplaces : [marketplaces];
-        where.marketplaces = { [Op.overlap]: marketplaceArray };
+      // Filter by marketplaces - only apply filter if marketplaces array is provided and not empty
+      if (marketplaces && Array.isArray(marketplaces) && marketplaces.length > 0) {
+        where.marketplaces = { [Op.overlap]: marketplaces };
       }
 
       const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
