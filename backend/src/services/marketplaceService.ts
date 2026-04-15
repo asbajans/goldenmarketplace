@@ -4,22 +4,17 @@
  * Supports: Etsy, Trendyol, Hepsiburada, Pazarama, N11, Amazon
  */
 
-import axios, { AxiosInstance } from 'axios';
-import * as qs from 'qs';
 import MarketplaceIntegration from '../models/MarketplaceIntegration';
 import Product from '../models/Product';
 import ProductVariant from '../models/ProductVariant';
 import ProductMarketplaceListing from '../models/ProductMarketplaceListing';
 import Store from '../models/Store';
-import IntegrationLog from '../models/IntegrationLog';
-import { Op } from 'sequelize';
 
 // Import existing clients
 import TrendyolClient from '../integrations/trendyol/trendyolClient';
 import HepsiburadaClient from '../integrations/hepsiburada/hepsiburadaClient';
 import PazaramaClient from '../integrations/pazarama/pazaramaClient';
 import N11Client from '../integrations/n11/n11Client';
-import EtsyClient from '../integrations/etsy/etsyClient';
 
 export interface MarketplaceProductInput {
     title: string;
@@ -160,7 +155,7 @@ class MarketplaceIntegrationService {
                 }
             });
 
-            if (existingListing) {
+            if (existingListing && existingListing.externalId) {
                 // Update existing product
                 return await this.updateProductOnMarketplace(product, marketplace, integration, existingListing.externalId);
             } else {
@@ -305,13 +300,17 @@ class MarketplaceIntegrationService {
      */
     async getTrendyolCategories(integration: MarketplaceIntegration): Promise<MarketplaceCategory[]> {
         try {
-            const client = new TrendyolClient(
-                integration.apiKey!,
-                integration.apiSecret!,
-                integration.shopId!,
+            if (!integration.apiKey || !integration.apiSecret || !integration.shopId) {
+                return [];
+            }
+            new TrendyolClient(
+                integration.apiKey,
+                integration.apiSecret,
+                integration.shopId,
                 integration.userId
             );
-            // Implementation would call Trendyol category API
+            // TODO: Implement Trendyol category API call
+            console.log('[Trendyol] Get categories - implementation pending');
             return [];
         } catch (error: any) {
             console.error('[Trendyol] Get categories error:', error.message);
@@ -482,18 +481,26 @@ class MarketplaceIntegrationService {
 
     // ==================== ETSY ====================
 
+    /**
+     * Create product on Etsy - placeholder for future implementation
+     */
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     private async createEtsyProduct(
-        product: Product,
-        integration: MarketplaceIntegration
+        _product: Product,
+        _integration: MarketplaceIntegration
     ): Promise<{ success: boolean; externalId?: string; error?: string }> {
         // Etsy requires OAuth and more complex flow
         // This would typically be handled by the existing EtsyClient
         return { success: false, error: 'Etsy ürün oluşturma ayrıca yapılandırılmalı' };
     }
 
+    /**
+     * Update product on Etsy - handled by marketplacePriceSyncService
+     */
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     private async updateEtsyProduct(
-        product: Product,
-        integration: MarketplaceIntegration,
+        _product: Product,
+        _integration: MarketplaceIntegration,
         externalId: string
     ): Promise<{ success: boolean; externalId?: string; error?: string }> {
         // Handled by marketplacePriceSyncService for Etsy
@@ -580,9 +587,10 @@ class MarketplaceIntegrationService {
     /**
      * Handle webhook from marketplace
      */
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     async handleWebhook(
         platform: string,
-        payload: any
+        _payload: any
     ): Promise<{ processed: boolean; message?: string }> {
         try {
             switch (platform) {
