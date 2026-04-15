@@ -4,7 +4,7 @@
  */
 
 import { Request, Response } from 'express';
-import { Op } from 'sequelize';
+import { Op, Sequelize } from 'sequelize';
 import { Product, ProductVariant, Store, User, SubscriptionPlan } from '../models';
 import goldPriceService from '../services/goldPriceService';
 import { s3Service } from '../services/s3Service';
@@ -31,8 +31,6 @@ export class ProductController {
       }
       if (category) where.category = category;
       if (search) {
-        where.title = { [Op.substring]: String(search) };
-        // Make search case-insensitive for PostgreSQL
         where.title = { [Op.iLike]: `%${search}%` };
       }
       // Filter by marketplaces - only apply filter if marketplaces array is provided and not empty
@@ -46,13 +44,18 @@ export class ProductController {
         }
         
         if (marketplaceArray.length > 0) {
-          // Normalize marketplace values for comparison
+          // Normalize marketplace values - convert to lowercase
           const normalizedMarketplaces = marketplaceArray.map(m => 
             m === 'goldenmarketplace' ? 'golden' : m.toLowerCase()
           );
           
-          // Use Op.overlap for PostgreSQL array overlap operator
-          where.marketplaces = { [Op.overlap]: normalizedMarketplaces };
+          // Use JSON string matching approach - check JSON text representation contains each marketplace
+          // Build conditions for each marketplace
+          const conditions = normalizedMarketplaces.map((m: string) => 
+            `LOWER("marketplaces"::text) LIKE '%${m}%'`
+          ).join(' OR ');
+          
+          where[Op.and] = Sequelize.literal(`(${conditions})`);
         }
       }
 
