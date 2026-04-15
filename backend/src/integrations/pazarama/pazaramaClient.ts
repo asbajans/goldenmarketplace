@@ -27,6 +27,33 @@ export interface PazaramaStockUpdateItem {
     stockCount: number;
 }
 
+export interface PazaramaCategory {
+    id: string;
+    name: string;
+    parentId?: string;
+    hasChildren: boolean;
+}
+
+export interface PazaramaBrand {
+    id: string;
+    name: string;
+}
+
+export interface PazaramaProductCreateInput {
+    name: string;
+    description: string;
+    brandId: string;
+    categoryId: string;
+    stockCode: string;
+    barcode?: string;
+    stockCount: number;
+    salePrice: number;
+    listPrice: number;
+    vatRate: number;
+    images: string[];
+    attributes?: Record<string, string>;
+}
+
 export class PazaramaClient {
     private apiBaseUrl = 'https://isortagimapi.pazarama.com';
     private authUrl = 'https://isortagimgiris.pazarama.com/connect/token';
@@ -130,6 +157,131 @@ export class PazaramaClient {
             const errMsg = error.response?.data?.message || error.message;
             console.error('[Pazarama] updateStock error:', errMsg);
             throw new Error(`Pazarama stok güncelleme hatası: ${errMsg}`);
+        }
+    }
+
+    /**
+     * Get category tree
+     */
+    async getCategories(): Promise<PazaramaCategory[]> {
+        try {
+            const response = await this.client.get('/api/Product/GetCategoryTree');
+            return response.data?.data || [];
+        } catch (error: any) {
+            console.error('[Pazarama] getCategories error:', error.response?.data || error.message);
+            throw new Error(`Pazarama kategori alma hatası: ${error.message}`);
+        }
+    }
+
+    /**
+     * Get brand list
+     */
+    async getBrands(page = 1, size = 100): Promise<PazaramaBrand[]> {
+        try {
+            const response = await this.client.get('/api/Product/GetBrandList', {
+                params: { page, size }
+            });
+            return response.data?.data || [];
+        } catch (error: any) {
+            console.error('[Pazarama] getBrands error:', error.response?.data || error.message);
+            throw new Error(`Pazarama marka alma hatası: ${error.message}`);
+        }
+    }
+
+    /**
+     * Get category attributes
+     */
+    async getCategoryAttributes(categoryId: string): Promise<any[]> {
+        try {
+            const response = await this.client.get('/api/Product/GetCategoryAttributes', {
+                params: { categoryId }
+            });
+            return response.data?.data || [];
+        } catch (error: any) {
+            console.error('[Pazarama] getCategoryAttributes error:', error.response?.data || error.message);
+            throw new Error(`Pazarama kategori özellikleri alma hatası: ${error.message}`);
+        }
+    }
+
+    /**
+     * Create product on Pazarama
+     */
+    async createProduct(input: PazaramaProductCreateInput): Promise<string> {
+        try {
+            const productData = {
+                products: [{
+                    name: input.name,
+                    description: input.description,
+                    brandId: input.brandId,
+                    categoryId: input.categoryId,
+                    stockCode: input.stockCode,
+                    barcode: input.barcode,
+                    stockCount: input.stockCount,
+                    salePrice: input.salePrice,
+                    listPrice: input.listPrice,
+                    vatRate: input.vatRate,
+                    images: input.images.slice(0, 5).map(url => ({ url })),
+                    attributes: Object.entries(input.attributes || {}).map(([key, value]) => ({
+                        attributeName: key,
+                        attributeValue: value
+                    }))
+                }]
+            };
+
+            const response = await this.client.post('/api/Product/InsertProduct-v2', productData);
+            const batchId = response.data?.batchId || response.data?.batchRequestId || '';
+            console.log(`[Pazarama] Product created. Batch: ${batchId}`);
+            return batchId;
+        } catch (error: any) {
+            const errMsg = error.response?.data?.message || error.message;
+            console.error('[Pazarama] createProduct error:', errMsg);
+            throw new Error(`Pazarama ürün oluşturma hatası: ${errMsg}`);
+        }
+    }
+
+    /**
+     * Update product
+     */
+    async updateProduct(input: Partial<PazaramaProductCreateInput> & { stockCode: string }): Promise<void> {
+        try {
+            await this.client.post('/api/Product/UpdateProduct-v2', {
+                products: [input]
+            });
+            console.log(`[Pazarama] Product updated: ${input.stockCode}`);
+        } catch (error: any) {
+            const errMsg = error.response?.data?.message || error.message;
+            console.error('[Pazarama] updateProduct error:', errMsg);
+            throw new Error(`Pazarama ürün güncelleme hatası: ${errMsg}`);
+        }
+    }
+
+    /**
+     * Get product list
+     */
+    async getProducts(page = 1, size = 50): Promise<any[]> {
+        try {
+            const response = await this.client.get('/api/Product/GetProductList', {
+                params: { page, size }
+            });
+            return response.data?.data || [];
+        } catch (error: any) {
+            console.error('[Pazarama] getProducts error:', error.message);
+            return [];
+        }
+    }
+
+    /**
+     * Delete product
+     */
+    async deleteProduct(stockCode: string): Promise<void> {
+        try {
+            await this.client.post('/api/Product/DeleteProduct', {
+                stockCodes: [stockCode]
+            });
+            console.log(`[Pazarama] Product deleted: ${stockCode}`);
+        } catch (error: any) {
+            console.error('[Pazarama] deleteProduct error:', error.message);
+            throw new Error(`Pazarama ürün silme hatası: ${error.message}`);
         }
     }
 }
