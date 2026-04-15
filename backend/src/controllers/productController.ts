@@ -16,7 +16,7 @@ export class ProductController {
    */
   static async getProducts(req: Request, res: Response) {
     try {
-      const { storeId, category, page = 1, limit = 20, search, marketplaces } = req.query;
+      const { storeId, category, page = 1, limit = 25, search, marketplaces } = req.query;
 
       const where: any = { isActive: true };
 
@@ -36,13 +36,24 @@ export class ProductController {
         where.title = { [Op.iLike]: `%${search}%` };
       }
       // Filter by marketplaces - only apply filter if marketplaces array is provided and not empty
-      if (marketplaces && Array.isArray(marketplaces) && marketplaces.length > 0) {
-        // Normalize marketplace values for comparison
-        const normalizedMarketplaces = marketplaces.map(m => 
-          m === 'goldenmarketplace' ? 'golden' : m
-        );
+      if (marketplaces) {
+        // Parse marketplace parameter - could be array or comma-separated string
+        let marketplaceArray: string[] = [];
+        if (Array.isArray(marketplaces)) {
+          marketplaceArray = marketplaces as string[];
+        } else if (typeof marketplaces === 'string') {
+          marketplaceArray = (marketplaces as string).split(',').map(m => m.trim());
+        }
         
-        where.marketplaces = { [Op.overlap]: normalizedMarketplaces };
+        if (marketplaceArray.length > 0) {
+          // Normalize marketplace values for comparison
+          const normalizedMarketplaces = marketplaceArray.map(m => 
+            m === 'goldenmarketplace' ? 'golden' : m.toLowerCase()
+          );
+          
+          // Use Op.overlap for PostgreSQL array overlap operator
+          where.marketplaces = { [Op.overlap]: normalizedMarketplaces };
+        }
       }
 
       const offset = (parseInt(page as string) - 1) * parseInt(limit as string);

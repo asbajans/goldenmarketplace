@@ -24,7 +24,7 @@ export interface Product {
 }
 
 export const getProducts = async (search?: string, marketplaces?: string[]) => {
-    const params: any = {};
+    const params: any = { limit: 100 };
     if (search) params.search = search;
     if (marketplaces && marketplaces.length > 0) params.marketplaces = marketplaces.join(',');
     
