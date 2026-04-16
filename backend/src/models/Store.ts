@@ -105,36 +105,43 @@ Store.init(
     bankName: {
       type: DataTypes.STRING,
       allowNull: true,
+      field: 'bankname',
       comment: 'Bank account name for bank transfers'
     },
     iban: {
       type: DataTypes.STRING,
       allowNull: true,
+      field: 'iban',
       comment: 'IBAN for bank transfers'
     },
     accountNumber: {
       type: DataTypes.STRING,
       allowNull: true,
+      field: 'accountnumber',
       comment: 'Bank account number'
     },
     accountHolder: {
       type: DataTypes.STRING,
       allowNull: true,
+      field: 'accountholder',
       comment: 'Account holder name'
     },
     branchCode: {
       type: DataTypes.STRING,
       allowNull: true,
+      field: 'branchcode',
       comment: 'Bank branch code'
     },
     cryptoWallet: {
       type: DataTypes.STRING,
       allowNull: true,
+      field: 'cryptowallet',
       comment: 'USDT TRC20 wallet address'
     },
     paymentMethods: {
       type: DataTypes.JSONB,
       allowNull: true,
+      field: 'paymentmethods',
       defaultValue: { stripe: true, bankTransfer: false, crypto: false },
       comment: 'Enabled payment methods'
     },
