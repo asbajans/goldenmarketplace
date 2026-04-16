@@ -33,6 +33,13 @@ class Store extends Model<StoreAttributes> implements StoreAttributes {
   public rating!: number;
   public totalProducts!: number;
   public autoPriceSync!: boolean;
+  public bankName?: string;
+  public iban?: string;
+  public accountNumber?: string;
+  public accountHolder?: string;
+  public branchCode?: string;
+  public cryptoWallet?: string;
+  public paymentMethods?: { stripe: boolean; bankTransfer: boolean; crypto: boolean };
   public isActive!: boolean;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -87,6 +94,42 @@ Store.init(
       type: DataTypes.BOOLEAN,
       defaultValue: true,
       comment: 'If true, product prices sync automatically with global gold price'
+    },
+    bankName: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: 'Bank account name for bank transfers'
+    },
+    iban: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: 'IBAN for bank transfers'
+    },
+    accountNumber: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: 'Bank account number'
+    },
+    accountHolder: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: 'Account holder name'
+    },
+    branchCode: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: 'Bank branch code'
+    },
+    cryptoWallet: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: 'USDT TRC20 wallet address'
+    },
+    paymentMethods: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: { stripe: true, bankTransfer: false, crypto: false },
+      comment: 'Enabled payment methods'
     },
     isActive: {
       type: DataTypes.BOOLEAN,

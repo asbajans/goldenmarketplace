@@ -185,6 +185,145 @@ export class AuthController {
   }
 
   /**
+   * Fast signup - minimal registration for customers
+   */
+  static async fastSignup(req: Request, res: Response) {
+    try {
+      const { email, firstName, googleId } = req.body;
+
+      if (!email) {
+        return res.status(400).json({
+          error: { message: 'Email is required', status: 400 }
+        });
+      }
+
+      let user = await User.findOne({ where: { email } });
+      
+      if (user) {
+        const { accessToken, refreshToken } = JWTService.generateTokenPair({
+          id: user.id,
+          email: user.email,
+          userType: user.userType
+        });
+        return res.status(200).json({
+          accessToken,
+          refreshToken,
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            userType: user.userType
+          }
+        });
+      }
+
+      const hashedPassword = await PasswordService.hashPassword(Math.random().toString(36).slice(2) + Date.now().toString());
+      
+      user = await User.create({
+        email,
+        password: hashedPassword,
+        firstName: firstName || email.split('@')[0],
+        userType: 'customer',
+        isActive: true
+      });
+
+      const { accessToken, refreshToken } = JWTService.generateTokenPair({
+        id: user.id,
+        email: user.email,
+        userType: user.userType
+      });
+
+      return res.status(201).json({
+        accessToken,
+        refreshToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          userType: user.userType
+        }
+      });
+    } catch (error) {
+      console.error('Fast signup error:', error);
+      return res.status(500).json({
+        error: { message: 'Internal server error', status: 500 }
+      });
+    }
+  }
+
+  /**
+   * Google OAuth signup/login
+   */
+  static async googleAuth(req: Request, res: Response) {
+    try {
+      const { googleToken, email, firstName, lastName, picture } = req.body;
+
+      if (!googleToken && !email) {
+        return res.status(400).json({
+          error: { message: 'Google token or email is required', status: 400 }
+        });
+      }
+
+      let user = await User.findOne({ where: { email } });
+      
+      if (user) {
+        const { accessToken, refreshToken } = JWTService.generateTokenPair({
+          id: user.id,
+          email: user.email,
+          userType: user.userType
+        });
+        return res.status(200).json({
+          accessToken,
+          refreshToken,
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            userType: user.userType
+          }
+        });
+      }
+
+      const hashedPassword = await PasswordService.hashPassword(Math.random().toString(36).slice(2) + Date.now().toString());
+      
+      user = await User.create({
+        email,
+        password: hashedPassword,
+        firstName: firstName || email.split('@')[0],
+        lastName: lastName,
+        userType: 'customer',
+        isActive: true
+      });
+
+      const { accessToken, refreshToken } = JWTService.generateTokenPair({
+        id: user.id,
+        email: user.email,
+        userType: user.userType
+      });
+
+      return res.status(201).json({
+        accessToken,
+        refreshToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          userType: user.userType
+        }
+      });
+    } catch (error) {
+      console.error('Google auth error:', error);
+      return res.status(500).json({
+        error: { message: 'Internal server error', status: 500 }
+      });
+    }
+  }
+
+  /**
    * Get current user
    */
   static async getCurrentUser(req: Request, res: Response) {

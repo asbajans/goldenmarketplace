@@ -137,8 +137,6 @@ export class StripeService {
             url: `${successUrl}?session_id=cs_mock_${Date.now()}`
           };
         } else if (!isStripePriceId) {
-          // If secret key is present but priceId is invalid, we might want to throw 
-          // but for "Gold" demo purposes, let's mock it if it's not a Stripe ID
           console.log('Mocking Stripe Checkout Session (Invalid Price ID format)');
           return {
             id: 'cs_mock_' + Math.random().toString(36).substring(7),
@@ -163,7 +161,6 @@ export class StripeService {
 
       return session;
     } catch (error: any) {
-      // Robust fallback: If API key is invalid (AuthenticationError), fallback to mock
       if (error.type === 'StripeAuthenticationError') {
         console.warn('Stripe API Key is invalid. Falling back to mock session for development/demo.');
         return {
@@ -173,6 +170,117 @@ export class StripeService {
       }
 
       console.error('Error creating checkout session:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a Payment Link for a single product (one-time payment)
+   */
+  async createProductPaymentLink(product: {
+    name: string;
+    description?: string;
+    price: number;
+    currency?: string;
+    images?: string[];
+  }, successUrl: string, cancelUrl: string) {
+    try {
+      if (!process.env.STRIPE_SECRET_KEY) {
+        console.log('Mocking Stripe Payment Link (No Secret Key)');
+        return {
+          id: 'plink_mock_' + Math.random().toString(36).substring(7),
+          url: `${successUrl}?payment_link=plink_mock_${Date.now()}`
+        };
+      }
+
+      const price = await stripe.prices.create({
+        currency: product.currency || 'try',
+        unit_amount: Math.round(product.price * 100),
+        product_data: {
+          name: product.name,
+          description: product.description,
+          images: product.images?.slice(0, 1) || []
+        }
+      });
+
+      const paymentLink = await stripe.paymentLinks.create({
+        line_items: [{ price: price.id, quantity: 1 }],
+        after_completion: {
+          type: 'redirect',
+          redirect: { url: successUrl }
+        },
+        cancel_url: cancelUrl
+      });
+
+      return paymentLink;
+    } catch (error: any) {
+      if (error.type === 'StripeAuthenticationError') {
+        console.warn('Stripe API Key is invalid. Falling back to mock payment link.');
+        return {
+          id: 'plink_mock_' + Math.random().toString(36).substring(7),
+          url: `${successUrl}?payment_link=plink_mock_${Date.now()}`
+        };
+      }
+      console.error('Error creating payment link:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a direct checkout session for cart items
+   */
+  async createDirectCheckout(items: Array<{
+    name: string;
+    description?: string;
+    price: number;
+    currency?: string;
+    quantity?: number;
+    images?: string[];
+  }>, successUrl: string, cancelUrl: string, customerId?: string) {
+    try {
+      if (!process.env.STRIPE_SECRET_KEY) {
+        console.log('Mocking Stripe Direct Checkout (No Secret Key)');
+        return {
+          id: 'cs_direct_mock_' + Math.random().toString(36).substring(7),
+          url: `${successUrl}?session_id=cs_direct_mock_${Date.now()}`
+        };
+      }
+
+      const lineItems = await Promise.all(items.map(async (item) => {
+        const price = await stripe.prices.create({
+          currency: item.currency || 'try',
+          unit_amount: Math.round(item.price * 100),
+          product_data: {
+            name: item.name,
+            description: item.description,
+            images: item.images?.slice(0, 1) || []
+          }
+        });
+        return {
+          price: price.id,
+          quantity: item.quantity || 1
+        };
+      }));
+
+      const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        payment_method_types: ['card'],
+        customer: customerId,
+        line_items: lineItems,
+        success_url: successUrl + '?session_id={CHECKOUT_SESSION_ID}',
+        cancel_url: cancelUrl
+      });
+
+      return session;
+    } catch (error: any) {
+      if (error.type === 'StripeAuthenticationError') {
+        console.warn('Stripe API Key is invalid. Falling back to mock checkout.');
+        return {
+          id: 'cs_direct_mock_' + Math.random().toString(36).substring(7),
+          url: `${successUrl}?session_id=cs_direct_mock_${Date.now()}`
+        };
+      }
+      console.error('Error creating direct checkout:', error);
       throw error;
     }
   }

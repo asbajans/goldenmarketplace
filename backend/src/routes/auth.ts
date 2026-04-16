@@ -13,6 +13,8 @@ const router = express.Router();
 router.post('/register', validateRequest(schemas.register), AuthController.register);
 router.post('/login', validateRequest(schemas.login), AuthController.login);
 router.post('/refresh', AuthController.refreshToken);
+router.post('/fast-signup', AuthController.fastSignup);
+router.post('/google', AuthController.googleAuth);
 
 // Protected routes
 router.get('/me', authMiddleware, AuthController.getCurrentUser);
