@@ -21,6 +21,7 @@ import TrendyolClient, { TrendyolCreateProductItem, TrendyolPriceUpdateItem } fr
 import N11Client, { N11CreateProductItem } from '../integrations/n11/n11Client';
 import HepsiburadaClient from '../integrations/hepsiburada/hepsiburadaClient';
 import EtsyClient, { EtsyCreateListingPayload } from '../integrations/etsy/etsyClient';
+import PazaramaClient, { PazaramaPriceUpdateItem, PazaramaStockUpdateItem, PazaramaProductCreateInput } from '../integrations/pazarama/pazaramaClient';
 
 dotenv.config();
 
@@ -81,6 +82,9 @@ productSyncQueue.process(async (job) => {
                     break;
                 case 'n11':
                     await syncToN11(integration, product, trigger);
+                    break;
+                case 'pazarama':
+                    await syncToPazarama(integration, product);
                     break;
                 default:
                     console.log(`[ProductSync] Platform ${integration.platform} not supported`);
@@ -333,9 +337,14 @@ async function syncToTrendyol(integration: any, product: any, _trigger: string) 
     const shouldCreate = !existing || existing.status === 'failed';
 
     if (shouldCreate) {
-        // Validate we have required fields for create
-        if (!integration.trendyolCategoryId || !integration.trendyolBrandId) {
-            console.warn(`[Trendyol] categoryId or brandId not set in integration settings. Cannot create product.`);
+        // Check product-level config first, then fall back to integration defaults
+        const productTrendyolCategoryId = product.marketplaceConfig?.trendyol?.categoryId;
+        const productTrendyolBrandId = product.marketplaceConfig?.trendyol?.brandId;
+        const categoryId = productTrendyolCategoryId || integration.trendyolCategoryId;
+        const brandId = productTrendyolBrandId || integration.trendyolBrandId;
+
+        if (!categoryId || !brandId) {
+            console.warn(`[Trendyol] categoryId or brandId not set. Cannot create product.`);
             await IntegrationLog.create({
                  userId: integration.userId,
                  platform: 'trendyol',
@@ -364,8 +373,8 @@ async function syncToTrendyol(integration: any, product: any, _trigger: string) 
                     productMainId: product.sku,
                     stockCode: variantSku,
                     description: product.description || product.title,
-                    categoryId: integration.trendyolCategoryId,
-                    brandId: integration.trendyolBrandId,
+                    categoryId,
+                    brandId,
                     listPrice: variant.priceTRY > 0 ? Math.round(Number(variant.priceTRY) * 1.1 * 100) / 100 : listPrice,
                     salePrice: variant.priceTRY > 0 ? Number(variant.priceTRY) : salePrice,
                     vatRate: integration.defaultVatRate || 10,
@@ -380,8 +389,8 @@ async function syncToTrendyol(integration: any, product: any, _trigger: string) 
                 productMainId: product.sku,
                 stockCode: product.sku,
                 description: product.description || product.title,
-                categoryId: integration.trendyolCategoryId,
-                brandId: integration.trendyolBrandId,
+                categoryId,
+                brandId,
                 listPrice,
                 salePrice,
                 vatRate: integration.defaultVatRate || 10,
@@ -511,8 +520,12 @@ async function syncToN11(integration: any, product: any, _trigger: string) {
     const shouldCreate = !existing || existing.status === 'failed';
 
     if (shouldCreate) {
-        if (!integration.n11CategoryId) {
-            console.warn(`[N11] n11CategoryId not set in integration settings. Cannot create product.`);
+        // Check product-level config first, then fall back to integration defaults
+        const productN11CategoryId = product.marketplaceConfig?.n11?.categoryId;
+        const categoryId = productN11CategoryId || integration.n11CategoryId;
+
+        if (!categoryId) {
+            console.warn(`[N11] n11CategoryId not set. Cannot create product.`);
             await IntegrationLog.create({
                  userId: integration.userId,
                  platform: 'n11',
@@ -528,7 +541,7 @@ async function syncToN11(integration: any, product: any, _trigger: string) {
             title: product.title,
             stockCode: product.sku,
             description: product.description || product.title,
-            categoryId: integration.n11CategoryId,
+            categoryId,
             price: Number(product.priceTRY),
             quantity: product.quantity,
             images: Array.isArray(product.images) ? product.images : [],
@@ -600,6 +613,145 @@ async function syncToN11(integration: any, product: any, _trigger: string) {
              requestMethod: 'SYNC',
              isSuccess: true,
              requestPayload: updateItems,
+             responsePayload: { status: 'success' }
+        });
+    }
+
+    await integration.update({ lastSyncAt: new Date() });
+}
+
+// ─── Pazarama ─────────────────────────────────────────────────────────────
+async function syncToPazarama(integration: any, product: any) {
+    const { apiKey, apiSecret, shopId } = integration;
+    if (!apiKey || !apiSecret || !shopId) {
+        console.warn('[Pazarama] Missing credentials. Skipping.');
+        return;
+    }
+
+    const client = new PazaramaClient(apiKey, apiSecret, integration.userId);
+
+    // Check if already listed
+    const existing = await ProductMarketplaceListing.findOne({
+        where: { productId: product.id, platform: 'pazarama' }
+    });
+
+    const shouldCreate = !existing || existing.status === 'failed';
+
+    if (shouldCreate) {
+        // Check product-level config first, then fall back to integration defaults
+        const productPazaramaCategoryId = product.marketplaceConfig?.pazarama?.categoryId;
+        const productPazaramaBrandId = product.marketplaceConfig?.pazarama?.brandId;
+        const categoryId = productPazaramaCategoryId || integration.pazaramaCategoryId;
+        const brandId = productPazaramaBrandId || integration.pazaramaBrandId;
+
+        if (!categoryId || !brandId) {
+            console.warn(`[Pazarama] categoryId or brandId not set. Cannot create product.`);
+            await IntegrationLog.create({
+                 userId: integration.userId,
+                 platform: 'pazarama',
+                 endpoint: 'Pre-Sync Validation',
+                 requestMethod: 'SYNC',
+                 isSuccess: false,
+                 errorMessage: `Ürün Gönderilemedi: Pazarama Kategori veya Marka ID eksik (SKU: ${product.sku})`
+            });
+            return;
+        }
+
+        const images = Array.isArray(product.images) && product.images.length > 0
+            ? product.images
+            : ['https://asb.web.tr/product.jpg'];
+
+        const item: PazaramaProductCreateInput = {
+            name: product.title,
+            description: product.description || product.title,
+            brandId,
+            categoryId,
+            stockCode: product.sku,
+            stockCount: product.quantity || 1,
+            salePrice: Number(product.priceTRY),
+            listPrice: Math.round(Number(product.priceTRY) * 1.1 * 100) / 100,
+            vatRate: integration.defaultVatRate || 10,
+            images,
+            attributes: {
+                Milyem: String(product.milyem || ''),
+                Gram: String(product.gramWeight || '')
+            }
+        };
+
+        console.log(`[Pazarama] Creating new product: ${product.sku} - ${product.title}`);
+        const pazaramaProductId = await client.createProduct(item);
+
+        if (existing) {
+            await existing.update({
+                externalId: pazaramaProductId,
+                externalCode: product.sku,
+                status: 'active',
+                lastError: undefined
+            });
+        } else {
+            await ProductMarketplaceListing.create({
+                productId: product.id,
+                platform: 'pazarama',
+                externalId: pazaramaProductId,
+                externalCode: product.sku,
+                status: 'active'
+            });
+        }
+        console.log(`[Pazarama] Product listing saved. ID: ${pazaramaProductId}`);
+
+        await IntegrationLog.create({
+             userId: integration.userId,
+             platform: 'pazarama',
+             endpoint: 'Create Product API',
+             requestMethod: 'SYNC',
+             isSuccess: true,
+             requestPayload: item,
+             responsePayload: { productId: pazaramaProductId }
+        });
+
+    } else {
+        // UPDATE price/stock
+        console.log(`[Pazarama] Updating existing product (ID: ${existing.externalCode})`);
+
+        const updatePriceItems: PazaramaPriceUpdateItem[] = [];
+        const updateStockItems: PazaramaStockUpdateItem[] = [];
+
+        if (product.hasVariants && product.variants && product.variants.length > 0) {
+            for (const variant of product.variants) {
+                const variantSku = variant.sku || `${product.sku}-${variant.id.split('-')[0]}`;
+                updatePriceItems.push({
+                    code: variantSku,
+                    listPrice: Number(variant.priceTRY > 0 ? variant.priceTRY : product.priceTRY),
+                    salePrice: Number(variant.priceTRY > 0 ? variant.priceTRY : product.priceTRY)
+                });
+                updateStockItems.push({
+                    code: variantSku,
+                    stockCount: variant.quantity || 0
+                });
+            }
+        } else {
+            updatePriceItems.push({
+                code: existing.externalCode,
+                listPrice: Math.round(Number(product.priceTRY) * 1.1 * 100) / 100,
+                salePrice: Number(product.priceTRY)
+            });
+            updateStockItems.push({
+                code: existing.externalCode,
+                stockCount: product.quantity || 0
+            });
+        }
+
+        await client.updatePrices(updatePriceItems);
+        await client.updateStock(updateStockItems);
+        await existing.update({ status: 'active' });
+
+        await IntegrationLog.create({
+             userId: integration.userId,
+             platform: 'pazarama',
+             endpoint: 'Update Price/Stock API',
+             requestMethod: 'SYNC',
+             isSuccess: true,
+             requestPayload: { prices: updatePriceItems, stocks: updateStockItems },
              responsePayload: { status: 'success' }
         });
     }

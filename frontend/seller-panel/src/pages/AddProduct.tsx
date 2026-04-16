@@ -839,6 +839,97 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                         <Text type="secondary" style={{ fontSize: '12px', marginTop: 4, display: 'block' }}>Etsy API'den eşzamanlı çekildi.</Text>
                     </Card>
                 )}
+
+                {selectedMarketplaces.includes('trendyol') && (
+                    <Card size="small" style={{ marginBottom: 12, border: '1px solid #F27A1A', background: '#fffbf0' }} title={<span style={{ color: '#F27A1A' }}>Trendyol Ürün Ayarları</span>}>
+                        <Row gutter={16}>
+                            <Col span={12}>
+                                <Form.Item 
+                                    name={['marketplaceConfig', 'trendyol', 'categoryId']} 
+                                    label="Trendyol Kategori"
+                                >
+                                    <Select placeholder="Trendyol Kategori Seçin" allowClear>
+                                        <Option value={508463}>Takı & Aksesuar</Option>
+                                        <Option value={508464}>Altın Takı</Option>
+                                        <Option value={508465}>Gümüş Takı</Option>
+                                        <Option value={508466}>Bilezik</Option>
+                                        <Option value={508467}>Yüzük</Option>
+                                        <Option value={508468}>Kolye</Option>
+                                        <Option value={508469}>Küpe</Option>
+                                        <Option value={508470}>Tesbih</Option>
+                                    </Select>
+                                </Form.Item>
+                            </Col>
+                            <Col span={12}>
+                                <Form.Item 
+                                    name={['marketplaceConfig', 'trendyol', 'brandId']} 
+                                    label="Trendyol Marka"
+                                >
+                                    <Select placeholder="Trendyol Marka Seçin" allowClear showSearch>
+                                        <Option value={111}>Altın</Option>
+                                        <Option value={222}>Gümüş</Option>
+                                        <Option value={333}>Platinyum</Option>
+                                        <Option value={444}>Bronz</Option>
+                                    </Select>
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                    </Card>
+                )}
+
+                {selectedMarketplaces.includes('n11') && (
+                    <Card size="small" style={{ marginBottom: 12, border: '1px solid #5333ED', background: '#f5f3ff' }} title={<span style={{ color: '#5333ED' }}>N11 Ürün Ayarları</span>}>
+                        <Form.Item 
+                            name={['marketplaceConfig', 'n11', 'categoryId']} 
+                            label="N11 Kategori"
+                        >
+                            <Select placeholder="N11 Kategori Seçin" allowClear>
+                                <Option value="tak-i">Takı & Aksesuar</Option>
+                                <Option value="altin-taki">Altın Takı</Option>
+                                <Option value="gumus-taki">Gümüş Takı</Option>
+                                <Option value="bilezik">Bilezik</Option>
+                                <Option value="yuzuk">Yüzük</Option>
+                                <Option value="kolye">Kolye</Option>
+                                <Option value="kupe">Küpe</Option>
+                            </Select>
+                        </Form.Item>
+                    </Card>
+                )}
+
+                {selectedMarketplaces.includes('pazarama') && (
+                    <Card size="small" style={{ marginBottom: 12, border: '1px solid #E4002B', background: '#fff0f3' }} title={<span style={{ color: '#E4002B' }}>Pazarama Ürün Ayarları</span>}>
+                        <Row gutter={16}>
+                            <Col span={12}>
+                                <Form.Item 
+                                    name={['marketplaceConfig', 'pazarama', 'categoryId']} 
+                                    label="Pazarama Kategori"
+                                >
+                                    <Select placeholder="Pazarama Kategori Seçin" allowClear>
+                                        <Option value="tak-aksesuar">Takı & Aksesuar</Option>
+                                        <Option value="altin-taki">Altın Takı</Option>
+                                        <Option value="gumus-taki">Gümüş Takı</Option>
+                                        <Option value="bilezik">Bilezik</Option>
+                                        <Option value="yuzuk">Yüzük</Option>
+                                        <Option value="kolye">Kolye</Option>
+                                        <Option value="kupe">Küpe</Option>
+                                    </Select>
+                                </Form.Item>
+                            </Col>
+                            <Col span={12}>
+                                <Form.Item 
+                                    name={['marketplaceConfig', 'pazarama', 'brandId']} 
+                                    label="Pazarama Marka"
+                                >
+                                    <Select placeholder="Pazarama Marka Seçin" allowClear>
+                                        <Option value="altin">Altın</Option>
+                                        <Option value="gumus">Gümüş</Option>
+                                        <Option value="platinum">Platinyum</Option>
+                                    </Select>
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                    </Card>
+                )}
                 
                 <div style={{ padding: '8px 12px', background: '#f0f2f5', borderRadius: 4 }}>
                     <Text type="secondary" style={{ fontSize: '0.85em' }}>
