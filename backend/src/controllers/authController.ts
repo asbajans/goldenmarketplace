@@ -189,7 +189,7 @@ export class AuthController {
    */
   static async fastSignup(req: Request, res: Response) {
     try {
-      const { email, firstName, googleId } = req.body;
+      const { email, firstName } = req.body;
 
       if (!email) {
         return res.status(400).json({
@@ -224,6 +224,7 @@ export class AuthController {
         email,
         password: hashedPassword,
         firstName: firstName || email.split('@')[0],
+        lastName: '',
         userType: 'customer',
         isActive: true
       });
@@ -258,7 +259,7 @@ export class AuthController {
    */
   static async googleAuth(req: Request, res: Response) {
     try {
-      const { googleToken, email, firstName, lastName, picture } = req.body;
+      const { googleToken, email, firstName, lastName } = req.body;
 
       if (!googleToken && !email) {
         return res.status(400).json({
@@ -293,7 +294,7 @@ export class AuthController {
         email,
         password: hashedPassword,
         firstName: firstName || email.split('@')[0],
-        lastName: lastName,
+        lastName: lastName || '',
         userType: 'customer',
         isActive: true
       });

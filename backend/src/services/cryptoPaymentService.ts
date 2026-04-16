@@ -50,7 +50,7 @@ export class CryptoPaymentService {
     }
 
     await Store.update(
-      { cryptoWallet: walletAddress },
+      { cryptoWallet: walletAddress } as any,
       { where: { id: storeId } }
     );
   }

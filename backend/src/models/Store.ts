@@ -17,6 +17,13 @@ interface StoreAttributes {
   rating: number;
   totalProducts: number;
   autoPriceSync?: boolean;
+  bankName?: string;
+  iban?: string;
+  accountNumber?: string;
+  accountHolder?: string;
+  branchCode?: string;
+  cryptoWallet?: string;
+  paymentMethods?: { stripe: boolean; bankTransfer: boolean; crypto: boolean };
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
