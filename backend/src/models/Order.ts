@@ -157,7 +157,6 @@ Order.init(
     orderNumber: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
       comment: 'Unique order number with GC prefix (e.g., GC20260418143045001)'
     },
     customerId: {

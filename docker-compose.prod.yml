@@ -34,7 +34,7 @@ services:
       echo 'Running database migrations...' &&
       PGPASSWORD=$$POSTGRES_PASSWORD psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE stores ADD COLUMN IF NOT EXISTS commissionRate DECIMAL(5,2) DEFAULT 10;\" &&
       PGPASSWORD=$$POSTGRES_PASSWORD psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE stores ADD COLUMN IF NOT EXISTS defaultShippingDays INTEGER DEFAULT 3;\" &&
-      PGPASSWORD=$$POSTGRES_PASSWORD psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE stores ADD COLUMN IF NOT EXISTS availableShippingCompanies JSON DEFAULT '[\\'MNG Kargo\\',\\'Yurtiçi Kargo\\']';\" &&
+      PGPASSWORD=$$POSTGRES_PASSWORD psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE stores ADD COLUMN IF NOT EXISTS availableShippingCompanies JSON DEFAULT '[''MNG Kargo'', ''Yurtiçi Kargo'', ''Sürat Kargo'', ''PTT Kargo'']';\" &&
       PGPASSWORD=$$POSTGRES_PASSWORD psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE products ADD COLUMN IF NOT EXISTS discountRate DECIMAL(5,2) DEFAULT 0;\" &&
       PGPASSWORD=$$POSTGRES_PASSWORD psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE products ADD COLUMN IF NOT EXISTS discountedPrice DECIMAL(15,2) DEFAULT 0;\" &&
       echo 'Checking orders table...' &&

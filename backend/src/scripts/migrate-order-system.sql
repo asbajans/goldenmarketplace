@@ -41,6 +41,20 @@ CREATE TABLE IF NOT EXISTS orders (
     "updatedAt" TIMESTAMP DEFAULT NOW()
 );
 
+-- If orders table already existed, ensure it has the required columns and constraints
+DO $$
+BEGIN
+    -- Add UNIQUE constraint on orderNumber if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'orders_orderNumber_key' AND contype = 'u') THEN
+        ALTER TABLE orders ADD CONSTRAINT orders_orderNumber_key UNIQUE ("orderNumber");
+    END IF;
+    
+    -- Ensure orderNumber is NOT NULL (in case it was nullable before)
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'orders' AND column_name = 'orderNumber' AND is_nullable = 'YES') THEN
+        ALTER TABLE orders ALTER COLUMN "orderNumber" SET NOT NULL;
+    END IF;
+END $$;
+
 -- Create order_items table if not exists
 CREATE TABLE IF NOT EXISTS order_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
