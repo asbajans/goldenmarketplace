@@ -4,7 +4,7 @@
 -- Stores table columns
 ALTER TABLE stores ADD COLUMN IF NOT EXISTS commissionRate DECIMAL(5,2) DEFAULT 10;
 ALTER TABLE stores ADD COLUMN IF NOT EXISTS defaultShippingDays INTEGER DEFAULT 3;
-ALTER TABLE stores ADD COLUMN IF NOT EXISTS availableShippingCompanies JSON DEFAULT '["MNG Kargo", "Yurtiçi Kargo", "Sürat Kargo", "PTT Kargo"]';
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS availableShippingCompanies JSON DEFAULT '{"MNG Kargo", "Yurtiçi Kargo", "Sürat Kargo", "PTT Kargo"}';
 
 -- Products table columns
 ALTER TABLE products ADD COLUMN IF NOT EXISTS discountRate DECIMAL(5,2) DEFAULT 0;
