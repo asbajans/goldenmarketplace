@@ -63,7 +63,9 @@ const seed = async () => {
             description: 'En kaliteli altın ve mücevherler',
             rating: 4.8,
             totalProducts: 5,
-            isActive: true
+            isActive: true,
+            commissionRate: 10,
+            defaultShippingDays: 3
         });
         console.log('✅ Store created.');
 
@@ -123,6 +125,8 @@ const seed = async () => {
                 isB2BEnabled: false,
                 b2bDiscount: 0,
                 b2bPrice: Math.round(priceTRY * 100) / 100,
+                discountRate: 0,
+                discountedPrice: 0,
                 quantity: p.quantity,
                 images: p.images,
                 sku: p.sku,

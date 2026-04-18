@@ -439,6 +439,8 @@ export class B2BController {
         isB2BEnabled: false,
         b2bDiscount: 0,
         b2bPrice: 0,
+        discountRate: 0,
+        discountedPrice: 0,
         quantity: originalProduct.quantity,
         images: originalProduct.images,
         videoUrl: originalProduct.videoUrl,

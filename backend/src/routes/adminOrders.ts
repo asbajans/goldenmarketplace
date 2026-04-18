@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { authMiddleware, adminMiddleware } from '../middleware/authMiddleware';
 import { Op } from 'sequelize';
-import Order, { OrderItem, OrderStatus, OrderSource } from '../models/Order';
+import Order, { OrderItem } from '../models/Order';
 import Store from '../models/Store';
 import User from '../models/User';
 
@@ -37,14 +37,14 @@ router.get('/orders', async (req: Request, res: Response) => {
       offset: (Number(page) - 1) * Number(limit)
     });
 
-    res.json({
+    return res.json({
       orders: orders.rows,
       total: orders.count,
       page: Number(page),
       totalPages: Math.ceil(orders.count / Number(limit))
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -65,9 +65,9 @@ router.get('/orders/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    res.json(order);
+    return res.json(order);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -75,11 +75,6 @@ router.patch('/orders/:id/status', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-
-    const validStatuses: OrderStatus[] = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ error: 'Invalid status' });
-    }
 
     const order = await Order.findOne({ where: { id } });
     if (!order) {
@@ -97,9 +92,9 @@ router.patch('/orders/:id/status', async (req: Request, res: Response) => {
 
     await order.update(updateData);
 
-    res.json(order);
+    return res.json(order);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -112,13 +107,13 @@ router.get('/stores/:id/commission', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Store not found' });
     }
 
-    res.json({
+    return res.json({
       commissionRate: store.commissionRate,
       defaultShippingDays: store.defaultShippingDays,
       availableShippingCompanies: store.availableShippingCompanies
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -138,13 +133,13 @@ router.put('/stores/:id/commission', async (req: Request, res: Response) => {
       availableShippingCompanies: availableShippingCompanies ?? store.availableShippingCompanies
     });
 
-    res.json(store);
+    return res.json(store);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
-router.get('/stats/orders', async (req: Request, res: Response) => {
+router.get('/stats/orders', async (_req: Request, res: Response) => {
   try {
     const totalOrders = await Order.count();
     const pendingOrders = await Order.count({ where: { status: 'pending' } });
@@ -154,7 +149,7 @@ router.get('/stats/orders', async (req: Request, res: Response) => {
     const totalRevenue = await Order.sum('totalAmount', { where: { status: { [Op.ne]: 'cancelled' } } });
     const totalCommission = await Order.sum('commissionAmount', { where: { status: { [Op.ne]: 'cancelled' } } });
 
-    res.json({
+    return res.json({
       totalOrders,
       pendingOrders,
       shippedOrders,
@@ -163,7 +158,7 @@ router.get('/stats/orders', async (req: Request, res: Response) => {
       totalCommission: totalCommission || 0
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 

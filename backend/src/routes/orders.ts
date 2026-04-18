@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import Order, { OrderItem, OrderStatus, OrderSource } from '../models/Order';
+import Order, { OrderItem, OrderSource } from '../models/Order';
 import Store from '../models/Store';
 import User from '../models/User';
 
@@ -29,22 +29,20 @@ router.get('/', async (req: Request, res: Response) => {
 
     const orders = await Order.findAndCountAll({
       where,
-      include: [
-        { model: OrderItem, as: 'items' }
-      ],
+      include: [{ model: OrderItem, as: 'items' }],
       order: [['createdAt', 'DESC']],
       limit: Number(limit),
       offset: (Number(page) - 1) * Number(limit)
     });
 
-    res.json({
+    return res.json({
       orders: orders.rows,
       total: orders.count,
       page: Number(page),
       totalPages: Math.ceil(orders.count / Number(limit))
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -70,9 +68,9 @@ router.get('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    res.json(order);
+    return res.json(order);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -139,9 +137,9 @@ router.post('/', async (req: Request, res: Response) => {
       include: [{ model: OrderItem, as: 'items' }]
     });
 
-    res.status(201).json(fullOrder);
+    return res.status(201).json(fullOrder);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -151,7 +149,7 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const validStatuses: OrderStatus[] = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'];
+    const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
@@ -180,9 +178,9 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
 
     await order.update(updateData);
 
-    res.json(order);
+    return res.json(order);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -215,9 +213,9 @@ router.patch('/:id/shipping', async (req: Request, res: Response) => {
 
     await order.update(updateData);
 
-    res.json(order);
+    return res.json(order);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -256,9 +254,9 @@ router.patch('/:id/return', async (req: Request, res: Response) => {
       );
     }
 
-    res.json(order);
+    return res.json(order);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 

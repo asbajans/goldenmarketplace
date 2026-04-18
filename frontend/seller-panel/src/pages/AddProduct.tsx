@@ -93,9 +93,6 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         if (initialValues?.marketplaces) {
             setSelectedMarketplaces(initialValues.marketplaces);
         }
-        if (initialValues?.discountRate) {
-            setDiscountRate(initialValues.discountRate);
-        }
     }, []);
 
     useEffect(() => {

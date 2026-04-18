@@ -114,12 +114,12 @@ router.get('/sync/:marketplace', async (req: Request, res: Response) => {
         }
       }
 
-      res.json({ imported: totalImported });
+      return res.json({ imported: totalImported });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: err.message });
     }
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -152,9 +152,9 @@ router.post('/import', async (req: Request, res: Response) => {
       }
     }
 
-    res.json({ imported });
+    return res.json({ imported });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
