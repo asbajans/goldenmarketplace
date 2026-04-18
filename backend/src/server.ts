@@ -31,6 +31,82 @@ async function syncAndSeedSettings() {
       console.log('[DB] Connection verified (production mode).');
       await sequelize.sync({ force: false, alter: false });
       console.log('[DB] New tables created if missing (safe sync).');
+
+      // Migration: Add new columns to existing tables
+      try {
+        await sequelize.query(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS commissionRate DECIMAL(5,2) DEFAULT 10`, { raw: true });
+        await sequelize.query(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS "defaultShippingDays" INTEGER DEFAULT 3`, { raw: true });
+        await sequelize.query(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS "availableShippingCompanies" JSON DEFAULT '["MNG Kargo", "Yurtiçi Kargo", "Sürat Kargo", "PTT Kargo"]'`, { raw: true });
+        console.log('[DB] Store migration completed.');
+      } catch (e: any) {
+        console.log('[DB] Store migration skipped (columns may exist).');
+      }
+
+      try {
+        await sequelize.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS discountRate DECIMAL(5,2) DEFAULT 0`, { raw: true });
+        await sequelize.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS discountedPrice DECIMAL(15,2) DEFAULT 0`, { raw: true });
+        console.log('[DB] Product migration completed.');
+      } catch (e: any) {
+        console.log('[DB] Product migration skipped (columns may exist).');
+      }
+
+      try {
+        await sequelize.query(`
+          CREATE TABLE IF NOT EXISTS orders (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            "orderNumber" VARCHAR UNIQUE NOT NULL,
+            "customerId" UUID NOT NULL,
+            "sellerId" UUID NOT NULL,
+            "storeId" UUID NOT NULL,
+            status VARCHAR DEFAULT 'pending',
+            subtotal DECIMAL(15,2) DEFAULT 0,
+            "shippingCost" DECIMAL(15,2) DEFAULT 0,
+            "totalAmount" DECIMAL(15,2) DEFAULT 0,
+            "commissionRate" DECIMAL(5,2) DEFAULT 10,
+            "commissionAmount" DECIMAL(15,2) DEFAULT 0,
+            "sellerEarnings" DECIMAL(15,2) DEFAULT 0,
+            "shippingTime" INTEGER DEFAULT 3,
+            "shippingDeadline" TIMESTAMP,
+            "trackingNumber" VARCHAR,
+            "shippingCompany" VARCHAR,
+            "orderDate" TIMESTAMP DEFAULT NOW(),
+            "confirmedDate" TIMESTAMP,
+            "shippedDate" TIMESTAMP,
+            "deliveredDate" TIMESTAMP,
+            source VARCHAR DEFAULT 'golden',
+            "externalOrderId" VARCHAR,
+            "shippingAddress" JSONB,
+            "billingAddress" JSONB,
+            "customerNote" TEXT,
+            "createdAt" TIMESTAMP DEFAULT NOW(),
+            "updatedAt" TIMESTAMP DEFAULT NOW()
+          )
+        `, { raw: true });
+        console.log('[DB] Orders table check completed.');
+      } catch (e: any) {
+        console.log('[DB] Order table migration skipped:', e.message);
+      }
+
+      try {
+        await sequelize.query(`
+          CREATE TABLE IF NOT EXISTS order_items (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            "orderId" UUID NOT NULL,
+            "productId" UUID NOT NULL,
+            "variantId" UUID,
+            title VARCHAR NOT NULL,
+            sku VARCHAR NOT NULL,
+            quantity INTEGER DEFAULT 1,
+            "unitPrice" DECIMAL(15,2) NOT NULL,
+            "totalPrice" DECIMAL(15,2) NOT NULL,
+            "createdAt" TIMESTAMP DEFAULT NOW(),
+            "updatedAt" TIMESTAMP DEFAULT NOW()
+          )
+        `, { raw: true });
+        console.log('[DB] OrderItems table check completed.');
+      } catch (e: any) {
+        console.log('[DB] OrderItems table migration skipped:', e.message);
+      }
     }
 
     // Seed initial GlobalSettings for Etsy keys
