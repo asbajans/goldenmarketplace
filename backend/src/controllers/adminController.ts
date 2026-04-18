@@ -107,7 +107,7 @@ export class AdminController {
 
     static async createStore(req: Request, res: Response): Promise<Response> {
         try {
-            const { userId, storeName, storeSlug, description, isActive } = req.body;
+            const { userId, storeName, storeSlug, description, isActive, commissionRate, defaultShippingDays } = req.body;
             const store = await Store.create({
                 userId,
                 storeName,
@@ -115,7 +115,9 @@ export class AdminController {
                 description,
                 isActive,
                 rating: 0,
-                totalProducts: 0
+                totalProducts: 0,
+                commissionRate: commissionRate || 10,
+                defaultShippingDays: defaultShippingDays || 3
             });
             return res.status(201).json(store);
         } catch (error: any) {

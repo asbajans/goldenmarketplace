@@ -137,6 +137,8 @@ app.use('/api/admin', require('./routes/admin').default || require('./routes/adm
 app.use('/api/b2b', require('./routes/b2b').default || require('./routes/b2b'));
 app.use('/api/marketplace', require('./routes/marketplace').default || require('./routes/marketplace'));
 app.use('/api/variations', require('./routes/variations').default || require('./routes/variations'));
+app.use('/api/orders', require('./routes/orders').default || require('./routes/orders'));
+app.use('/api/external-orders', require('./routes/externalOrders').default || require('./routes/externalOrders'));
 
 // Error handling middleware
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

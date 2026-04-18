@@ -94,7 +94,7 @@ export class ProductController {
       const {
         title, description, category, sku, quantity,
         images, videoUrl, marketplaces, marketplaceConfig, gramWeight, milyem, effectiveMilyem, profitMargin,
-        isB2BEnabled, b2bDiscount,
+        isB2BEnabled, b2bDiscount, discountRate,
         hasVariants, variantAttributes, variants
       } = req.body;
 
@@ -152,6 +152,10 @@ export class ProductController {
       const finalB2bDiscount = isB2BEnabled ? (b2bDiscount || 0) : 0;
       const b2bPrice = Math.round(priceTRY * (1 - finalB2bDiscount / 100) * 100) / 100;
 
+      // Handle Golden Marketplace discount
+      const finalDiscountRate = discountRate || 0;
+      const discountedPrice = finalDiscountRate > 0 ? Math.round(priceTRY * (1 - finalDiscountRate / 100) * 100) / 100 : 0;
+
       const tags = ProductController.generateTags(title, category);
 
       const product = await Product.create({
@@ -171,6 +175,8 @@ export class ProductController {
         isB2BEnabled: !!isB2BEnabled,
         b2bDiscount: finalB2bDiscount,
         b2bPrice,
+        discountRate: finalDiscountRate,
+        discountedPrice,
         quantity: quantity || 0,
         images: Array.isArray(images) ? await Promise.all(images.map((img: string) => s3Service.uploadBase64Image(img, `products/${store.storeSlug}`))) : [],
         videoUrl,
@@ -251,7 +257,7 @@ export class ProductController {
       const {
         title, description, category, quantity,
         images, videoUrl, marketplaces, marketplaceConfig, gramWeight, milyem, effectiveMilyem, profitMargin,
-        isB2BEnabled, b2bDiscount,
+        isB2BEnabled, b2bDiscount, discountRate,
         hasVariants, variantAttributes, variants
       } = req.body;
 
@@ -324,6 +330,8 @@ export class ProductController {
 
       const finalIsB2BEnabled = isCloned ? false : (isB2BEnabled !== undefined ? !!isB2BEnabled : product.isB2BEnabled);
       const finalB2bDiscount = isCloned ? 0 : (b2bDiscount !== undefined ? b2bDiscount : product.b2bDiscount);
+      const finalDiscountRate = isCloned ? 0 : (discountRate !== undefined ? discountRate : product.discountRate);
+      const finalDiscountedPrice = finalDiscountRate > 0 ? Math.round(finalPriceTRY * (1 - finalDiscountRate / 100) * 100) / 100 : 0;
       const finalHasVariants = isCloned ? false : (hasVariants !== undefined ? !!hasVariants : product.hasVariants);
       const finalVariantAttributes = isCloned ? [] : (variantAttributes || product.variantAttributes);
 
@@ -341,6 +349,8 @@ export class ProductController {
         isB2BEnabled: finalIsB2BEnabled,
         b2bDiscount: finalB2bDiscount,
         b2bPrice: finalB2bPrice,
+        discountRate: finalDiscountRate,
+        discountedPrice: finalDiscountedPrice,
         quantity: finalQuantity,
         images: isCloned ? product.images : (Array.isArray(images) ? await Promise.all(images.map((img: string) => s3Service.uploadBase64Image(img, `products/${product.storeId}`))) : product.images),
         videoUrl: isCloned ? product.videoUrl : (videoUrl !== undefined ? videoUrl : product.videoUrl),

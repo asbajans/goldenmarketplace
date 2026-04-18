@@ -25,6 +25,8 @@ interface ProductAttributes {
   isB2BEnabled: boolean;
   b2bDiscount: number;
   b2bPrice: number;
+  discountRate: number;
+  discountedPrice: number;
   quantity: number;
   images: string[];
   videos?: string[];
@@ -59,6 +61,8 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public isB2BEnabled!: boolean;
   public b2bDiscount!: number;
   public b2bPrice!: number;
+  public discountRate!: number;
+  public discountedPrice!: number;
   public quantity!: number;
   public images!: string[];
   public videos?: string[];
@@ -165,6 +169,18 @@ Product.init(
       allowNull: false,
       defaultValue: 0,
       comment: 'Calculated: priceTRY × (1 - b2bDiscount/100)'
+    },
+    discountRate: {
+      type: DataTypes.DECIMAL(5, 2),
+      allowNull: false,
+      defaultValue: 0,
+      comment: 'Discount percentage for golden marketplace'
+    },
+    discountedPrice: {
+      type: DataTypes.DECIMAL(15, 2),
+      allowNull: false,
+      defaultValue: 0,
+      comment: 'Calculated: priceTRY × (1 - discountRate/100)'
     },
     quantity: {
       type: DataTypes.INTEGER,

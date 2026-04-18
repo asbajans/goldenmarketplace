@@ -77,6 +77,7 @@ export const AdminAPI = {
     createStore: (data: any) => api.post('/stores', data).then((res) => res.data),
     updateStore: (id: string, data: any) => api.put(`/stores/${id}`, data).then((res) => res.data),
     deleteStore: (id: string) => api.delete(`/stores/${id}`).then((res) => res.data),
+    updateStoreCommission: (id: string, data: any) => api.put(`/stores/${id}/commission`, data).then((res) => res.data),
     getCategories: () => api.get('/categories').then((res) => res.data),
     createCategory: (data: any) => api.post('/categories', data).then((res) => res.data),
     updateCategory: (id: string, data: any) => api.put(`/categories/${id}`, data).then((res) => res.data),
@@ -103,6 +104,10 @@ export const AdminAPI = {
     }).then((res) => res.data),
     // Integration Logs
     getIntegrationLogs: (params: any) => api.get('/integration-logs', { params }).then((res) => res.data),
+
+    // Orders
+    getOrders: (params?: any) => api.get('/orders', { params }).then((res) => res.data),
+    getOrderStats: () => api.get('/stats/orders').then((res) => res.data),
 };
 
 export default api;

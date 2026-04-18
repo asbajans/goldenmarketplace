@@ -17,6 +17,9 @@ interface StoreAttributes {
   rating: number;
   totalProducts: number;
   autoPriceSync?: boolean;
+  commissionRate: number;
+  defaultShippingDays: number;
+  availableShippingCompanies?: string[];
   bankName?: string;
   iban?: string;
   accountNumber?: string;
@@ -40,6 +43,9 @@ class Store extends Model<StoreAttributes> implements StoreAttributes {
   public rating!: number;
   public totalProducts!: number;
   public autoPriceSync!: boolean;
+  public commissionRate!: number;
+  public defaultShippingDays!: number;
+  public availableShippingCompanies?: string[];
   public bankName?: string;
   public iban?: string;
   public accountNumber?: string;
@@ -101,6 +107,24 @@ Store.init(
       type: DataTypes.BOOLEAN,
       defaultValue: true,
       comment: 'If true, product prices sync automatically with global gold price'
+    },
+    commissionRate: {
+      type: DataTypes.DECIMAL(5, 2),
+      allowNull: false,
+      defaultValue: 10,
+      comment: 'Commission percentage for this seller (default 10%)'
+    },
+    defaultShippingDays: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 3,
+      comment: 'Default shipping time in days'
+    },
+    availableShippingCompanies: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      defaultValue: ['MNG Kargo', 'Yurtiçi Kargo', 'Sürat Kargo', 'PTT Kargo'],
+      comment: 'Available shipping companies for this seller'
     },
     bankName: {
       type: DataTypes.STRING,

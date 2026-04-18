@@ -7,7 +7,8 @@ import {
   CreditCardOutlined,
   SettingOutlined,
   LogoutOutlined,
-  AppstoreOutlined
+  AppstoreOutlined,
+  InboxOutlined
 } from '@ant-design/icons';
 import './App.css';
 
@@ -20,6 +21,7 @@ import IntegrationsPage from './pages/IntegrationsPage';
 import IntegrationLogsPage from './pages/IntegrationLogsPage';
 import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
+import OrdersPage from './pages/OrdersPage';
 import { AdminAPI } from './services/api';
 
 const { Header, Sider, Content } = Layout;
@@ -105,6 +107,11 @@ function App() {
       key: 'settings',
       icon: <SettingOutlined />,
       label: 'Sistem Ayarları'
+    },
+    {
+      key: 'orders',
+      icon: <InboxOutlined />,
+      label: 'Siparişler'
     }
   ];
 
@@ -162,6 +169,9 @@ function App() {
 
       case 'settings':
         return <SettingsPage />;
+
+      case 'orders':
+        return <OrdersPage />;
 
       default:
         return null;

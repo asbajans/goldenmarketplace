@@ -13,6 +13,8 @@ import IntegrationLog from './IntegrationLog';
 import ProductVariant from './ProductVariant';
 import Variation from './Variation';
 import VariationOption from './VariationOption';
+import Order from './Order';
+import { OrderItem } from './Order';
 
 // User <-> Store (One-to-One)
 User.hasOne(Store, { foreignKey: 'userId', as: 'store' });
@@ -56,6 +58,16 @@ VariationOption.belongsTo(Variation, { foreignKey: 'variationId', as: 'variation
 User.hasMany(Variation, { foreignKey: 'userId', as: 'variations' });
 Variation.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
+// Order associations
+Store.hasMany(Order, { foreignKey: 'storeId', as: 'orders' });
+Order.belongsTo(Store, { foreignKey: 'storeId', as: 'store' });
+
+User.hasMany(Order, { foreignKey: 'customerId', as: 'customerOrders' });
+Order.belongsTo(User, { foreignKey: 'customerId', as: 'customer' });
+
+User.hasMany(Order, { foreignKey: 'sellerId', as: 'sellerOrders' });
+Order.belongsTo(User, { foreignKey: 'sellerId', as: 'seller' });
+
 // Export all models
 export {
     User,
@@ -72,5 +84,7 @@ export {
     IntegrationLog,
     ProductVariant,
     Variation,
-    VariationOption
+    VariationOption,
+    Order,
+    OrderItem
 };

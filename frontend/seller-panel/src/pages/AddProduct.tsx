@@ -93,6 +93,9 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         if (initialValues?.marketplaces) {
             setSelectedMarketplaces(initialValues.marketplaces);
         }
+        if (initialValues?.discountRate) {
+            setDiscountRate(initialValues.discountRate);
+        }
     }, []);
 
     useEffect(() => {
@@ -319,6 +322,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 isB2BEnabled,
                 b2bDiscount: isB2BEnabled ? b2bDiscount : 0,
                 b2bPrice: computedB2bPrice,
+                discountRate: values.discountRate || 0,
                 hasVariants,
                 variantAttributes: hasVariants ? ['Renk', 'Beden', 'Ölçü'] : [],
                 variants: hasVariants ? values.variants : []
@@ -773,6 +777,25 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                         </Row>
                     </Checkbox.Group>
                 </Form.Item>
+
+                {selectedMarketplaces.includes('golden') && (
+                    <Card size="small" style={{ marginBottom: 12, border: '1px solid #d4a017', background: '#fffbf0' }} title={<span style={{ color: '#d4a017' }}>Golden Marketplace İndirimi</span>}>
+                        <Form.Item 
+                            name="discountRate" 
+                            label="İndirim Oranı (%)"
+                            tooltip="Ürüne uygulanacak indirim yüzdesi"
+                        >
+                            <InputNumber 
+                                min={0} 
+                                max={100} 
+                                precision={2}
+                                style={{ width: '100%' }}
+                                placeholder="0"
+                                addonAfter="%"
+                            />
+                        </Form.Item>
+                    </Card>
+                )}
 
                 {selectedMarketplaces.includes('etsy') && (
                     <Card size="small" style={{ marginBottom: 12, border: '1px solid #F56400', background: '#fff9f5' }} title={<span style={{ color: '#F56400' }}>Etsy Ürün Ayarları (Zorunlu)</span>}>

@@ -73,7 +73,14 @@ export const SellersPage: React.FC = () => {
     const parseSubmit = async (values: any) => {
         try {
             if (editingStore) {
+                const { commissionRate, defaultShippingDays } = values;
                 await AdminAPI.updateStore(editingStore.id, values);
+                if (commissionRate !== undefined || defaultShippingDays !== undefined) {
+                    await AdminAPI.updateStoreCommission(editingStore.id, {
+                        commissionRate, 
+                        defaultShippingDays
+                    });
+                }
                 message.success('Store updated successfully');
             } else {
                 await AdminAPI.createStore(values);
@@ -97,6 +104,12 @@ export const SellersPage: React.FC = () => {
             render: (user: any) => user ? `${user.firstName} ${user.lastName}` : '-'
         },
         { title: 'Ürün Sayısı', dataIndex: 'totalProducts', key: 'totalProducts' },
+        { 
+            title: 'Komisyon (%)', 
+            dataIndex: 'commissionRate', 
+            key: 'commissionRate',
+            render: (rate: number) => `${rate || 10}%`
+        },
         {
             title: 'Durum',
             dataIndex: 'isActive',
@@ -163,6 +176,17 @@ export const SellersPage: React.FC = () => {
                     <Form.Item name="isActive" label="Aktif mi?" valuePropName="checked">
                         <Switch />
                     </Form.Item>
+
+                    {editingStore && (
+                        <>
+                            <Form.Item name="commissionRate" label="Komisyon Oranı (%)">
+                                <Input type="number" min={0} max={100} addonAfter="%" />
+                            </Form.Item>
+                            <Form.Item name="defaultShippingDays" label="Varsayılan Kargo Süresi (Gün)">
+                                <Input type="number" min={1} max={30} />
+                            </Form.Item>
+                        </>
+                    )}
                 </Form>
             </Modal>
         </Card>
