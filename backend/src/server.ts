@@ -34,78 +34,111 @@ async function syncAndSeedSettings() {
 
       // Migration: Add new columns to existing tables
       try {
-        await sequelize.query(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS commissionRate DECIMAL(5,2) DEFAULT 10`, { raw: true });
-        await sequelize.query(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS "defaultShippingDays" INTEGER DEFAULT 3`, { raw: true });
-        await sequelize.query(`ALTER TABLE stores ADD COLUMN IF NOT EXISTS "availableShippingCompanies" JSON DEFAULT '["MNG Kargo", "Yurtiçi Kargo", "Sürat Kargo", "PTT Kargo"]'`, { raw: true });
+        await sequelize.query(`
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'stores' AND column_name = 'commissionRate') THEN
+              ALTER TABLE stores ADD COLUMN commissionRate DECIMAL(5,2) DEFAULT 10;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'stores' AND column_name = 'defaultShippingDays') THEN
+              ALTER TABLE stores ADD COLUMN "defaultShippingDays" INTEGER DEFAULT 3;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'stores' AND column_name = 'availableShippingCompanies') THEN
+              ALTER TABLE stores ADD COLUMN "availableShippingCompanies" JSON DEFAULT '["MNG Kargo", "Yurtiçi Kargo", "Sürat Kargo", "PTT Kargo"]';
+            END IF;
+          END $$;
+        `, { raw: true });
         console.log('[DB] Store migration completed.');
       } catch (e: any) {
-        console.log('[DB] Store migration skipped (columns may exist).');
+        console.log('[DB] Store migration skipped:', e.message);
       }
 
       try {
-        await sequelize.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS discountRate DECIMAL(5,2) DEFAULT 0`, { raw: true });
-        await sequelize.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS discountedPrice DECIMAL(15,2) DEFAULT 0`, { raw: true });
+        await sequelize.query(`
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'discountRate') THEN
+              ALTER TABLE products ADD COLUMN discountRate DECIMAL(5,2) DEFAULT 0;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'discountedPrice') THEN
+              ALTER TABLE products ADD COLUMN discountedPrice DECIMAL(15,2) DEFAULT 0;
+            END IF;
+          END $$;
+        `, { raw: true });
         console.log('[DB] Product migration completed.');
       } catch (e: any) {
-        console.log('[DB] Product migration skipped (columns may exist).');
+        console.log('[DB] Product migration skipped:', e.message);
+      }
+
+      // Check if orders table exists, create if not
+      try {
+        const tableExists = await sequelize.query(`
+          SELECT 1 FROM information_schema.tables WHERE table_name = 'orders'
+        `, { raw: true });
+        
+        if (!tableExists[0]?.length) {
+          await sequelize.query(`
+            CREATE TABLE orders (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              "orderNumber" VARCHAR UNIQUE NOT NULL,
+              "customerId" UUID NOT NULL,
+              "sellerId" UUID NOT NULL,
+              "storeId" UUID NOT NULL,
+              status VARCHAR DEFAULT 'pending',
+              subtotal DECIMAL(15,2) DEFAULT 0,
+              "shippingCost" DECIMAL(15,2) DEFAULT 0,
+              "totalAmount" DECIMAL(15,2) DEFAULT 0,
+              "commissionRate" DECIMAL(5,2) DEFAULT 10,
+              "commissionAmount" DECIMAL(15,2) DEFAULT 0,
+              "sellerEarnings" DECIMAL(15,2) DEFAULT 0,
+              "shippingTime" INTEGER DEFAULT 3,
+              "shippingDeadline" TIMESTAMP,
+              "trackingNumber" VARCHAR,
+              "shippingCompany" VARCHAR,
+              "orderDate" TIMESTAMP DEFAULT NOW(),
+              "confirmedDate" TIMESTAMP,
+              "shippedDate" TIMESTAMP,
+              "deliveredDate" TIMESTAMP,
+              source VARCHAR DEFAULT 'golden',
+              "externalOrderId" VARCHAR,
+              "shippingAddress" JSONB,
+              "billingAddress" JSONB,
+              "customerNote" TEXT,
+              "createdAt" TIMESTAMP DEFAULT NOW(),
+              "updatedAt" TIMESTAMP DEFAULT NOW()
+            )
+          `, { raw: true });
+          console.log('[DB] Orders table created.');
+        }
+      } catch (e: any) {
+        console.log('[DB] Orders table check skipped:', e.message);
       }
 
       try {
-        await sequelize.query(`
-          CREATE TABLE IF NOT EXISTS orders (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            "orderNumber" VARCHAR UNIQUE NOT NULL,
-            "customerId" UUID NOT NULL,
-            "sellerId" UUID NOT NULL,
-            "storeId" UUID NOT NULL,
-            status VARCHAR DEFAULT 'pending',
-            subtotal DECIMAL(15,2) DEFAULT 0,
-            "shippingCost" DECIMAL(15,2) DEFAULT 0,
-            "totalAmount" DECIMAL(15,2) DEFAULT 0,
-            "commissionRate" DECIMAL(5,2) DEFAULT 10,
-            "commissionAmount" DECIMAL(15,2) DEFAULT 0,
-            "sellerEarnings" DECIMAL(15,2) DEFAULT 0,
-            "shippingTime" INTEGER DEFAULT 3,
-            "shippingDeadline" TIMESTAMP,
-            "trackingNumber" VARCHAR,
-            "shippingCompany" VARCHAR,
-            "orderDate" TIMESTAMP DEFAULT NOW(),
-            "confirmedDate" TIMESTAMP,
-            "shippedDate" TIMESTAMP,
-            "deliveredDate" TIMESTAMP,
-            source VARCHAR DEFAULT 'golden',
-            "externalOrderId" VARCHAR,
-            "shippingAddress" JSONB,
-            "billingAddress" JSONB,
-            "customerNote" TEXT,
-            "createdAt" TIMESTAMP DEFAULT NOW(),
-            "updatedAt" TIMESTAMP DEFAULT NOW()
-          )
+        const tableExists = await sequelize.query(`
+          SELECT 1 FROM information_schema.tables WHERE table_name = 'order_items'
         `, { raw: true });
-        console.log('[DB] Orders table check completed.');
+        
+        if (!tableExists[0]?.length) {
+          await sequelize.query(`
+            CREATE TABLE order_items (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              "orderId" UUID NOT NULL,
+              "productId" UUID NOT NULL,
+              "variantId" UUID,
+              title VARCHAR NOT NULL,
+              sku VARCHAR NOT NULL,
+              quantity INTEGER DEFAULT 1,
+              "unitPrice" DECIMAL(15,2) NOT NULL,
+              "totalPrice" DECIMAL(15,2) NOT NULL,
+              "createdAt" TIMESTAMP DEFAULT NOW(),
+              "updatedAt" TIMESTAMP DEFAULT NOW()
+            )
+          `, { raw: true });
+          console.log('[DB] OrderItems table created.');
+        }
       } catch (e: any) {
-        console.log('[DB] Order table migration skipped:', e.message);
-      }
-
-      try {
-        await sequelize.query(`
-          CREATE TABLE IF NOT EXISTS order_items (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            "orderId" UUID NOT NULL,
-            "productId" UUID NOT NULL,
-            "variantId" UUID,
-            title VARCHAR NOT NULL,
-            sku VARCHAR NOT NULL,
-            quantity INTEGER DEFAULT 1,
-            "unitPrice" DECIMAL(15,2) NOT NULL,
-            "totalPrice" DECIMAL(15,2) NOT NULL,
-            "createdAt" TIMESTAMP DEFAULT NOW(),
-            "updatedAt" TIMESTAMP DEFAULT NOW()
-          )
-        `, { raw: true });
-        console.log('[DB] OrderItems table check completed.');
-      } catch (e: any) {
-        console.log('[DB] OrderItems table migration skipped:', e.message);
+        console.log('[DB] OrderItems table check skipped:', e.message);
       }
     }
 
