@@ -47,7 +47,7 @@ router.get('/settings', SettingsController.getSettings);
 router.post('/settings', SettingsController.updateSettings);
 
 // --- ORDERS ---
-const adminOrdersRouter = require('./adminOrders');
+import adminOrdersRouter from './adminOrders';
 router.use('/orders', adminOrdersRouter);
 
 export default router;
