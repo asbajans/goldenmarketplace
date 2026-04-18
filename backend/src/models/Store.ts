@@ -112,18 +112,21 @@ Store.init(
       type: DataTypes.DECIMAL(5, 2),
       allowNull: false,
       defaultValue: 10,
+      field: 'commissionrate',
       comment: 'Commission percentage for this seller (default 10%)'
     },
     defaultShippingDays: {
       type: DataTypes.INTEGER,
       allowNull: false,
       defaultValue: 3,
+      field: 'defaultshippingdays',
       comment: 'Default shipping time in days'
     },
     availableShippingCompanies: {
       type: DataTypes.JSON,
       allowNull: true,
       defaultValue: ['MNG Kargo', 'Yurtiçi Kargo', 'Sürat Kargo', 'PTT Kargo'],
+      field: 'availableshippingcompanies',
       comment: 'Available shipping companies for this seller'
     },
     bankName: {

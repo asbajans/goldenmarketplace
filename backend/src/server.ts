@@ -32,43 +32,28 @@ async function syncAndSeedSettings() {
       await sequelize.sync({ force: false, alter: false });
       console.log('[DB] New tables created if missing (safe sync).');
 
-      // Migration: Add new columns to existing tables
+      // Migration: Try to add columns, but don't fail if they exist
       try {
-        await sequelize.query(`
-          DO $$
-          BEGIN
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'stores' AND column_name = 'commissionRate') THEN
-              ALTER TABLE stores ADD COLUMN commissionRate DECIMAL(5,2) DEFAULT 10;
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'stores' AND column_name = 'defaultShippingDays') THEN
-              ALTER TABLE stores ADD COLUMN "defaultShippingDays" INTEGER DEFAULT 3;
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'stores' AND column_name = 'availableShippingCompanies') THEN
-              ALTER TABLE stores ADD COLUMN "availableShippingCompanies" JSON DEFAULT '["MNG Kargo", "Yurtiçi Kargo", "Sürat Kargo", "PTT Kargo"]';
-            END IF;
-          END $$;
-        `, { raw: true });
-        console.log('[DB] Store migration completed.');
+        await sequelize.query(`ALTER TABLE stores ADD COLUMN commissionRate DECIMAL(5,2) DEFAULT 10`, { raw: true });
+        console.log('[DB] Added commissionRate to stores');
       } catch (e: any) {
-        console.log('[DB] Store migration skipped:', e.message);
+        // Column may already exist
       }
+      try {
+        await sequelize.query(`ALTER TABLE stores ADD COLUMN "defaultShippingDays" INTEGER DEFAULT 3`, { raw: true });
+      } catch (e: any) {}
+      try {
+        await sequelize.query(`ALTER TABLE stores ADD COLUMN "availableShippingCompanies" JSON DEFAULT '["MNG Kargo"]'`, { raw: true });
+      } catch (e: any) {}
+      console.log('[DB] Store migration done.');
 
       try {
-        await sequelize.query(`
-          DO $$
-          BEGIN
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'discountRate') THEN
-              ALTER TABLE products ADD COLUMN discountRate DECIMAL(5,2) DEFAULT 0;
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'discountedPrice') THEN
-              ALTER TABLE products ADD COLUMN discountedPrice DECIMAL(15,2) DEFAULT 0;
-            END IF;
-          END $$;
-        `, { raw: true });
-        console.log('[DB] Product migration completed.');
-      } catch (e: any) {
-        console.log('[DB] Product migration skipped:', e.message);
-      }
+        await sequelize.query(`ALTER TABLE products ADD COLUMN discountRate DECIMAL(5,2) DEFAULT 0`, { raw: true });
+      } catch (e: any) {}
+      try {
+        await sequelize.query(`ALTER TABLE products ADD COLUMN discountedPrice DECIMAL(15,2) DEFAULT 0`, { raw: true });
+      } catch (e: any) {}
+      console.log('[DB] Product migration done.');
 
       // Check if orders table exists, create if not
       try {

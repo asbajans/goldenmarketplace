@@ -174,12 +174,14 @@ Product.init(
       type: DataTypes.DECIMAL(5, 2),
       allowNull: false,
       defaultValue: 0,
+      field: 'discountrate',
       comment: 'Discount percentage for golden marketplace'
     },
     discountedPrice: {
       type: DataTypes.DECIMAL(15, 2),
       allowNull: false,
       defaultValue: 0,
+      field: 'discountedprice',
       comment: 'Calculated: priceTRY × (1 - discountRate/100)'
     },
     quantity: {
