@@ -29,100 +29,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - ./backend/src/scripts/migrate-order-system.sql:/migrate-order-system.sql:ro
     entrypoint: >
       /bin/sh -c "
       echo 'Running database migrations...' &&
       export PGPASSWORD=$$POSTGRES_PASSWORD &&
-      
-      # Add store columns
-      psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE stores ADD COLUMN IF NOT EXISTS commissionRate DECIMAL(5,2) DEFAULT 10;\" &&
-      psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE stores ADD COLUMN IF NOT EXISTS defaultShippingDays INTEGER DEFAULT 3;\" &&
-      psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE stores ADD COLUMN IF NOT EXISTS availableShippingCompanies JSONB DEFAULT '[\''MNG Kargo'\'', '\''Yurtiçi Kargo'\'', '\''Sürat Kargo'\'', '\''PTT Kargo'\'']'\";\" &&
-      
-      # Add product columns
-      psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE products ADD COLUMN IF NOT EXISTS discountRate DECIMAL(5,2) DEFAULT 0;\" &&
-      psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE products ADD COLUMN IF NOT EXISTS discountedPrice DECIMAL(15,2) DEFAULT 0;\" &&
-      
-      # Check if orders table exists
-      echo 'Checking orders table...' &&
-      if psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -t -c \"SELECT 1 FROM information_schema.tables WHERE table_name = 'orders'\" | grep -q 1; then
-        echo 'Orders table exists, ensuring columns...';
-        # Add missing columns if they don't exist
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE orders ADD COLUMN IF NOT EXISTS \"orderNumber\" VARCHAR;\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE orders ADD COLUMN IF NOT EXISTS \"commissionRate\" DECIMAL(5,2) DEFAULT 10;\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE orders ADD COLUMN IF NOT EXISTS \"commissionAmount\" DECIMAL(15,2) DEFAULT 0;\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE orders ADD COLUMN IF NOT EXISTS \"sellerEarnings\" DECIMAL(15,2) DEFAULT 0;\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE orders ADD COLUMN IF NOT EXISTS \"shippingTime\" INTEGER DEFAULT 3;\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE orders ADD COLUMN IF NOT EXISTS \"shippingDeadline\" TIMESTAMP;\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE orders ADD COLUMN IF NOT EXISTS \"trackingNumber\" VARCHAR;\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE orders ADD COLUMN IF NOT EXISTS \"shippingCompany\" VARCHAR;\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE orders ADD COLUMN IF NOT EXISTS source VARCHAR DEFAULT 'golden';\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE orders ADD COLUMN IF NOT EXISTS \"externalOrderId\" VARCHAR;\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE orders ADD COLUMN IF NOT EXISTS \"shippingAddress\" JSONB;\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE orders ADD COLUMN IF NOT EXISTS \"billingAddress\" JSONB;\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE orders ADD COLUMN IF NOT EXISTS \"customerNote\" TEXT;\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE orders ADD COLUMN IF NOT EXISTS \"createdAt\" TIMESTAMP DEFAULT NOW();\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"ALTER TABLE orders ADD COLUMN IF NOT EXISTS \"updatedAt\" TIMESTAMP DEFAULT NOW();\" &&
-        # Ensure orderNumber is not null and unique
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"DO $$\$ BEGIN BEGIN ALTER TABLE orders ALTER COLUMN \"orderNumber\" SET NOT NULL; EXCEPTION WHEN OTHERS THEN NULL; END; END; $$\$;\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"DO $$\$ BEGIN BEGIN ALTER TABLE orders ADD CONSTRAINT orders_orderNumber_key UNIQUE (\"orderNumber\"); EXCEPTION WHEN duplicate_object THEN NULL; END; END; $$\$;\"; 
-      else
-        echo 'Creating orders table...';
-        # Create orders table if it doesn't exist
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"
-        CREATE TABLE orders (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            \"orderNumber\" VARCHAR UNIQUE NOT NULL,
-            \"customerId\" UUID NOT NULL,
-            \"sellerId\" UUID NOT NULL,
-            \"storeId\" UUID NOT NULL,
-            status VARCHAR DEFAULT 'pending',
-            subtotal DECIMAL(15,2) DEFAULT 0,
-            \"shippingCost\" DECIMAL(15,2) DEFAULT 0,
-            \"totalAmount\" DECIMAL(15,2) DEFAULT 0,
-            \"commissionRate\" DECIMAL(5,2) DEFAULT 10,
-            \"commissionAmount\" DECIMAL(15,2) DEFAULT 0,
-            \"sellerEarnings\" DECIMAL(15,2) DEFAULT 0,
-            \"shippingTime\" INTEGER DEFAULT 3,
-            \"shippingDeadline\" TIMESTAMP,
-            \"trackingNumber\" VARCHAR,
-            \"shippingCompany\" VARCHAR,
-            \"orderDate\" TIMESTAMP DEFAULT NOW(),
-            \"confirmedDate\" TIMESTAMP,
-            \"shippedDate\" TIMESTAMP,
-            \"deliveredDate\" TIMESTAMP,
-            source VARCHAR DEFAULT 'golden',
-            \"externalOrderId\" VARCHAR,
-            \"shippingAddress\" JSONB,
-            \"billingAddress\" JSONB,
-            \"customerNote\" TEXT,
-            \"createdAt\" TIMESTAMP DEFAULT NOW(),
-            \"updatedAt\" TIMESTAMP DEFAULT NOW()
-        );
-        \" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"
-        CREATE TABLE order_items (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            \"orderId\" UUID NOT NULL,
-            \"productId\" UUID NOT NULL,
-            \"variantId\" UUID,
-            title VARCHAR NOT NULL,
-            sku VARCHAR NOT NULL,
-            quantity INTEGER DEFAULT 1,
-            \"unitPrice\" DECIMAL(15,2) NOT NULL,
-            \"totalPrice\" DECIMAL(15,2) NOT NULL,
-            \"createdAt\" TIMESTAMP DEFAULT NOW(),
-            \"updatedAt\" TIMESTAMP DEFAULT NOW()
-        );
-        \" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"CREATE INDEX IF NOT EXISTS idx_orders_orderNumber ON orders(\"orderNumber\");\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"CREATE INDEX IF NOT EXISTS idx_orders_seller ON orders(\"sellerId\", status);\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"CREATE INDEX IF NOT EXISTS idx_orders_store ON orders(\"storeId\", status);\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(\"customerId\", \"createdAt\");\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"CREATE INDEX IF NOT EXISTS idx_orders_source ON orders(source, status);\" &&
-        psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -c \"CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);\";
-      fi &&
-      
+      psql -U $$POSTGRES_USER -d $$POSTGRES_DB -h postgres -f /migrate-order-system.sql &&
       echo 'Database migration completed!'
       "
     environment:
