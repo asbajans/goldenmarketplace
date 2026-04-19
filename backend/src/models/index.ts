@@ -68,6 +68,10 @@ Order.belongsTo(User, { foreignKey: 'customerId', as: 'customer' });
 User.hasMany(Order, { foreignKey: 'sellerId', as: 'sellerOrders' });
 Order.belongsTo(User, { foreignKey: 'sellerId', as: 'seller' });
 
+// Order -> OrderItem association (for items include) - must be in index.ts for Sequelize to recognize
+Order.hasMany(OrderItem, { foreignKey: 'orderId', as: 'items' });
+OrderItem.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
+
 // Export all models
 export {
     User,
