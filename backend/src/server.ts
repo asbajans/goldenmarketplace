@@ -20,18 +20,9 @@ async function syncAndSeedSettings() {
   try {
     const isProduction = process.env.NODE_ENV === 'production';
 
-    if (!isProduction) {
-      // Development only: sync schema changes automatically
-      await sequelize.sync({ alter: true });
-      console.log('[DB] Schema synced (development mode).');
-    } else {
-      // Production: verify connection, then safely create any NEW tables only
-      // sync({ force: false, alter: false }) = only creates missing tables, never modifies existing ones
-      await sequelize.authenticate();
-      console.log('[DB] Connection verified (production mode).');
-      await sequelize.sync({ force: false, alter: false });
-      console.log('[DB] New tables created if missing (safe sync).');
-    }
+    // Sync schema - uses alter in both dev and prod to add new columns/tables
+    await sequelize.sync({ alter: true });
+    console.log(`[DB] Schema synced (${isProduction ? 'production' : 'development'} mode).`);
 
     // Seed initial GlobalSettings for Etsy keys
     const settingsToSeed = [
