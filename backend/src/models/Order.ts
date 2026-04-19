@@ -303,9 +303,6 @@ Order.init(
   }
 );
 
-Order.hasMany(OrderItem, { foreignKey: 'orderId', as: 'items' });
-OrderItem.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
-
 export default Order;
 export { Order, OrderItem };
 export type { IOrderStatus as OrderStatus, IOrderSource as OrderSource };
