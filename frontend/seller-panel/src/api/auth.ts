@@ -24,3 +24,12 @@ export const logout = () => {
     localStorage.removeItem('user');
     window.location.href = '/login';
 };
+
+export const googleAuth = async (googleToken: string) => {
+    const response = await client.post('/auth/google', { googleToken });
+    if (response.data.accessToken) {
+        localStorage.setItem('token', response.data.accessToken);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+    }
+    return response.data;
+};
