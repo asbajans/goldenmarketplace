@@ -69,6 +69,10 @@ Order.belongsTo(User, { foreignKey: 'customerId', as: 'customer' });
 User.hasMany(Order, { foreignKey: 'sellerId', as: 'sellerOrders' });
 Order.belongsTo(User, { foreignKey: 'sellerId', as: 'seller' });
 
+// Order <-> OrderItem associations
+Order.hasMany(OrderItem, { foreignKey: 'orderId', as: 'items' });
+OrderItem.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
+
 // Wishlist associations
 User.hasMany(Wishlist, { foreignKey: 'userId', as: 'wishlists' });
 Wishlist.belongsTo(User, { foreignKey: 'userId', as: 'user' });

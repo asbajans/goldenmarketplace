@@ -26,7 +26,7 @@ router.get('/', async (req: Request, res: Response) => {
       include: [{
         model: Product,
         as: 'product',
-        attributes: ['id', 'title', 'price', 'image', 'storeSlug']
+        attributes: ['id', 'title', 'priceTRY', 'image', 'storeSlug']
       }],
       order: [['createdAt', 'DESC']]
     });
@@ -35,7 +35,7 @@ router.get('/', async (req: Request, res: Response) => {
       id: item.id,
       productId: item.productId,
       title: item.product?.title,
-      price: item.product?.price,
+      price: item.product?.priceTRY,
       image: item.product?.image,
       storeSlug: item.product?.storeSlug,
       createdAt: item.createdAt
