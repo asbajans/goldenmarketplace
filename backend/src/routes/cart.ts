@@ -18,21 +18,32 @@ function generateOrderNumber() {
   return `GC${datePart}${timePart}${random}`;
 }
 
-function getGuestId(req: any): string | null {
+function getCartId(req: any): string | null {
+  if (req.user?.id) {
+    return `user_${req.user.id}`;
+  }
   return req.cookies?.guestId || (req.sessionID ? `guest_${req.sessionID}` : null);
 }
 
-// Get cart
+// Get cart - now supports both guest and authenticated users
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const guestId = getGuestId(req);
+    const cartId = getCartId(req);
+    const userId = req.user?.id;
     
-    if (!guestId) {
+    if (!cartId && !userId) {
       return res.json({ items: [], total: 0, count: 0, cartId: null });
     }
 
+    const where: any = { status: 'pending' };
+    if (userId) {
+      where.customerId = userId;
+    } else if (cartId) {
+      where.guestId = cartId;
+    }
+
     const cart = await Order.findOne({
-      where: { guestId, status: 'pending' },
+      where,
       include: [{ model: OrderItem, as: 'items' }]
     });
 
@@ -60,13 +71,14 @@ router.get('/', async (req: Request, res: Response) => {
 router.post('/add', async (req: Request, res: Response) => {
   try {
     const { productId, variantId, quantity = 1 } = req.body;
-    const guestId = getGuestId(req);
+    const userId = req.user?.id;
+    const cartId = getCartId(req);
 
     if (!productId && !variantId) {
       return res.status(400).json({ error: 'Product or variant required' });
     }
 
-    if (!guestId) {
+    if (!cartId && !userId) {
       return res.status(400).json({ error: 'Session invalid' });
     }
 
@@ -89,15 +101,22 @@ router.post('/add', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
+    const cartWhere: any = { status: 'pending' };
+    if (userId) {
+      cartWhere.customerId = userId;
+    } else if (cartId) {
+      cartWhere.guestId = cartId;
+    }
+
     let cart = await Order.findOne({
-      where: { guestId, status: 'pending' }
+      where: cartWhere
     });
 
     if (!cart) {
       cart = await Order.create({
         orderNumber: generateOrderNumber(),
-        customerId: undefined,
-        guestId,
+        customerId: userId || undefined,
+        guestId: cartId || undefined,
         status: 'pending',
         source: 'golden',
         storeId: product.storeId
@@ -152,14 +171,23 @@ router.put('/item/:itemId', async (req: Request, res: Response) => {
   try {
     const { itemId } = req.params;
     const { quantity } = req.body;
-    const guestId = getGuestId(req);
+    const userId = req.user?.id;
 
     if (quantity < 1) {
       return res.status(400).json({ error: 'Quantity must be at least 1' });
     }
 
+    const where: any = { id: itemId };
+    if (userId) {
+      (await import('../models/Order')).Order.findByPk;
+    }
+
     const item = await OrderItem.findByPk(itemId, {
-      include: [{ model: Order, as: 'order', where: { guestId } }]
+      include: [{
+        model: (await import('../models/Order')).Order,
+        as: 'order',
+        where: userId ? { customerId: userId } : {}
+      }]
     } as any);
 
     if (!item) {

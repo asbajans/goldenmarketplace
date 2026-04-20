@@ -132,6 +132,7 @@ app.use('/api/variations', require('./routes/variations').default || require('./
 app.use('/api/orders', require('./routes/orders').default || require('./routes/orders'));
 app.use('/api/external-orders', require('./routes/externalOrders').default || require('./routes/externalOrders'));
 app.use('/api/cart', require('./routes/cart').default || require('./routes/cart'));
+app.use('/api/orders/customer', require('./routes/customerOrders').default || require('./routes/customerOrders'));
 
 // Error handling middleware
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
