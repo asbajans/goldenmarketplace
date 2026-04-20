@@ -9,7 +9,9 @@ const router = express.Router();
 const { Order, OrderItem } = require('../models/Order');
 const Product = require('../models/Product');
 const ProductVariant = require('../models/ProductVariant');
-const JWTService = require('../utils/jwt');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key';
 
 function generateOrderNumber() {
   const now = new Date();
@@ -19,13 +21,15 @@ function generateOrderNumber() {
   return `GC${datePart}${timePart}${random}`;
 }
 
-function extractUser(req: any): { id: string } | null {
+function extractUser(req: any): { id: string; email: string; userType: string } | null {
   const token = req.headers.authorization?.split(' ')[1];
   if (token) {
     try {
-      const decoded = JWTService.default.verifyToken(token);
-      if (decoded) return decoded;
-    } catch (e) {}
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      if (decoded && decoded.id) return decoded;
+    } catch (e: any) {
+      console.error('JWT verify error:', e?.message || e);
+    }
   }
   return null;
 }
