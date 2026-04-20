@@ -9,6 +9,7 @@ const router = express.Router();
 const { Order, OrderItem } = require('../models/Order');
 const Product = require('../models/Product');
 const ProductVariant = require('../models/ProductVariant');
+const JWTService = require('../utils/jwt');
 
 function generateOrderNumber() {
   const now = new Date();
@@ -18,9 +19,21 @@ function generateOrderNumber() {
   return `GC${datePart}${timePart}${random}`;
 }
 
+function extractUser(req: any): { id: string } | null {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (token) {
+    try {
+      const decoded = JWTService.default.verifyToken(token);
+      if (decoded) return decoded;
+    } catch (e) {}
+  }
+  return null;
+}
+
 function getCartId(req: any): string | null {
-  if (req.user?.id) {
-    return `user_${req.user.id}`;
+  const user = extractUser(req);
+  if (user?.id) {
+    return `user_${user.id}`;
   }
   return req.cookies?.guestId || (req.sessionID ? `guest_${req.sessionID}` : null);
 }
@@ -28,8 +41,9 @@ function getCartId(req: any): string | null {
 // Get cart - now supports both guest and authenticated users
 router.get('/', async (req: Request, res: Response) => {
   try {
+    const user = extractUser(req);
+    const userId = user?.id;
     const cartId = getCartId(req);
-    const userId = req.user?.id;
     
     if (!cartId && !userId) {
       return res.json({ items: [], total: 0, count: 0, cartId: null });
@@ -71,7 +85,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.post('/add', async (req: Request, res: Response) => {
   try {
     const { productId, variantId, quantity = 1 } = req.body;
-    const userId = req.user?.id;
+    const userId = extractUser(req)?.id;
     const cartId = getCartId(req);
 
     if (!productId && !variantId) {
@@ -171,7 +185,7 @@ router.put('/item/:itemId', async (req: Request, res: Response) => {
   try {
     const { itemId } = req.params;
     const { quantity } = req.body;
-    const userId = req.user?.id;
+    const userId = extractUser(req)?.id;
 
     if (quantity < 1) {
       return res.status(400).json({ error: 'Quantity must be at least 1' });
@@ -206,7 +220,7 @@ router.put('/item/:itemId', async (req: Request, res: Response) => {
 router.delete('/item/:itemId', async (req: Request, res: Response) => {
   try {
     const { itemId } = req.params;
-    const userId = req.user?.id;
+    const userId = extractUser(req)?.id;
     const cartId = getCartId(req);
 
     const whereClause: any = userId ? { customerId: userId } : { guestId: cartId };
@@ -231,7 +245,7 @@ router.delete('/item/:itemId', async (req: Request, res: Response) => {
 // Clear cart
 router.delete('/clear', async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = extractUser(req)?.id;
     const cartId = getCartId(req);
 
     if (!userId && !cartId) {
@@ -261,7 +275,7 @@ router.delete('/clear', async (req: Request, res: Response) => {
 // Checkout
 router.post('/checkout', async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = extractUser(req)?.id;
     const cartId = getCartId(req);
     const { name, phone, address, city, country, notes } = req.body;
 
