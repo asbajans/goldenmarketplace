@@ -177,16 +177,13 @@ router.put('/item/:itemId', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Quantity must be at least 1' });
     }
 
-    const where: any = { id: itemId };
-    if (userId) {
-      (await import('../models/Order')).Order.findByPk;
-    }
+    const whereClause: any = userId ? { customerId: userId } : {};
 
     const item = await OrderItem.findByPk(itemId, {
       include: [{
-        model: (await import('../models/Order')).Order,
+        model: Order,
         as: 'order',
-        where: userId ? { customerId: userId } : {}
+        where: whereClause
       }]
     } as any);
 
@@ -209,10 +206,13 @@ router.put('/item/:itemId', async (req: Request, res: Response) => {
 router.delete('/item/:itemId', async (req: Request, res: Response) => {
   try {
     const { itemId } = req.params;
-    const guestId = getGuestId(req);
+    const userId = req.user?.id;
+    const cartId = getCartId(req);
+
+    const whereClause: any = userId ? { customerId: userId } : { guestId: cartId };
 
     const item = await OrderItem.findByPk(itemId, {
-      include: [{ model: Order, as: 'order', where: { guestId } }]
+      include: [{ model: Order, as: 'order', where: whereClause }]
     } as any);
 
     if (!item) {
@@ -231,15 +231,21 @@ router.delete('/item/:itemId', async (req: Request, res: Response) => {
 // Clear cart
 router.delete('/clear', async (req: Request, res: Response) => {
   try {
-    const guestId = getGuestId(req);
+    const userId = req.user?.id;
+    const cartId = getCartId(req);
 
-    if (!guestId) {
+    if (!userId && !cartId) {
       return res.json({ success: true });
     }
 
-    const cart = await Order.findOne({
-      where: { guestId, status: 'pending' }
-    });
+    const whereClause: any = { status: 'pending' };
+    if (userId) {
+      whereClause.customerId = userId;
+    } else if (cartId) {
+      whereClause.guestId = cartId;
+    }
+
+    const cart = await Order.findOne({ where: whereClause });
 
     if (cart) {
       await OrderItem.destroy({ where: { orderId: cart.id } });
@@ -255,15 +261,23 @@ router.delete('/clear', async (req: Request, res: Response) => {
 // Checkout
 router.post('/checkout', async (req: Request, res: Response) => {
   try {
-    const guestId = getGuestId(req);
+    const userId = req.user?.id;
+    const cartId = getCartId(req);
     const { name, phone, address, city, country, notes } = req.body;
 
-    if (!guestId) {
+    if (!userId && !cartId) {
       return res.status(400).json({ error: 'Session invalid' });
     }
 
+    const whereClause: any = { status: 'pending' };
+    if (userId) {
+      whereClause.customerId = userId;
+    } else if (cartId) {
+      whereClause.guestId = cartId;
+    }
+
     const cart = await Order.findOne({
-      where: { guestId, status: 'pending' },
+      where: whereClause,
       include: [{ model: OrderItem, as: 'items' }]
     });
 
