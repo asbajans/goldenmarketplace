@@ -10,7 +10,7 @@ export const schemas = {
     email: Joi.string().email().required(),
     password: Joi.string().min(8).required(),
     firstName: Joi.string().required(),
-    lastName: Joi.string().required(),
+    lastName: Joi.string().allow(''),
     userType: Joi.string().valid('seller', 'customer', 'admin'),
     phone: Joi.string().allow('', null),
     storeName: Joi.string().allow('', null)
