@@ -9,9 +9,6 @@ const router = express.Router();
 const { Order, OrderItem } = require('../models/Order');
 const Product = require('../models/Product');
 const ProductVariant = require('../models/ProductVariant');
-const jwt = require('jsonwebtoken');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key';
 
 function generateOrderNumber() {
   const now = new Date();
@@ -22,14 +19,21 @@ function generateOrderNumber() {
 }
 
 function extractUser(req: any): { id: string; email: string; userType: string } | null {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (token) {
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
-      if (decoded && decoded.id) return decoded;
-    } catch (e: any) {
-      console.error('JWT verify error:', e?.message || e);
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return null;
+  
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+  if (!token) return null;
+  
+  try {
+    const jwt = require('jsonwebtoken');
+    const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key';
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    if (decoded && decoded.id) {
+      return decoded;
     }
+  } catch (e) {
+    // Ignore JWT errors
   }
   return null;
 }
@@ -42,7 +46,7 @@ function getCartId(req: any): string | null {
   return req.cookies?.guestId || (req.sessionID ? `guest_${req.sessionID}` : null);
 }
 
-// Get cart - now supports both guest and authenticated users
+// Get cart - supports both guest and authenticated users
 router.get('/', async (req: Request, res: Response) => {
   try {
     const user = extractUser(req);
@@ -126,9 +130,7 @@ router.post('/add', async (req: Request, res: Response) => {
       cartWhere.guestId = cartId;
     }
 
-    let cart = await Order.findOne({
-      where: cartWhere
-    });
+    let cart = await Order.findOne({ where: cartWhere });
 
     if (!cart) {
       cart = await Order.create({
@@ -142,10 +144,7 @@ router.post('/add', async (req: Request, res: Response) => {
     }
 
     const existingItem = await OrderItem.findOne({
-      where: {
-        orderId: cart.id,
-        productId: product.id
-      }
+      where: { orderId: cart.id, productId: product.id }
     } as any);
 
     if (existingItem) {
@@ -165,10 +164,7 @@ router.post('/add', async (req: Request, res: Response) => {
       } as any);
     }
 
-    const cartItems = await OrderItem.findAll({
-      where: { orderId: cart.id }
-    });
-
+    const cartItems = await OrderItem.findAll({ where: { orderId: cart.id } });
     const total = cartItems.reduce((sum: number, item: any) => sum + (item.totalPrice || 0), 0);
 
     return res.json({
@@ -238,7 +234,6 @@ router.delete('/item/:itemId', async (req: Request, res: Response) => {
     }
 
     await item.destroy();
-
     return res.json({ success: true });
   } catch (error: any) {
     console.error('Remove item error:', error);
