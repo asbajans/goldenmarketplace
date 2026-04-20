@@ -43,8 +43,8 @@ export class AuthController {
         pendingStoreName: userType === 'seller' ? storeName : undefined
       });
 
-      // Generate token
-      const token = JWTService.generateToken({
+      // Generate tokens
+      const { accessToken, refreshToken } = JWTService.generateTokenPair({
         id: user.id,
         email: user.email,
         userType: user.userType
@@ -52,7 +52,8 @@ export class AuthController {
 
       return res.status(201).json({
         message: userType === 'seller' ? 'Kayıt alındı. Yönetici onayının ardından hesabınız aktifleşecektir.' : 'User registered successfully',
-        token,
+        accessToken,
+        refreshToken,
         user: {
           id: user.id,
           email: user.email,
@@ -197,30 +198,30 @@ export class AuthController {
         });
       }
 
-      let user = await User.findOne({ where: { email } });
+      const existingUser = await User.findOne({ where: { email } });
       
-      if (user) {
+      if (existingUser) {
         const { accessToken, refreshToken } = JWTService.generateTokenPair({
-          id: user.id,
-          email: user.email,
-          userType: user.userType
+          id: existingUser.id,
+          email: existingUser.email,
+          userType: existingUser.userType
         });
         return res.status(200).json({
           accessToken,
           refreshToken,
           user: {
-            id: user.id,
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            userType: user.userType
+            id: existingUser.id,
+            email: existingUser.email,
+            firstName: existingUser.firstName,
+            lastName: existingUser.lastName,
+            userType: existingUser.userType
           }
         });
       }
 
       const hashedPassword = await PasswordService.hashPassword(Math.random().toString(36).slice(2) + Date.now().toString());
       
-      user = await User.create({
+      const newUser = await User.create({
         email,
         password: hashedPassword,
         firstName: firstName || email.split('@')[0],
@@ -230,20 +231,20 @@ export class AuthController {
       });
 
       const { accessToken, refreshToken } = JWTService.generateTokenPair({
-        id: user.id,
-        email: user.email,
-        userType: user.userType
+        id: newUser.id,
+        email: newUser.email,
+        userType: newUser.userType
       });
 
       return res.status(201).json({
         accessToken,
         refreshToken,
         user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          userType: user.userType
+          id: newUser.id,
+          email: newUser.email,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          userType: newUser.userType
         }
       });
     } catch (error) {
