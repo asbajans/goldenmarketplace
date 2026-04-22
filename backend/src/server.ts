@@ -30,7 +30,11 @@ async function syncAndSeedSettings() {
       { key: 'etsy_api_secret', value: '', description: 'Etsy Master Application Shared Secret', isPublic: false },
       { key: 'ai_provider', value: 'openai', description: 'AI Provider (openai, openrouter, gemini)', isPublic: true },
       { key: 'ai_api_key', value: '', description: 'AI Provider API Key', isPublic: false },
-      { key: 'ai_model', value: 'gpt-4o-mini', description: 'AI Model (e.g. gpt-4o-mini, gemini-pro)', isPublic: true }
+      { key: 'ai_model', value: 'gpt-4o-mini', description: 'AI Model (e.g. gpt-4o-mini, gemini-pro)', isPublic: true },
+      { key: 'bank_name', value: '', description: 'Bank Name for Wire Transfer', isPublic: true },
+      { key: 'bank_iban', value: '', description: 'IBAN for Wire Transfer', isPublic: true },
+      { key: 'bank_account_name', value: '', description: 'Account Holder Name', isPublic: true },
+      { key: 'bank_swift', value: '', description: 'SWIFT Code', isPublic: true }
     ];
 
     for (const setting of settingsToSeed) {
