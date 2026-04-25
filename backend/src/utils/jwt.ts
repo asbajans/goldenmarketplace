@@ -59,12 +59,12 @@ export class JWTService {
    */
   static generateTokenPair(payload: Omit<TokenPayload, 'iat' | 'exp'>) {
     const accessToken = jwt.sign(payload as any, JWT_SECRET as any, {
-      expiresIn: '1h',
+      expiresIn: '24h', // 24 saat - daha uzun oturum
       algorithm: 'HS256'
     } as any);
 
     const refreshToken = jwt.sign(payload as any, JWT_SECRET as any, {
-      expiresIn: '7d',
+      expiresIn: '30d', // 30 gün - refresh token
       algorithm: 'HS256'
     } as any);
 

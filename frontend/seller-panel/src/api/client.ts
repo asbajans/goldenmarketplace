@@ -24,17 +24,56 @@ client.interceptors.request.use(
     }
 );
 
+// Refresh token function
+const refreshAccessToken = async (): Promise<boolean> => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) return false;
+    
+    try {
+        const response = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
+        if (response.data.accessToken) {
+            localStorage.setItem('token', response.data.accessToken);
+            if (response.data.refreshToken) {
+                localStorage.setItem('refreshToken', response.data.refreshToken);
+            }
+            return true;
+        }
+    } catch (error) {
+        console.error('Token refresh failed:', error);
+    }
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    return false;
+};
+
 // Add a response interceptor
 client.interceptors.response.use(
     (response) => response,
-    (error) => {
+    async (error) => {
+        const originalRequest = error.config;
+        
         if (error.response && error.response.status === 401) {
+            // Try to refresh token if not already retried
+            if (!originalRequest._retry) {
+                originalRequest._retry = true;
+                
+                const refreshed = await refreshAccessToken();
+                if (refreshed) {
+                    // Retry the original request
+                    const token = localStorage.getItem('token');
+                    originalRequest.headers.Authorization = `Bearer ${token}`;
+                    return client(originalRequest);
+                }
+            }
+            
+            // If refresh failed or already retried, redirect to login
             const currentPath = window.location.pathname;
-            const requestUrl = error.config?.url || '';
-
-            // Don't redirect if already on login/register or if this was an auth check
+            const requestUrl = originalRequest?.url || '';
+            
             if (!currentPath.includes('/login') && !currentPath.includes('/register') && !requestUrl.includes('/auth/me')) {
                 localStorage.removeItem('token');
+                localStorage.removeItem('refreshToken');
                 localStorage.removeItem('user');
                 window.location.href = '/login';
             }
