@@ -448,6 +448,83 @@ export class EtsyClient {
             }
         });
     }
+
+    /**
+     * Get shop receipts (orders) from Etsy
+     * Etsy uses "receipts" for orders in their API
+     * @param shopId  Etsy shop ID
+     * @param accessToken  OAuth access token
+     * @param options  Optional filters: min_created, max_created, status, limit, offset
+     */
+    async getShopReceipts(shopId: string, accessToken: string, options: {
+        min_created?: number;
+        max_created?: number;
+        status?: string;
+        limit?: number;
+        offset?: number;
+        was_paid?: boolean;
+        was_shipped?: boolean;
+    } = {}) {
+        return this.withTokenRefresh(accessToken, async (validToken: string) => {
+            const { apiKey, apiSecret } = await this.getApiCredentials();
+            const xApiKey = `${apiKey}:${apiSecret}`;
+
+            const params = new URLSearchParams();
+            if (options.limit)       params.set('limit',        String(options.limit));
+            if (options.offset)      params.set('offset',       String(options.offset));
+            if (options.min_created) params.set('min_created',  String(options.min_created));
+            if (options.max_created) params.set('max_created',  String(options.max_created));
+            if (options.status)      params.set('status',       options.status);
+            if (options.was_paid !== undefined) params.set('was_paid', String(options.was_paid));
+            if (options.was_shipped !== undefined) params.set('was_shipped', String(options.was_shipped));
+
+            const qs = params.toString() ? `?${params.toString()}` : '';
+
+            try {
+                const response = await axios.get(
+                    `${this.baseUrl}/application/shops/${shopId}/receipts${qs}`,
+                    {
+                        headers: {
+                            'x-api-key': xApiKey,
+                            'Authorization': `Bearer ${validToken}`
+                        }
+                    }
+                );
+                // response.data = { count, results: [...] }
+                return response.data;
+            } catch (error: any) {
+                console.error(`Etsy getShopReceipts Error for Shop ${shopId}:`, error.response?.data || error.message);
+                throw error;
+            }
+        });
+    }
+
+    /**
+     * Get a single shop receipt (order) by receipt ID
+     */
+    async getShopReceipt(shopId: string, receiptId: number, accessToken: string) {
+        return this.withTokenRefresh(accessToken, async (validToken: string) => {
+            const { apiKey, apiSecret } = await this.getApiCredentials();
+            const xApiKey = `${apiKey}:${apiSecret}`;
+
+            try {
+                const response = await axios.get(
+                    `${this.baseUrl}/application/shops/${shopId}/receipts/${receiptId}`,
+                    {
+                        headers: {
+                            'x-api-key': xApiKey,
+                            'Authorization': `Bearer ${validToken}`
+                        }
+                    }
+                );
+                return response.data;
+            } catch (error: any) {
+                console.error(`Etsy getShopReceipt Error for Receipt ${receiptId}:`, error.response?.data || error.message);
+                throw error;
+            }
+        });
+    }
 }
 
 export default EtsyClient;
+

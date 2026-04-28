@@ -16,6 +16,8 @@ router.get('/etsy/shipping-profiles', IntegrationController.getEtsyShippingProfi
 router.get('/etsy/return-policies', IntegrationController.getEtsyReturnPolicies);
 router.get('/etsy/readiness-states', IntegrationController.getEtsyReadinessStates);
 router.get('/etsy/seller-taxonomy-nodes', IntegrationController.getEtsySellerTaxonomyNodes);
+router.get('/etsy/orders', IntegrationController.getEtsyOrders);
+router.post('/etsy/orders/sync', IntegrationController.syncEtsyOrders);
 router.post('/connect', IntegrationController.connect);
 router.delete('/:platform', IntegrationController.disconnect);
 router.get('/test/:platform', IntegrationController.testConnection);

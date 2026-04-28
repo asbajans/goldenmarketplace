@@ -231,4 +231,177 @@ export class IntegrationController {
             return res.status(500).json({ error: 'Failed to generate auth url: ' + (error?.message || 'Unknown server error') });
         }
     }
+
+    /**
+     * Get Etsy orders (receipts) — shows recent orders from Etsy API
+     */
+    static async getEtsyOrders(req: Request, res: Response) {
+        try {
+            const userId = (req as any).user?.id;
+
+            const integration = await MarketplaceIntegration.findOne({
+                where: { userId, platform: 'etsy', isActive: true }
+            });
+
+            if (!integration || !integration.accessToken || !integration.shopId) {
+                return res.status(400).json({ error: 'Etsy bağlantısı bulunamadı' });
+            }
+
+            const client = new EtsyClient(integration);
+            const data = await client.getShopReceipts(integration.shopId, integration.accessToken, {
+                limit: 100,
+                was_paid: true
+            });
+
+            return res.json(data);
+        } catch (error: any) {
+            console.error('[Etsy] getEtsyOrders error:', error.message);
+            return res.status(500).json({ error: error.message });
+        }
+    }
+
+    /**
+     * Sync Etsy orders into the local system
+     * Pulls receipts from Etsy and imports them as Orders in the database
+     */
+    static async syncEtsyOrders(req: Request, res: Response) {
+        try {
+            const userId = (req as any).user?.id;
+
+            const Store = require('../models/Store').default;
+            const { Order, OrderItem } = require('../models/Order');
+
+            const integration = await MarketplaceIntegration.findOne({
+                where: { userId, platform: 'etsy', isActive: true }
+            });
+
+            if (!integration || !integration.accessToken || !integration.shopId) {
+                return res.status(400).json({ error: 'Etsy bağlantısı bulunamadı' });
+            }
+
+            const store = await Store.findOne({ where: { userId } });
+            if (!store) {
+                return res.status(404).json({ error: 'Mağaza bulunamadı' });
+            }
+
+            const client = new EtsyClient(integration);
+
+            // Fetch last 100 paid receipts from Etsy
+            const data = await client.getShopReceipts(integration.shopId, integration.accessToken, {
+                limit: 100,
+                was_paid: true
+            });
+
+            const receipts: any[] = data.results || [];
+            let imported = 0;
+            let skipped = 0;
+            const errors: string[] = [];
+
+            function generateOrderNumber(): string {
+                const now = new Date();
+                const datePart = now.toISOString().slice(0, 10).replace(/-/g, '');
+                const timePart = now.toISOString().slice(11, 19).replace(/:/g, '');
+                const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+                return `GC${datePart}${timePart}${random}`;
+            }
+
+            for (const receipt of receipts) {
+                const externalOrderId = String(receipt.receipt_id);
+
+                // Skip if already imported
+                const existing = await Order.findOne({
+                    where: { externalOrderId, source: 'etsy' }
+                });
+                if (existing) {
+                    skipped++;
+                    continue;
+                }
+
+                try {
+                    // Map Etsy status to internal status
+                    let status = 'confirmed';
+                    if (receipt.status === 'completed') status = 'delivered';
+                    else if (receipt.is_shipped) status = 'shipped';
+
+                    // Build shipping address from Etsy receipt
+                    const addr = receipt.shipping_address || receipt.delivery_address || {};
+                    const shippingAddress = {
+                        name: `${receipt.buyer_display_name || receipt.name || 'Etsy Customer'}`,
+                        address: [addr.first_line, addr.second_line].filter(Boolean).join(', '),
+                        city: addr.city || '',
+                        country: addr.country_iso || addr.country || 'TR',
+                        phone: receipt.buyer_phone || ''
+                    };
+
+                    // Build order items from receipt transactions
+                    const transactions: any[] = receipt.transactions || [];
+                    let subtotal = 0;
+                    const orderItemsData: any[] = [];
+
+                    for (const tx of transactions) {
+                        const qty = tx.quantity || 1;
+                        // Etsy price is in smallest currency unit (cents for USD)
+                        const unitPrice = Number(tx.price?.amount || 0) / Number(tx.price?.divisor || 100);
+                        const totalPrice = unitPrice * qty;
+                        subtotal += totalPrice;
+
+                        orderItemsData.push({
+                            productId: store.id, // fallback: use storeId as placeholder
+                            variantId: null,
+                            title: tx.title || tx.product_data?.description || 'Etsy Ürünü',
+                            sku: tx.sku || String(tx.listing_id || tx.transaction_id),
+                            quantity: qty,
+                            unitPrice,
+                            totalPrice
+                        });
+                    }
+
+                    const shippingCost = Number(receipt.total_shipping_cost?.amount || 0) / Number(receipt.total_shipping_cost?.divisor || 100);
+                    const totalAmount = subtotal + shippingCost;
+                    const commissionRate = store.commissionRate || 10;
+                    const commissionAmount = totalAmount * (commissionRate / 100);
+                    const sellerEarnings = totalAmount - commissionAmount;
+
+                    const order = await Order.create({
+                        orderNumber: generateOrderNumber(),
+                        customerId: userId,   // Etsy customer not in our system → use seller as placeholder
+                        sellerId: userId,
+                        storeId: store.id,
+                        status,
+                        subtotal,
+                        shippingCost,
+                        totalAmount,
+                        commissionRate,
+                        commissionAmount,
+                        sellerEarnings,
+                        shippingTime: 3,
+                        orderDate: receipt.create_timestamp ? new Date(receipt.create_timestamp * 1000) : new Date(),
+                        source: 'etsy',
+                        externalOrderId,
+                        shippingAddress,
+                        customerNote: receipt.message_from_buyer || ''
+                    });
+
+                    for (const item of orderItemsData) {
+                        await OrderItem.create({ orderId: order.id, ...item });
+                    }
+
+                    imported++;
+                } catch (err: any) {
+                    errors.push(`Receipt ${externalOrderId}: ${err.message}`);
+                }
+            }
+
+            return res.json({
+                success: true,
+                total: receipts.length,
+                imported,
+                skipped,
+                errors
+            });
+        } catch (error: any) {
+            console.error('[Etsy] syncEtsyOrders error:', error.message);
+            return res.status(500).json({ error: error.message });
+        }
+    }
 }
