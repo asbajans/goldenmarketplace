@@ -74,6 +74,7 @@ const IntegrationSettings: React.FC = () => {
     const [integrations, setIntegrations] = useState<Integration[]>([]);
     const [loading, setLoading] = useState(true);
     const [connecting, setConnecting] = useState<string | null>(null);
+    const [syncingOrders, setSyncingOrders] = useState(false);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isEtsyModalVisible, setIsEtsyModalVisible] = useState(false);
     const [etsyForm] = Form.useForm();
@@ -174,6 +175,18 @@ const IntegrationSettings: React.FC = () => {
         }
     };
 
+    const handleSyncEtsyOrders = async () => {
+        setSyncingOrders(true);
+        try {
+            const { data } = await client.post('/integrations/etsy/orders/sync', {});
+            message.success(`Senkronizasyon tamamlandı: ${data.imported} sipariş içe aktarıldı, ${data.skipped} atlandı.`);
+        } catch (error: any) {
+            message.error(error.response?.data?.error || 'Sipariş senkronizasyonu başarısız');
+        } finally {
+            setSyncingOrders(false);
+        }
+    };
+
     const getIntegrationStatus = (platformKey: string) => {
         return integrations.find(i => i.platform === platformKey);
     };
@@ -193,7 +206,18 @@ const IntegrationSettings: React.FC = () => {
                             <Card
                                 actions={[
                                     isConnected ? (
-                                        <div style={{ display: 'flex', gap: 8 }}>
+                                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                                            {platform.key === 'etsy' && (
+                                                <Button
+                                                    type="primary"
+                                                    size="small"
+                                                    icon={<SyncOutlined spin={syncingOrders} />}
+                                                    onClick={handleSyncEtsyOrders}
+                                                    loading={syncingOrders}
+                                                >
+                                                    Siparişleri Çek
+                                                </Button>
+                                            )}
                                             <Button type="default" size="small" onClick={() => handleTestConnection(platform.key)} loading={connecting === platform.key + '-test'}>
                                                 Test Et
                                             </Button>
