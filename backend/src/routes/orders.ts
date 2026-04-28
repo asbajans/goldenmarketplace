@@ -5,6 +5,9 @@ import User from '../models/User';
 
 const router = express.Router();
 
+import { authMiddleware, sellerMiddleware } from '../middleware/authMiddleware';
+router.use(authMiddleware, sellerMiddleware);
+
 function generateOrderNumber(): string {
   const now = new Date();
   const datePart = now.toISOString().slice(0, 10).replace(/-/g, '');
@@ -15,7 +18,14 @@ function generateOrderNumber(): string {
 
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const user = (req as any).user || {};
+    const userId = user.id || user.userId || user.sub;
+    
+    if (!userId) {
+      console.error('[GET /orders] Missing user ID in token. Token payload:', user);
+      return res.status(401).json({ error: 'Lütfen oturumunuzu kapatıp tekrar giriş yapın (Token geçersiz).' });
+    }
+
     const { status, source, page = 1, limit = 20 } = req.query;
 
     const store = await Store.findOne({ where: { userId } });
