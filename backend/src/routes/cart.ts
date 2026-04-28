@@ -272,12 +272,107 @@ router.delete('/clear', async (req: Request, res: Response) => {
 });
 
 // Checkout
+// Supports two modes:
+//   1. cartItems[] in body (frontend local cart) - creates order from scratch
+//   2. DB pending cart (legacy session/token cart)
 router.post('/checkout', async (req: Request, res: Response) => {
   try {
-    const userId = extractUser(req)?.id;
+    const user = extractUser(req);
+    const userId = user?.id;
     const cartId = getCartId(req);
-    const { name, phone, address, city, country, notes } = req.body;
+    const { name, phone, address, city, country, notes, cartItems } = req.body;
 
+    if (!name || !address || !city) {
+      return res.status(400).json({ error: 'Shipping address required (name, address, city)' });
+    }
+
+    // ── MODE 1: Frontend sends cartItems directly (local cart) ──────────────
+    if (Array.isArray(cartItems) && cartItems.length > 0) {
+      const orderItems: any[] = [];
+      let orderTotal = 0;
+      let storeId: string | null = null;
+      let sellerId: string | null = null;
+
+      for (const ci of cartItems) {
+        let product: any = null;
+        let variant: any = null;
+        let unitPrice = 0;
+
+        if (ci.variantId) {
+          variant = await ProductVariant.findByPk(ci.variantId);
+          if (variant) {
+            product = await Product.findByPk(variant.productId);
+            unitPrice = parseFloat(variant.priceTRY) || 0;
+          }
+        }
+        if (!product && ci.productId) {
+          product = await Product.findByPk(ci.productId);
+          unitPrice = parseFloat(product?.priceTRY) || 0;
+        }
+
+        if (!product) {
+          return res.status(400).json({ error: `Product not found: ${ci.productId || ci.variantId}` });
+        }
+
+        if (!storeId) {
+          storeId = product.storeId;
+          // Get seller from store
+          const Store = require('../models/Store').default;
+          const store = await Store.findByPk(storeId);
+          sellerId = store?.userId || null;
+        }
+
+        const qty = ci.quantity || 1;
+        const total = unitPrice * qty;
+        orderTotal += total;
+
+        orderItems.push({
+          productId: product.id,
+          variantId: variant?.id || null,
+          title: product.title,
+          sku: variant?.sku || product.sku || 'N/A',
+          quantity: qty,
+          unitPrice,
+          totalPrice: total
+        });
+      }
+
+      if (!storeId || !sellerId) {
+        return res.status(400).json({ error: 'Could not determine store for order' });
+      }
+
+      const newOrder = await Order.create({
+        orderNumber: generateOrderNumber(),
+        customerId: userId || sellerId, // fallback to seller if guest (temporary)
+        sellerId,
+        storeId,
+        status: 'confirmed',
+        subtotal: orderTotal,
+        shippingCost: 0,
+        totalAmount: orderTotal,
+        commissionRate: 10,
+        commissionAmount: orderTotal * 0.1,
+        sellerEarnings: orderTotal * 0.9,
+        shippingTime: 3,
+        orderDate: new Date(),
+        source: 'golden',
+        shippingAddress: { name, address, city, country: country || 'Turkey', phone },
+        customerNote: notes || ''
+      } as any);
+
+      for (const item of orderItems) {
+        await OrderItem.create({ orderId: newOrder.id, ...item } as any);
+      }
+
+      return res.json({
+        success: true,
+        orderId: newOrder.id,
+        orderNumber: newOrder.orderNumber,
+        total: orderTotal
+      });
+    }
+
+    // ── MODE 2: DB-side pending cart (legacy) ────────────────────────────────
     if (!userId && !cartId) {
       return res.status(400).json({ error: 'Session invalid' });
     }
@@ -298,16 +393,12 @@ router.post('/checkout', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Cart is empty' });
     }
 
-    if (!name || !address || !city) {
-      return res.status(400).json({ error: 'Shipping address required' });
-    }
-
-    const orderTotal = cart.items.reduce((sum: number, item: any) => sum + (item.totalPrice || 0), 0);
+    const orderTotal2 = cart.items.reduce((sum: number, item: any) => sum + (item.totalPrice || 0), 0);
 
     const order = await cart.update({
       status: 'confirmed',
-      subtotal: orderTotal,
-      totalAmount: orderTotal,
+      subtotal: orderTotal2,
+      totalAmount: orderTotal2,
       shippingAddress: { name, address, city, country: country || 'Turkey', phone },
       customerNote: notes || ''
     } as any);
@@ -316,7 +407,7 @@ router.post('/checkout', async (req: Request, res: Response) => {
       success: true,
       orderId: order.id,
       orderNumber: order.orderNumber,
-      total: orderTotal
+      total: orderTotal2
     });
   } catch (error: any) {
     console.error('Checkout error:', error);

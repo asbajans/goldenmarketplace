@@ -16,6 +16,7 @@ import VariationOption from './VariationOption';
 import Order from './Order';
 import { OrderItem } from './Order';
 import Wishlist from './Wishlist';
+import UserAddress from './UserAddress';
 
 // User <-> Store (One-to-One)
 User.hasOne(Store, { foreignKey: 'userId', as: 'store' });
@@ -80,6 +81,10 @@ Wishlist.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 Product.hasMany(Wishlist, { foreignKey: 'productId', as: 'wishlists' });
 Wishlist.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 
+// UserAddress associations
+User.hasMany(UserAddress, { foreignKey: 'userId', as: 'addresses' });
+UserAddress.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
 // Export all models
 export {
     User,
@@ -99,5 +104,6 @@ export {
     VariationOption,
     Order,
     OrderItem,
-    Wishlist
+    Wishlist,
+    UserAddress
 };

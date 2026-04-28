@@ -138,6 +138,7 @@ app.use('/api/external-orders', require('./routes/externalOrders').default || re
 app.use('/api/cart', require('./routes/cart').default || require('./routes/cart'));
 app.use('/api/orders/customer', require('./routes/customerOrders').default || require('./routes/customerOrders'));
 app.use('/api/wishlist', require('./routes/wishlist').default || require('./routes/wishlist'));
+app.use('/api/addresses', require('./routes/addresses').default || require('./routes/addresses'));
 
 // Error handling middleware
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
