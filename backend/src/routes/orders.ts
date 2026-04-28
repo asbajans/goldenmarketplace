@@ -42,6 +42,7 @@ router.get('/', async (req: Request, res: Response) => {
       totalPages: Math.ceil(orders.count / Number(limit))
     });
   } catch (error: any) {
+    console.error('[GET /orders] Error:', error);
     return res.status(500).json({ error: error.message });
   }
 });
@@ -70,6 +71,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
     return res.json(order);
   } catch (error: any) {
+    console.error('[GET /orders/:id] Error:', error);
     return res.status(500).json({ error: error.message });
   }
 });
@@ -139,6 +141,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     return res.status(201).json(fullOrder);
   } catch (error: any) {
+    console.error('[POST /orders] Error:', error);
     return res.status(500).json({ error: error.message });
   }
 });
@@ -180,6 +183,7 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
 
     return res.json(order);
   } catch (error: any) {
+    console.error('[PATCH /orders/:id/status] Error:', error);
     return res.status(500).json({ error: error.message });
   }
 });
@@ -215,6 +219,7 @@ router.patch('/:id/shipping', async (req: Request, res: Response) => {
 
     return res.json(order);
   } catch (error: any) {
+    console.error('[PATCH /orders/:id/shipping] Error:', error);
     return res.status(500).json({ error: error.message });
   }
 });
@@ -256,6 +261,7 @@ router.patch('/:id/return', async (req: Request, res: Response) => {
 
     return res.json(order);
   } catch (error: any) {
+    console.error('[PATCH /orders/:id/return] Error:', error);
     return res.status(500).json({ error: error.message });
   }
 });

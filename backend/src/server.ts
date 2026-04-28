@@ -133,10 +133,10 @@ app.use('/api/admin', require('./routes/admin').default || require('./routes/adm
 app.use('/api/b2b', require('./routes/b2b').default || require('./routes/b2b'));
 app.use('/api/marketplace', require('./routes/marketplace').default || require('./routes/marketplace'));
 app.use('/api/variations', require('./routes/variations').default || require('./routes/variations'));
+app.use('/api/orders/customer', require('./routes/customerOrders').default || require('./routes/customerOrders'));
 app.use('/api/orders', require('./routes/orders').default || require('./routes/orders'));
 app.use('/api/external-orders', require('./routes/externalOrders').default || require('./routes/externalOrders'));
 app.use('/api/cart', require('./routes/cart').default || require('./routes/cart'));
-app.use('/api/orders/customer', require('./routes/customerOrders').default || require('./routes/customerOrders'));
 app.use('/api/wishlist', require('./routes/wishlist').default || require('./routes/wishlist'));
 app.use('/api/addresses', require('./routes/addresses').default || require('./routes/addresses'));
 
