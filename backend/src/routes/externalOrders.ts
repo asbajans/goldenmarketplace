@@ -45,6 +45,7 @@ async function importExternalOrder(storeId: string, externalOrder: any, source: 
     commissionRate,
     commissionAmount,
     sellerEarnings,
+    currency: externalOrder.currency || 'TRY',
     shippingTime: store.defaultShippingDays || 3,
     shippingDeadline: new Date(Date.now() + (store.defaultShippingDays || 3) * 24 * 60 * 60 * 1000),
     orderDate: new Date(),
