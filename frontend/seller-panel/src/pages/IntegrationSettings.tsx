@@ -179,7 +179,7 @@ const IntegrationSettings: React.FC = () => {
         setSyncingOrders(true);
         try {
             const { data } = await client.post('/integrations/etsy/orders/sync', {});
-            message.success(`Senkronizasyon tamamlandı: ${data.imported} sipariş içe aktarıldı, ${data.skipped} atlandı.`);
+            message.success(`Senkronizasyon tamamlandı: ${data.imported} içe aktarıldı, ${data.updated || 0} güncellendi, ${data.skipped} atlandı.`);
         } catch (error: any) {
             message.error(error.response?.data?.error || 'Sipariş senkronizasyonu başarısız');
         } finally {

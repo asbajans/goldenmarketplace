@@ -294,6 +294,7 @@ export class IntegrationController {
 
             const receipts: any[] = data.results || [];
             let imported = 0;
+            let updated = 0;
             let skipped = 0;
             const errors: string[] = [];
 
@@ -307,15 +308,6 @@ export class IntegrationController {
 
             for (const receipt of receipts) {
                 const externalOrderId = String(receipt.receipt_id);
-
-                // Skip if already imported
-                const existing = await Order.findOne({
-                    where: { externalOrderId, source: 'etsy' }
-                });
-                if (existing) {
-                    skipped++;
-                    continue;
-                }
 
                 try {
                     // Map Etsy status to internal status
@@ -366,32 +358,59 @@ export class IntegrationController {
                     const commissionAmount = totalAmount * (commissionRate / 100);
                     const sellerEarnings = totalAmount - commissionAmount;
 
-                    const order = await Order.create({
-                        orderNumber: generateOrderNumber(),
-                        customerId: userId,   // Etsy customer not in our system → use seller as placeholder
-                        sellerId: userId,
-                        storeId: store.id,
-                        status,
-                        subtotal,
-                        shippingCost,
-                        totalAmount,
-                        commissionRate,
-                        commissionAmount,
-                        sellerEarnings,
-                        currency,
-                        shippingTime: 3,
-                        orderDate: receipt.create_timestamp ? new Date(receipt.create_timestamp * 1000) : new Date(),
-                        source: 'etsy',
-                        externalOrderId,
-                        shippingAddress,
-                        customerNote: receipt.message_from_buyer || ''
+                    const existing = await Order.findOne({
+                        where: { externalOrderId, source: 'etsy' }
                     });
 
-                    for (const item of orderItemsData) {
-                        await OrderItem.create({ orderId: order.id, ...item });
-                    }
+                    if (existing) {
+                        await existing.update({
+                            status,
+                            subtotal,
+                            shippingCost,
+                            totalAmount,
+                            commissionRate,
+                            commissionAmount,
+                            sellerEarnings,
+                            currency,
+                            shippingAddress,
+                            customerNote: receipt.message_from_buyer || ''
+                        });
 
-                    imported++;
+                        // Recreate items to ensure they are up to date
+                        await OrderItem.destroy({ where: { orderId: existing.id } });
+                        for (const item of orderItemsData) {
+                            await OrderItem.create({ orderId: existing.id, ...item });
+                        }
+
+                        updated++;
+                    } else {
+                        const order = await Order.create({
+                            orderNumber: generateOrderNumber(),
+                            customerId: userId,   // Etsy customer not in our system → use seller as placeholder
+                            sellerId: userId,
+                            storeId: store.id,
+                            status,
+                            subtotal,
+                            shippingCost,
+                            totalAmount,
+                            commissionRate,
+                            commissionAmount,
+                            sellerEarnings,
+                            currency,
+                            shippingTime: 3,
+                            orderDate: receipt.create_timestamp ? new Date(receipt.create_timestamp * 1000) : new Date(),
+                            source: 'etsy',
+                            externalOrderId,
+                            shippingAddress,
+                            customerNote: receipt.message_from_buyer || ''
+                        });
+
+                        for (const item of orderItemsData) {
+                            await OrderItem.create({ orderId: order.id, ...item });
+                        }
+
+                        imported++;
+                    }
                 } catch (err: any) {
                     errors.push(`Receipt ${externalOrderId}: ${err.message}`);
                 }
@@ -401,6 +420,7 @@ export class IntegrationController {
                 success: true,
                 total: receipts.length,
                 imported,
+                updated,
                 skipped,
                 errors
             });
