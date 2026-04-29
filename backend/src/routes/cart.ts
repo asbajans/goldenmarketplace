@@ -280,7 +280,14 @@ router.post('/checkout', async (req: Request, res: Response) => {
     const user = extractUser(req);
     const userId = user?.id;
     const cartId = getCartId(req);
-    const { name, phone, address, city, country, notes, cartItems } = req.body;
+    const { name, phone, address, city, country, notes, cartItems, paymentMethod } = req.body;
+
+    let finalNotes = notes || '';
+    if (paymentMethod === 'bankTransfer') {
+      finalNotes = `[Ödeme: Banka Havalesi] ${finalNotes}`.trim();
+    } else if (paymentMethod === 'stripe') {
+      finalNotes = `[Ödeme: Kredi Kartı] ${finalNotes}`.trim();
+    }
 
     if (!name || !address || !city) {
       return res.status(400).json({ error: 'Shipping address required (name, address, city)' });
@@ -357,7 +364,7 @@ router.post('/checkout', async (req: Request, res: Response) => {
         orderDate: new Date(),
         source: 'golden',
         shippingAddress: { name, address, city, country: country || 'Turkey', phone },
-        customerNote: notes || ''
+        customerNote: finalNotes
       } as any);
 
       for (const item of orderItems) {
@@ -400,7 +407,7 @@ router.post('/checkout', async (req: Request, res: Response) => {
       subtotal: orderTotal2,
       totalAmount: orderTotal2,
       shippingAddress: { name, address, city, country: country || 'Turkey', phone },
-      customerNote: notes || ''
+      customerNote: finalNotes
     } as any);
 
     return res.json({
