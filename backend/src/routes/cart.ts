@@ -9,6 +9,7 @@ const router = express.Router();
 const { Order, OrderItem } = require('../models/Order');
 const Product = require('../models/Product').default;
 const ProductVariant = require('../models/ProductVariant').default;
+const Store = require('../models/Store').default;
 
 function generateOrderNumber() {
   const now = new Date();
@@ -133,13 +134,15 @@ router.post('/add', async (req: Request, res: Response) => {
     let cart = await Order.findOne({ where: cartWhere });
 
     if (!cart) {
+      const store = await Store.findByPk(product.storeId);
       cart = await Order.create({
         orderNumber: generateOrderNumber(),
         customerId: userId || undefined,
         guestId: cartId || undefined,
         status: 'pending',
         source: 'golden',
-        storeId: product.storeId
+        storeId: product.storeId,
+        sellerId: store ? store.userId : null
       });
     }
 
