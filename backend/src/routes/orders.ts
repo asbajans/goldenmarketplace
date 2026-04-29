@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import { Op } from 'sequelize';
 import Order, { OrderItem, OrderSource } from '../models/Order';
 import Store from '../models/Store';
 import User from '../models/User';
@@ -34,8 +35,24 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const where: any = { storeId: store.id };
-    if (status) where.status = status;
-    if (source) where.source = source;
+    
+    if (status) {
+      const statusStr = status as string;
+      if (statusStr.includes(',')) {
+        where.status = { [Op.in]: statusStr.split(',') };
+      } else {
+        where.status = statusStr;
+      }
+    }
+    
+    if (source) {
+      const sourceStr = source as string;
+      if (sourceStr.includes(',')) {
+        where.source = { [Op.in]: sourceStr.split(',') };
+      } else {
+        where.source = sourceStr;
+      }
+    }
 
     const orders = await Order.findAndCountAll({
       where,
