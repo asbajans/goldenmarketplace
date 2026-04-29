@@ -122,6 +122,7 @@ router.post('/', async (req: Request, res: Response) => {
       commissionRate,
       commissionAmount,
       sellerEarnings,
+      currency: 'TRY', // Domestic manual orders are TRY by default
       shippingTime: store.defaultShippingDays || 3,
       shippingDeadline: new Date(Date.now() + (store.defaultShippingDays || 3) * 24 * 60 * 60 * 1000),
       orderDate: new Date(),
