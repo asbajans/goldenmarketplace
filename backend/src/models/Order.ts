@@ -98,6 +98,7 @@ interface IOrder {
   commissionRate: number;
   commissionAmount: number;
   sellerEarnings: number;
+  currency: string;
   shippingTime: number;
   shippingDeadline?: Date;
   trackingNumber?: string;
@@ -128,6 +129,7 @@ class Order extends Model<IOrder> implements IOrder {
   public commissionRate!: number;
   public commissionAmount!: number;
   public sellerEarnings!: number;
+  public currency!: string;
   public shippingTime!: number;
   public shippingDeadline?: Date;
   public trackingNumber?: string;
@@ -223,6 +225,12 @@ Order.init(
       allowNull: false,
       defaultValue: 0,
       comment: 'Amount to be paid to seller (totalAmount - commissionAmount)'
+    },
+    currency: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'TRY',
+      comment: 'Order currency (e.g. TRY, USD, EUR)'
     },
     shippingTime: {
       type: DataTypes.INTEGER,

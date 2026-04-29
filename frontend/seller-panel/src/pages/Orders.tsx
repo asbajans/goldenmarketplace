@@ -44,6 +44,7 @@ interface Order {
     trackingNumber?: string;
     shippingCompany?: string;
     source: string;
+    currency?: string;
     customerNote?: string;
     createdAt: string;
     confirmedDate?: string;
@@ -191,27 +192,32 @@ const Orders: React.FC = () => {
             title: 'Tutar',
             dataIndex: 'totalAmount',
             key: 'totalAmount',
-            render: (amount: number) => (
-                <Text strong>{Number(amount).toLocaleString('tr-TR')} TL</Text>
-            )
+            render: (amount: number, record: Order) => {
+                const formatter = new Intl.NumberFormat('tr-TR', { style: 'currency', currency: record.currency || 'TRY' });
+                return <Text strong>{formatter.format(amount)}</Text>;
+            }
         },
         {
             title: 'Komisyon',
             dataIndex: 'commissionAmount',
             key: 'commissionAmount',
-            render: (amount: number) => (
-                <Text type="danger">{Number(amount).toLocaleString('tr-TR')} TL</Text>
-            )
+            render: (amount: number, record: Order) => {
+                const formatter = new Intl.NumberFormat('tr-TR', { style: 'currency', currency: record.currency || 'TRY' });
+                return <Text type="danger">{formatter.format(amount)}</Text>;
+            }
         },
         {
             title: 'Kazanç',
             dataIndex: 'sellerEarnings',
             key: 'sellerEarnings',
-            render: (amount: number) => (
-                <Text type="success" style={{ color: '#52c41a' }}>
-                    {Number(amount).toLocaleString('tr-TR')} TL
-                </Text>
-            )
+            render: (amount: number, record: Order) => {
+                const formatter = new Intl.NumberFormat('tr-TR', { style: 'currency', currency: record.currency || 'TRY' });
+                return (
+                    <Text type="success" style={{ color: '#52c41a' }}>
+                        {formatter.format(amount)}
+                    </Text>
+                );
+            }
         },
         {
             title: 'Kargo Son',
@@ -399,24 +405,24 @@ const Orders: React.FC = () => {
                         <Card size="small" style={{ marginTop: 16 }} title="Fiyat">
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <Text>Ara Toplam:</Text>
-                                <Text>{Number(selectedOrder.subtotal).toLocaleString('tr-TR')} TL</Text>
+                                <Text>{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: selectedOrder.currency || 'TRY' }).format(selectedOrder.subtotal)}</Text>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <Text>Kargo:</Text>
-                                <Text>{Number(selectedOrder.shippingCost).toLocaleString('tr-TR')} TL</Text>
+                                <Text>{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: selectedOrder.currency || 'TRY' }).format(selectedOrder.shippingCost)}</Text>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, borderTop: '1px solid #f0f0f0', paddingTop: 8 }}>
                                 <Text strong>Toplam:</Text>
-                                <Text strong>{Number(selectedOrder.totalAmount).toLocaleString('tr-TR')} TL</Text>
+                                <Text strong>{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: selectedOrder.currency || 'TRY' }).format(selectedOrder.totalAmount)}</Text>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
                                 <Text>Komisyon (%{selectedOrder.commissionRate}):</Text>
-                                <Text type="danger">-{Number(selectedOrder.commissionAmount).toLocaleString('tr-TR')} TL</Text>
+                                <Text type="danger">-{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: selectedOrder.currency || 'TRY' }).format(selectedOrder.commissionAmount)}</Text>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
                                 <Text strong style={{ color: '#52c41a' }}>Kazanç:</Text>
                                 <Text strong style={{ color: '#52c41a' }}>
-                                    {Number(selectedOrder.sellerEarnings).toLocaleString('tr-TR')} TL
+                                    {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: selectedOrder.currency || 'TRY' }).format(selectedOrder.sellerEarnings)}
                                 </Text>
                             </div>
                         </Card>

@@ -13,7 +13,8 @@ import {
   FileTextOutlined,
   AppstoreOutlined,
   SyncOutlined,
-  InboxOutlined
+  InboxOutlined,
+  CarOutlined
 } from '@ant-design/icons';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
@@ -30,6 +31,7 @@ import B2BRequests from './pages/B2BRequests';
 import StoreStorefront from './pages/StoreStorefront';
 import Variations from './pages/Variations';
 import Orders from './pages/Orders';
+import Shipments from './pages/Shipments';
 import { getCurrentUser, logout } from './api/auth';
 
 const { Header, Sider, Content } = Layout;
@@ -120,6 +122,12 @@ const App: React.FC = () => {
       icon: <InboxOutlined />,
       label: 'Siparişler',
       onClick: () => navigate('/orders')
+    },
+    {
+      key: '/shipments',
+      icon: <CarOutlined />,
+      label: 'Kargolar',
+      onClick: () => navigate('/shipments')
     },
     {
       key: '/subscription',
@@ -216,6 +224,7 @@ const App: React.FC = () => {
             <Route path="/subscription/success" element={<SubscriptionSuccess />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/orders" element={<Orders />} />
+            <Route path="/shipments" element={<Shipments />} />
           </Routes>
         </Content>
       </Layout>

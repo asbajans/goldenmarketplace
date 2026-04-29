@@ -333,17 +333,23 @@ export class IntegrationController {
                         phone: receipt.buyer_phone || ''
                     };
 
+                    // Calculate real exact amounts including discounts
+                    const currency = receipt.grandtotal?.currency_code || 'TRY';
+                    const totalAmount = Number(receipt.grandtotal?.amount || 0) / Number(receipt.grandtotal?.divisor || 100);
+                    const shippingCost = Number(receipt.total_shipping_cost?.amount || 0) / Number(receipt.total_shipping_cost?.divisor || 100);
+                    const discountAmt = Number(receipt.discount_amt?.amount || 0) / Number(receipt.discount_amt?.divisor || 100);
+                    const rawSubtotal = Number(receipt.subtotal?.amount || 0) / Number(receipt.subtotal?.divisor || 100);
+                    
+                    const subtotal = rawSubtotal - discountAmt; // Real product subtotal after discount
+
                     // Build order items from receipt transactions
                     const transactions: any[] = receipt.transactions || [];
-                    let subtotal = 0;
                     const orderItemsData: any[] = [];
 
                     for (const tx of transactions) {
                         const qty = tx.quantity || 1;
-                        // Etsy price is in smallest currency unit (cents for USD)
                         const unitPrice = Number(tx.price?.amount || 0) / Number(tx.price?.divisor || 100);
                         const totalPrice = unitPrice * qty;
-                        subtotal += totalPrice;
 
                         orderItemsData.push({
                             productId: store.id, // fallback: use storeId as placeholder
@@ -356,8 +362,6 @@ export class IntegrationController {
                         });
                     }
 
-                    const shippingCost = Number(receipt.total_shipping_cost?.amount || 0) / Number(receipt.total_shipping_cost?.divisor || 100);
-                    const totalAmount = subtotal + shippingCost;
                     const commissionRate = store.commissionRate || 10;
                     const commissionAmount = totalAmount * (commissionRate / 100);
                     const sellerEarnings = totalAmount - commissionAmount;
@@ -374,6 +378,7 @@ export class IntegrationController {
                         commissionRate,
                         commissionAmount,
                         sellerEarnings,
+                        currency,
                         shippingTime: 3,
                         orderDate: receipt.create_timestamp ? new Date(receipt.create_timestamp * 1000) : new Date(),
                         source: 'etsy',
