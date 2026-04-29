@@ -7,8 +7,8 @@ import { Request, Response } from 'express';
 const express = require('express');
 const router = express.Router();
 const { Order, OrderItem } = require('../models/Order');
-const Product = require('../models/Product');
-const ProductVariant = require('../models/ProductVariant');
+const Product = require('../models/Product').default;
+const ProductVariant = require('../models/ProductVariant').default;
 
 function generateOrderNumber() {
   const now = new Date();
