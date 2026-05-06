@@ -109,6 +109,11 @@ function App() {
       label: 'Sistem Ayarları'
     },
     {
+      key: 'content',
+      icon: <SettingOutlined />,
+      label: 'İçerik Yönetimi'
+    },
+    {
       key: 'orders',
       icon: <InboxOutlined />,
       label: 'Siparişler'
@@ -169,6 +174,9 @@ function App() {
 
       case 'settings':
         return <SettingsPage />;
+
+      case 'content':
+        return <ContentManagementPage />;
 
       case 'orders':
         return <OrdersPage />;

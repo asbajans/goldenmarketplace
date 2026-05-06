@@ -95,7 +95,8 @@ export class ProductController {
         title, description, category, sku, quantity,
         images, videoUrl, marketplaces, marketplaceConfig, gramWeight, milyem, effectiveMilyem, profitMargin,
         isB2BEnabled, b2bDiscount, discountRate,
-        hasVariants, variantAttributes, variants
+        hasVariants, variantAttributes, variants,
+        translations, defaultLanguage = 'en'
       } = req.body;
 
       // Validate required gold fields
@@ -164,6 +165,10 @@ export class ProductController {
         slug: title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
         description,
         category,
+        // @ts-ignore - translations field added via migration
+        translations: translations || {},
+        // @ts-ignore - defaultLanguage field added via migration
+        defaultLanguage: defaultLanguage || 'en',
         sku,
         gramWeight,
         milyem,

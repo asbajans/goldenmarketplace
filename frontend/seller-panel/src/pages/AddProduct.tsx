@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     Form, Input, Button, InputNumber, message, Upload, TreeSelect,
-    Select, Checkbox, Space, Card, Tag, Typography, Statistic, Row, Col, Divider, Spin, Tooltip
+    Select, Checkbox, Space, Card, Tag, Typography, Statistic, Row, Col, Divider, Spin, Tooltip, Tabs
 } from 'antd';
 import type { UploadFile, UploadChangeParam } from 'antd/es/upload';
 import type { RcFile } from 'antd/es/upload/interface';
@@ -17,6 +17,14 @@ import client from '../api/client';
 
 const { Option } = Select;
 const { Text } = Typography;
+const { TabPane } = Tabs;
+
+const LANGUAGES = [
+    { key: 'en', label: 'English', flag: '🇺🇸' },
+    { key: 'tr', label: 'Türkçe', flag: '🇹🇷' },
+    { key: 'it', label: 'Italiano', flag: '🇮🇹' },
+    { key: 'ar', label: 'العربية', flag: '🇸🇦' },
+];
 
 interface AddProductProps {
     initialValues?: any;
@@ -322,7 +330,9 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 discountRate: values.discountRate || 0,
                 hasVariants,
                 variantAttributes: hasVariants ? ['Renk', 'Beden', 'Ölçü'] : [],
-                variants: hasVariants ? values.variants : []
+                variants: hasVariants ? values.variants : [],
+                translations,
+                defaultLanguage
             };
 
             if (initialValues?.id) {
@@ -401,8 +411,32 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                         Bu ürün B2B sisteminden kopyalanmıştır. Sadece Stok Adedi, Kâr Marjı ve Pazaryeri ayarları değiştirilebilir.
                     </div>
                 )}
-                <Form.Item name="title" label="Ürün Adı" rules={[{ required: true, message: 'Ürün adı gerekli' }]}>
-                    <Input placeholder="Örn: 22 Ayar Altın Burma Bilezik" onChange={handleTitleChange} disabled={isCloned} />
+
+                {/* Language Tabs */}
+                <div style={{ marginBottom: 16 }}>
+                    <Tabs activeKey={activeLanguage} onChange={(key) => setActiveLanguage(key)} type="card">
+                        {LANGUAGES.map(lang => (
+                            <TabPane tab={<span>{lang.flag} {lang.label}</span>} key={lang.key} />
+                        ))}
+                    </Tabs>
+                </div>
+
+                <Form.Item 
+                    name="title" 
+                    label="Ürün Adı"
+                    rules={[{ required: true, message: 'Ürün adı gerekli' }]}
+                >
+                    <Input 
+                        placeholder="Örn: 22 Ayar Altın Burma Bilezik" 
+                        onChange={(e) => {
+                            handleTitleChange(e);
+                            setTranslations(prev => ({
+                                ...prev,
+                                [activeLanguage]: { ...prev[activeLanguage], title: e.target.value }
+                            }));
+                        }}
+                        disabled={isCloned} 
+                    />
                 </Form.Item>
 
                 <Row gutter={16}>
@@ -751,7 +785,17 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 </Form.Item>
 
                 <Form.Item name="description" label="Ürün Açıklaması">
-                    <Input.TextArea disabled={isCloned} rows={4} placeholder="Ürün detaylarını buraya yazın..." />
+                    <Input.TextArea 
+                        disabled={isCloned} 
+                        rows={4} 
+                        placeholder="Ürün detaylarını buraya yazın..."
+                        onChange={(e) => {
+                            setTranslations(prev => ({
+                                ...prev,
+                                [activeLanguage]: { ...prev[activeLanguage], description: e.target.value }
+                            }));
+                        }}
+                    />
                 </Form.Item>
             </Card>
 
