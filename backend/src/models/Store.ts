@@ -17,6 +17,8 @@ interface StoreAttributes {
   rating: number;
   totalProducts: number;
   autoPriceSync?: boolean;
+  defaultLanguage?: string;
+  openAiApiKey?: string;
   commissionRate: number;
   defaultShippingDays: number;
   availableShippingCompanies?: string[];
@@ -107,6 +109,17 @@ Store.init(
       type: DataTypes.BOOLEAN,
       defaultValue: true,
       comment: 'If true, product prices sync automatically with global gold price'
+    },
+    defaultLanguage: {
+      type: DataTypes.STRING(10),
+      allowNull: true,
+      defaultValue: 'en',
+      comment: 'Default language for store (en, tr, it, ar)'
+    },
+    openAiApiKey: {
+      type: DataTypes.STRING(256),
+      allowNull: true,
+      comment: 'Seller own OpenAI API key for AI translations'
     },
     commissionRate: {
       type: DataTypes.DECIMAL(5, 2),

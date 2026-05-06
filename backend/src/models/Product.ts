@@ -110,6 +110,18 @@ Product.init(
       type: DataTypes.STRING,
       allowNull: false
     },
+    translations: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: {},
+      comment: 'Multi-language translations: { en: { title, description }, tr: {...}, it: {...}, ar: {...} }'
+    },
+    defaultLanguage: {
+      type: DataTypes.STRING(10),
+      allowNull: true,
+      defaultValue: 'en',
+      comment: 'Default language for product (en, tr, it, ar)'
+    },
     sku: {
       type: DataTypes.STRING,
       allowNull: false,

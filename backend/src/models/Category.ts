@@ -11,6 +11,7 @@ interface CategoryAttributes {
     name: string;
     slug: string;
     description?: string;
+    translations?: any;
     isActive: boolean;
     createdAt?: Date;
     updatedAt?: Date;
@@ -21,6 +22,7 @@ class Category extends Model<CategoryAttributes> implements CategoryAttributes {
     public name!: string;
     public slug!: string;
     public description?: string;
+    public translations?: any;
     public isActive!: boolean;
     public readonly createdAt!: Date;
     public readonly updatedAt!: Date;
@@ -45,6 +47,12 @@ Category.init(
         description: {
             type: DataTypes.TEXT,
             allowNull: true
+        },
+        translations: {
+            type: DataTypes.JSONB,
+            allowNull: true,
+            defaultValue: {},
+            comment: 'Multi-language translations: { en: { name, description }, tr: {...}, it: {...}, ar: {...} }'
         },
         isActive: {
             type: DataTypes.BOOLEAN,
