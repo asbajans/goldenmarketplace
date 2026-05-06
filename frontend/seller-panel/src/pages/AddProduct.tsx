@@ -341,9 +341,11 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
 
             const productPayload = {
                 ...values,
+                title: translations[activeLanguage]?.title || values.title || '',
+                description: translations[activeLanguage]?.description || values.description || '',
                 profitMargin: values.profitMargin || 0,
                 quantity: Number(values.quantity || 0),
-                gramWeight: values.gramWeight || 0,
+                gramWeight: values.gramWeight || 1,
                 milyem: values.milyem || 916,
                 effectiveMilyem: values.effectiveMilyem || values.milyem || 916,
                 tags,
@@ -410,10 +412,11 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             form={form}
             layout="vertical"
             initialValues={{
-                milyem: 916,
-                profitMargin: 0,
-                marketplaces: ['golden'],
-                hasVariants: false,
+                gramWeight: initialValues?.gramWeight || 1,
+                milyem: initialValues?.milyem || 916,
+                profitMargin: initialValues?.profitMargin || 0,
+                marketplaces: initialValues?.marketplaces || ['golden'],
+                hasVariants: initialValues?.hasVariants || false,
                 ...initialValues
             }}
             onFinish={onFinish}
