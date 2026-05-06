@@ -88,7 +88,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         fetchIntegrations();
         fetchCategories();
         fetchVariations();
-        // Pre-populate image previews when editing
+        
         if (initialValues?.images && Array.isArray(initialValues.images) && initialValues.images.length > 0) {
             setFileList(
                 initialValues.images.map((url: string, i: number) => ({
@@ -102,6 +102,13 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         
         if (initialValues?.marketplaces) {
             setSelectedMarketplaces(initialValues.marketplaces);
+        }
+
+        if (initialValues?.translations) {
+            setTranslations(initialValues.translations);
+        }
+        if (initialValues?.defaultLanguage) {
+            setActiveLanguage(initialValues.defaultLanguage);
         }
     }, []);
 
@@ -334,7 +341,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 variantAttributes: hasVariants ? ['Renk', 'Beden', 'Ölçü'] : [],
                 variants: hasVariants ? values.variants : [],
                 translations,
-                defaultLanguage
+                defaultLanguage: activeLanguage
             };
 
             if (initialValues?.id) {
@@ -424,12 +431,12 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 </div>
 
                 <Form.Item 
-                    name="title" 
                     label="Ürün Adı"
-                    rules={[{ required: true, message: 'Ürün adı gerekli' }]}
+                    required
                 >
                     <Input 
                         placeholder="Örn: 22 Ayar Altın Burma Bilezik" 
+                        value={translations[activeLanguage]?.title || ''}
                         onChange={(e) => {
                             handleTitleChange(e);
                             setTranslations(prev => ({
@@ -786,11 +793,12 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                     </Upload>
                 </Form.Item>
 
-                <Form.Item name="description" label="Ürün Açıklaması">
+                <Form.Item label="Ürün Açıklaması">
                     <Input.TextArea 
                         disabled={isCloned} 
                         rows={4} 
                         placeholder="Ürün detaylarını buraya yazın..."
+                        value={translations[activeLanguage]?.description || ''}
                         onChange={(e) => {
                             setTranslations(prev => ({
                                 ...prev,
