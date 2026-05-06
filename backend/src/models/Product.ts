@@ -50,6 +50,8 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public slug!: string;
   public description?: string;
   public category!: string;
+  public translations?: any;
+  public defaultLanguage?: string;
   public sku!: string;
   public gramWeight!: number;
   public milyem!: number;
@@ -110,12 +112,14 @@ Product.init(
       type: DataTypes.STRING,
       allowNull: false
     },
+    // @ts-ignore - translations column will be added via migration
     translations: {
       type: DataTypes.JSONB,
       allowNull: true,
       defaultValue: {},
       comment: 'Multi-language translations: { en: { title, description }, tr: {...}, it: {...}, ar: {...} }'
     },
+    // @ts-ignore - defaultLanguage column will be added via migration
     defaultLanguage: {
       type: DataTypes.STRING(10),
       allowNull: true,

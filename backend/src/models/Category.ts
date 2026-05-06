@@ -48,6 +48,7 @@ Category.init(
             type: DataTypes.TEXT,
             allowNull: true
         },
+        // @ts-ignore - translations column will be added via migration
         translations: {
             type: DataTypes.JSONB,
             allowNull: true,
