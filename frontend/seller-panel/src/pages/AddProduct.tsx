@@ -20,16 +20,11 @@ const { Text } = Typography;
 const { TabPane } = Tabs;
 
 const LANGUAGES = [
-    { key: 'en', label: 'English', flag: '🇺🇸' },
+    { key: 'en', label: 'English', flag: '🇬🇧' },
     { key: 'tr', label: 'Türkçe', flag: '🇹🇷' },
     { key: 'it', label: 'Italiano', flag: '🇮🇹' },
-    { key: 'ar', label: 'العربية', flag: '🇸🇦' },
+    { key: 'ar', label: 'العربية', flag: '🇸🇦' }
 ];
-
-interface AddProductProps {
-    initialValues?: any;
-    onSuccess: () => void;
-}
 
 interface Integration {
     id: string;
@@ -79,6 +74,13 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [etsyReadinessStates, setEtsyReadinessStates] = useState<any[]>([]);
     const [etsyTaxonomyNodes, setEtsyTaxonomyNodes] = useState<any[]>([]);
     const [fetchingEtsyProfiles, setFetchingEtsyProfiles] = useState(false);
+    const [activeLanguage, setActiveLanguage] = useState('en');
+    const [translations, setTranslations] = useState<Record<string, any>>({
+        en: { title: '', description: '', keywords: '' },
+        tr: { title: '', description: '', keywords: '' },
+        it: { title: '', description: '', keywords: '' },
+        ar: { title: '', description: '', keywords: '' }
+    });
     const isCloned = !!initialValues?.originalStoreName;
 
     useEffect(() => {
