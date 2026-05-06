@@ -113,8 +113,16 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         
         // Set form values when editing existing product
         if (initialValues?.id) {
+            // If translations exists, populate English title to main title field
+            const translationTitle = initialValues?.translations?.en?.title || initialValues?.title || '';
+            const translationDesc = initialValues?.translations?.en?.description || initialValues?.description || '';
+            
             setTimeout(() => {
-                form.setFieldsValue(initialValues);
+                form.setFieldsValue({
+                    ...initialValues,
+                    title: translationTitle,
+                    description: translationDesc
+                });
             }, 100);
         }
     }, []);
