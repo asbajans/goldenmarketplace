@@ -110,6 +110,13 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         if (initialValues?.defaultLanguage) {
             setActiveLanguage(initialValues.defaultLanguage);
         }
+        
+        // Set form values when editing existing product
+        if (initialValues?.id) {
+            setTimeout(() => {
+                form.setFieldsValue(initialValues);
+            }, 100);
+        }
     }, []);
 
     useEffect(() => {
