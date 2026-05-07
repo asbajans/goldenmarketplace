@@ -22,6 +22,7 @@ import IntegrationLogsPage from './pages/IntegrationLogsPage';
 import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import OrdersPage from './pages/OrdersPage';
+import ContentManagementPage from './pages/ContentManagementPage';
 import { AdminAPI } from './services/api';
 
 const { Header, Sider, Content } = Layout;
