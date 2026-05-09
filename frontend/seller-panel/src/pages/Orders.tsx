@@ -448,22 +448,22 @@ const Orders: React.FC = () => {
 
                         <Space style={{ marginTop: 16 }} wrap>
                             {selectedOrder.status === 'pending' && (
-                                <>
-                                    <Button 
-                                        type="primary"
-                                        icon={<CheckCircleOutlined />}
-                                        onClick={() => handleStatusChange(selectedOrder.id, 'confirmed')}
-                                    >
-                                        Onayla
-                                    </Button>
-                                    <Button 
-                                        danger
-                                        icon={<CloseCircleOutlined />}
-                                        onClick={() => handleStatusChange(selectedOrder.id, 'cancelled')}
-                                    >
-                                        İptal Et
-                                    </Button>
-                                </>
+                                <Button 
+                                    type="primary"
+                                    icon={<CheckCircleOutlined />}
+                                    onClick={() => handleStatusChange(selectedOrder.id, 'confirmed')}
+                                >
+                                    Onayla
+                                </Button>
+                            )}
+                            {['pending', 'confirmed', 'processing'].includes(selectedOrder.status) && (
+                                <Button 
+                                    danger
+                                    icon={<CloseCircleOutlined />}
+                                    onClick={() => handleStatusChange(selectedOrder.id, 'cancelled')}
+                                >
+                                    İptal Et
+                                </Button>
                             )}
                             {selectedOrder.status === 'confirmed' && (
                                 <>

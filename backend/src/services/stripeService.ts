@@ -238,8 +238,19 @@ export class StripeService {
     images?: string[];
   }>, successUrl: string, cancelUrl: string, customerId?: string) {
     try {
-      if (!process.env.STRIPE_SECRET_KEY) {
-        console.log('Mocking Stripe Direct Checkout (No Secret Key)');
+      let activeStripe = stripe;
+      try {
+        const GlobalSetting = require('../models/GlobalSetting').default;
+        const keySetting = await GlobalSetting.findOne({ where: { key: 'stripe_secret_key' } });
+        if (keySetting && keySetting.value && keySetting.value.trim() !== '') {
+          activeStripe = new StripeLib(keySetting.value, { apiVersion: '2023-10-16' });
+        }
+      } catch (dbErr) {
+        console.error('Could not fetch stripe key from DB, falling back to env', dbErr);
+      }
+
+      if (!activeStripe || (!process.env.STRIPE_SECRET_KEY && activeStripe === stripe)) {
+        console.log('Mocking Stripe Direct Checkout (No Secret Key in Env or DB)');
         return {
           id: 'cs_direct_mock_' + Math.random().toString(36).substring(7),
           url: `${successUrl}?session_id=cs_direct_mock_${Date.now()}`
@@ -247,7 +258,7 @@ export class StripeService {
       }
 
       const lineItems = await Promise.all(items.map(async (item) => {
-        const price = await stripe.prices.create({
+        const price = await activeStripe.prices.create({
           currency: item.currency || 'try',
           unit_amount: Math.round(item.price * 100),
           product_data: {
@@ -262,7 +273,7 @@ export class StripeService {
         };
       }));
 
-      const session = await stripe.checkout.sessions.create({
+      const session = await activeStripe.checkout.sessions.create({
         mode: 'payment',
         payment_method_types: ['card'],
         customer: customerId,
