@@ -95,6 +95,18 @@ export const AdminAPI = {
     getSettings: () => api.get('/settings').then((res) => res.data),
     updateSettings: (data: any) => api.post('/settings', data).then((res) => res.data),
 
+    // Settings – single key helpers (used by ContentManagementPage)
+    getSetting: (key: string) =>
+        api.get('/settings').then((res) => ({ data: { value: (res.data as Record<string, string>)[key] || '' } })),
+    updateSetting: (key: string, value: string) =>
+        api.post('/settings', { [key]: value }).then((res) => res.data),
+
+    // Payment Settings helpers
+    getPaymentSettings: () =>
+        api.get('/settings').then((res) => res.data as Record<string, string>),
+    updatePaymentSettings: (data: Record<string, string>) =>
+        api.post('/settings', data).then((res) => res.data),
+
     // Gold Price (manual admin control)
     getGoldPrice: () => axios.get(`${API_URL}/gold-price/current`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }

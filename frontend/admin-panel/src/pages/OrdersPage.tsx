@@ -96,7 +96,7 @@ const OrdersPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState('all');
     const [statusFilter, setStatusFilter] = useState<string>('');
     const [sourceFilter, setSourceFilter] = useState<string>('');
-    const [storeFilter, setStoreFilter] = useState<string>('');
+    const [storeFilter, _setStoreFilter] = useState<string>('');
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [detailModalOpen, setDetailModalOpen] = useState(false);
     const [stats, setStats] = useState({

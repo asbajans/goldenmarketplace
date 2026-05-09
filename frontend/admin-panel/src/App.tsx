@@ -8,7 +8,8 @@ import {
   SettingOutlined,
   LogoutOutlined,
   AppstoreOutlined,
-  InboxOutlined
+  InboxOutlined,
+  WalletOutlined
 } from '@ant-design/icons';
 import './App.css';
 
@@ -23,6 +24,7 @@ import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import OrdersPage from './pages/OrdersPage';
 import ContentManagementPage from './pages/ContentManagementPage';
+import PaymentSettingsPage from './pages/PaymentSettingsPage';
 import { AdminAPI } from './services/api';
 
 const { Header, Sider, Content } = Layout;
@@ -118,6 +120,11 @@ function App() {
       key: 'orders',
       icon: <InboxOutlined />,
       label: 'Siparişler'
+    },
+    {
+      key: 'payment',
+      icon: <WalletOutlined />,
+      label: 'Ödeme Yönetimi'
     }
   ];
 
@@ -181,6 +188,9 @@ function App() {
 
       case 'orders':
         return <OrdersPage />;
+
+      case 'payment':
+        return <PaymentSettingsPage />;
 
       default:
         return null;

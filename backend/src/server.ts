@@ -26,15 +26,34 @@ async function syncAndSeedSettings() {
 
     // Seed initial GlobalSettings for Etsy keys
     const settingsToSeed = [
+      // Etsy
       { key: 'etsy_api_key', value: '', description: 'Etsy Master Application Key (Client ID)', isPublic: false },
       { key: 'etsy_api_secret', value: '', description: 'Etsy Master Application Shared Secret', isPublic: false },
+      // AI
       { key: 'ai_provider', value: 'openai', description: 'AI Provider (openai, openrouter, gemini)', isPublic: true },
       { key: 'ai_api_key', value: '', description: 'AI Provider API Key', isPublic: false },
       { key: 'ai_model', value: 'gpt-4o-mini', description: 'AI Model (e.g. gpt-4o-mini, gemini-pro)', isPublic: true },
+      // Bank Transfer
       { key: 'bank_name', value: '', description: 'Bank Name for Wire Transfer', isPublic: true },
       { key: 'bank_iban', value: '', description: 'IBAN for Wire Transfer', isPublic: true },
       { key: 'bank_account_name', value: '', description: 'Account Holder Name', isPublic: true },
-      { key: 'bank_swift', value: '', description: 'SWIFT Code', isPublic: true }
+      { key: 'bank_swift', value: '', description: 'SWIFT/BIC Code', isPublic: true },
+      { key: 'bank_branch', value: '', description: 'Bank Branch Name', isPublic: true },
+      // Payment Methods – enabled flags
+      { key: 'payment_bank_transfer_enabled', value: 'true', description: 'Enable bank transfer payment method', isPublic: true },
+      { key: 'payment_credit_card_enabled', value: 'false', description: 'Enable credit card payment method', isPublic: true },
+      { key: 'credit_card_provider', value: 'none', description: 'Active credit card provider: iyzico | paytr | stripe | none', isPublic: true },
+      // iyzico
+      { key: 'iyzico_api_key', value: '', description: 'iyzico API Key', isPublic: false },
+      { key: 'iyzico_secret_key', value: '', description: 'iyzico Secret Key', isPublic: false },
+      { key: 'iyzico_base_url', value: 'https://api.iyzipay.com', description: 'iyzico Base URL (sandbox or prod)', isPublic: false },
+      // PayTR
+      { key: 'paytr_merchant_id', value: '', description: 'PayTR Merchant ID', isPublic: false },
+      { key: 'paytr_merchant_key', value: '', description: 'PayTR Merchant Key', isPublic: false },
+      { key: 'paytr_merchant_salt', value: '', description: 'PayTR Merchant Salt', isPublic: false },
+      // Stripe
+      { key: 'stripe_publishable_key', value: '', description: 'Stripe Publishable Key', isPublic: true },
+      { key: 'stripe_secret_key', value: '', description: 'Stripe Secret Key', isPublic: false },
     ];
 
     for (const setting of settingsToSeed) {
