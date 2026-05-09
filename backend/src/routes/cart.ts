@@ -356,7 +356,7 @@ router.post('/checkout', async (req: Request, res: Response) => {
         customerId: userId || sellerId, // fallback to seller if guest (temporary)
         sellerId,
         storeId,
-        status: 'confirmed',
+        status: paymentMethod === 'stripe' ? 'pending' : 'confirmed',
         subtotal: orderTotal,
         shippingCost: 0,
         totalAmount: orderTotal,
@@ -372,6 +372,29 @@ router.post('/checkout', async (req: Request, res: Response) => {
 
       for (const item of orderItems) {
         await OrderItem.create({ orderId: newOrder.id, ...item } as any);
+      }
+
+      if (paymentMethod === 'stripe') {
+        const stripeService = require('../services/stripeService').default;
+        const origin = req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:3000';
+        // Remove locale path logic for simplicity if frontend handles locale redirect, 
+        // but it's safer to just point to the root or the referer path
+        const successUrl = `${origin}/order/${newOrder.id}?success=1`;
+        const cancelUrl = `${origin}/checkout`;
+        
+        const stripeSession = await stripeService.createDirectCheckout(orderItems.map((i: any) => ({
+          name: i.title,
+          price: i.unitPrice,
+          quantity: i.quantity
+        })), successUrl, cancelUrl, undefined);
+        
+        return res.json({
+          success: true,
+          orderId: newOrder.id,
+          orderNumber: newOrder.orderNumber,
+          total: orderTotal,
+          checkoutUrl: stripeSession.url
+        });
       }
 
       return res.json({
@@ -406,12 +429,33 @@ router.post('/checkout', async (req: Request, res: Response) => {
     const orderTotal2 = cart.items.reduce((sum: number, item: any) => sum + (parseFloat(item.totalPrice) || 0), 0);
 
     const order = await cart.update({
-      status: 'confirmed',
+      status: paymentMethod === 'stripe' ? 'pending' : 'confirmed',
       subtotal: orderTotal2,
       totalAmount: orderTotal2,
       shippingAddress: { name, address, city, country: country || 'Turkey', phone },
       customerNote: finalNotes
     } as any);
+
+    if (paymentMethod === 'stripe') {
+      const stripeService = require('../services/stripeService').default;
+      const origin = req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:3000';
+      const successUrl = `${origin}/order/${order.id}?success=1`;
+      const cancelUrl = `${origin}/checkout`;
+      
+      const stripeSession = await stripeService.createDirectCheckout(cart.items.map((i: any) => ({
+        name: i.title,
+        price: i.unitPrice,
+        quantity: i.quantity
+      })), successUrl, cancelUrl, undefined);
+      
+      return res.json({
+        success: true,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        total: orderTotal2,
+        checkoutUrl: stripeSession.url
+      });
+    }
 
     return res.json({
       success: true,
