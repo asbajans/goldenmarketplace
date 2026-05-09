@@ -74,8 +74,8 @@ router.get('/', async (req: Request, res: Response) => {
       return res.json({ items: [], total: 0, count: 0, cartId: null });
     }
 
-    const count = cart.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0;
-    const total = cart.items?.reduce((sum: number, item: any) => sum + (item.totalPrice || 0), 0) || 0;
+    const count = cart.items?.reduce((sum: number, item: any) => sum + (parseInt(item.quantity, 10) || 0), 0) || 0;
+    const total = cart.items?.reduce((sum: number, item: any) => sum + (parseFloat(item.totalPrice) || 0), 0) || 0;
 
     return res.json({
       cartId: cart.id,
@@ -151,8 +151,8 @@ router.post('/add', async (req: Request, res: Response) => {
     } as any);
 
     if (existingItem) {
-      existingItem.quantity += quantity;
-      existingItem.totalPrice = existingItem.unitPrice * existingItem.quantity;
+      existingItem.quantity = parseInt(existingItem.quantity, 10) + quantity;
+      existingItem.totalPrice = parseFloat(existingItem.unitPrice) * existingItem.quantity;
       await existingItem.save();
     } else {
       await OrderItem.create({
@@ -168,7 +168,7 @@ router.post('/add', async (req: Request, res: Response) => {
     }
 
     const cartItems = await OrderItem.findAll({ where: { orderId: cart.id } });
-    const total = cartItems.reduce((sum: number, item: any) => sum + (item.totalPrice || 0), 0);
+    const total = cartItems.reduce((sum: number, item: any) => sum + (parseFloat(item.totalPrice) || 0), 0);
 
     return res.json({
       cartId: cart.id,
@@ -403,7 +403,7 @@ router.post('/checkout', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Cart is empty' });
     }
 
-    const orderTotal2 = cart.items.reduce((sum: number, item: any) => sum + (item.totalPrice || 0), 0);
+    const orderTotal2 = cart.items.reduce((sum: number, item: any) => sum + (parseFloat(item.totalPrice) || 0), 0);
 
     const order = await cart.update({
       status: 'confirmed',
