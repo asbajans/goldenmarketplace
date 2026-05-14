@@ -19,6 +19,9 @@ interface StoreAttributes {
   autoPriceSync?: boolean;
   defaultLanguage?: string;
   openAiApiKey?: string;
+  merchantCenterId?: string;
+  merchantTargetCountry?: string;
+  merchantTargetLanguage?: string;
   commissionRate: number;
   defaultShippingDays: number;
   availableShippingCompanies?: string[];
@@ -120,6 +123,23 @@ Store.init(
       type: DataTypes.STRING(256),
       allowNull: true,
       comment: 'Seller own OpenAI API key for AI translations'
+    },
+    merchantCenterId: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+      comment: 'Google Merchant Center ID for this store'
+    },
+    merchantTargetCountry: {
+      type: DataTypes.STRING(10),
+      allowNull: true,
+      defaultValue: 'TR',
+      comment: 'Target country for Google Shopping feed'
+    },
+    merchantTargetLanguage: {
+      type: DataTypes.STRING(10),
+      allowNull: true,
+      defaultValue: 'tr',
+      comment: 'Target language for Google Shopping feed'
     },
     commissionRate: {
       type: DataTypes.DECIMAL(5, 2),

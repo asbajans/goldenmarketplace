@@ -9,7 +9,8 @@ import {
   LogoutOutlined,
   AppstoreOutlined,
   InboxOutlined,
-  WalletOutlined
+  WalletOutlined,
+  ApiOutlined
 } from '@ant-design/icons';
 import './App.css';
 
@@ -24,6 +25,7 @@ import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import OrdersPage from './pages/OrdersPage';
 import ContentManagementPage from './pages/ContentManagementPage';
+import PixelsTrackingPage from './pages/PixelsTrackingPage';
 import PaymentSettingsPage from './pages/PaymentSettingsPage';
 import { AdminAPI } from './services/api';
 
@@ -125,6 +127,11 @@ function App() {
       key: 'payment',
       icon: <WalletOutlined />,
       label: 'Ödeme Yönetimi'
+    },
+    {
+      key: 'pixels-tracking',
+      icon: <ApiOutlined />,
+      label: 'Pixels & Tracking'
     }
   ];
 
@@ -191,6 +198,9 @@ function App() {
 
       case 'payment':
         return <PaymentSettingsPage />;
+
+      case 'pixels-tracking':
+        return <PixelsTrackingPage />;
 
       default:
         return null;

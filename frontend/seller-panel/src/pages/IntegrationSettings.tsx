@@ -81,11 +81,16 @@ const IntegrationSettings: React.FC = () => {
     const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
     const [form] = Form.useForm();
     const [searchParams] = useSearchParams();
+    const [storeInfo, setStoreInfo] = useState<any>(null);
+    const [merchantCenterId, setMerchantCenterId] = useState('');
+    const [merchantTargetCountry, setMerchantTargetCountry] = useState('TR');
+    const [merchantTargetLanguage, setMerchantTargetLanguage] = useState('tr');
+    const [savingMerchant, setSavingMerchant] = useState(false);
 
     useEffect(() => {
         fetchIntegrations();
+        fetchStoreInfo();
 
-        // Handle URL params for notifications
         const status = searchParams.get('status');
         const platform = searchParams.get('platform');
 
@@ -95,6 +100,35 @@ const IntegrationSettings: React.FC = () => {
             message.error('Bağlantı sırasında bir hata oluştu.');
         }
     }, [searchParams]);
+
+    const fetchStoreInfo = async () => {
+        try {
+            const { data } = await client.get('/store');
+            setStoreInfo(data);
+            setMerchantCenterId(data.merchantCenterId || '');
+            setMerchantTargetCountry(data.merchantTargetCountry || 'TR');
+            setMerchantTargetLanguage(data.merchantTargetLanguage || 'tr');
+        } catch (error) {
+            console.error('Failed to fetch store info', error);
+        }
+    };
+
+    const saveMerchantSettings = async () => {
+        setSavingMerchant(true);
+        try {
+            await client.put('/store', {
+                merchantCenterId,
+                merchantTargetCountry,
+                merchantTargetLanguage,
+            });
+            message.success('Google Merchant ayarları kaydedildi!');
+        } catch (error) {
+            console.error('Failed to save merchant settings', error);
+            message.error('Kaydetme hatası.');
+        } finally {
+            setSavingMerchant(false);
+        }
+    };
 
     const fetchIntegrations = async () => {
         try {
@@ -277,6 +311,58 @@ const IntegrationSettings: React.FC = () => {
                     );
                 })}
             </Row>
+
+            {/* Google Merchant Center */}
+            <Card
+                title="Google Merchant Center"
+                style={{ marginTop: 24 }}
+                extra={<a href="https://merchants.google.com" target="_blank" rel="noopener noreferrer">Merchant Center'a Git →</a>}
+            >
+                <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+                    Google Shopping'de ürünlerinizi listelemek için Merchant Center hesabınızı bağlayın.
+                    Feed URL'sini Google Merchant Center'da ürün feed'i olarak ekleyin.
+                </Text>
+                <Row gutter={[16, 16]}>
+                    <Col xs={24} sm={12}>
+                        <Form.Item label="Merchant Center ID">
+                            <Input
+                                value={storeInfo?.merchantCenterId || ''}
+                                onChange={e => setMerchantCenterId(e.target.value)}
+                                placeholder="123456789"
+                            />
+                        </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={6}>
+                        <Form.Item label="Hedef Ülke">
+                            <Input
+                                value={storeInfo?.merchantTargetCountry || 'TR'}
+                                onChange={e => setMerchantTargetCountry(e.target.value)}
+                                placeholder="TR"
+                                maxLength={2}
+                            />
+                        </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={6}>
+                        <Form.Item label="Hedef Dil">
+                            <Input
+                                value={storeInfo?.merchantTargetLanguage || 'tr'}
+                                onChange={e => setMerchantTargetLanguage(e.target.value)}
+                                placeholder="tr"
+                                maxLength={2}
+                            />
+                        </Form.Item>
+                    </Col>
+                </Row>
+                <Button type="primary" onClick={saveMerchantSettings} loading={savingMerchant} style={{ marginTop: 8 }}>
+                    Merchant Ayarlarını Kaydet
+                </Button>
+                {storeInfo?.storeSlug && (
+                    <div style={{ marginTop: 12, padding: '8px 12px', background: '#f5f5f5', borderRadius: 6, fontSize: 13 }}>
+                        <strong>Feed URL:</strong>{' '}
+                        <code>/api/feed/google/{storeInfo.storeSlug}.xml</code>
+                    </div>
+                )}
+            </Card>
 
             {loading && (
                 <div style={{ textAlign: 'center', marginTop: 40 }}>
