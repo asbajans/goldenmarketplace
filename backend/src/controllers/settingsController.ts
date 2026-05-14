@@ -1,6 +1,12 @@
 import { Request, Response } from 'express';
 import { GlobalSetting } from '../models/GlobalSetting';
 
+const PUBLIC_PREFIXES = ['facebook_', 'google_', 'tiktok_', 'instagram_', 'meta_'];
+
+function isPublicKey(key: string): boolean {
+    return PUBLIC_PREFIXES.some(prefix => key.startsWith(prefix));
+}
+
 export class SettingsController {
     /**
      * Get all public settings (or all settings if admin)
@@ -43,16 +49,16 @@ export class SettingsController {
             // Iterate and upsert all provided keys
             for (const [key, value] of Object.entries(settingsToUpdate)) {
                 if (typeof value === 'string') {
-                    // Find existing setting
                     const existing = await GlobalSetting.findOne({ where: { key } });
+                    const isPublic = isPublicKey(key);
 
                     if (existing) {
-                        await existing.update({ value });
+                        await existing.update({ value, isPublic });
                     } else {
                         await GlobalSetting.create({
                             key,
                             value,
-                            isPublic: false // Make sensitive by default
+                            isPublic
                         });
                     }
                 }

@@ -147,6 +147,7 @@ app.use('/api/gold-price', require('./routes/goldPrice').default || require('./r
 app.use('/api/subscriptions', require('./routes/subscriptions').default || require('./routes/subscriptions'));
 app.use('/api/integrations', require('./routes/integrations').default || require('./routes/integrations'));
 app.use('/api/feed', require('./routes/feed').default || require('./routes/feed'));
+app.use('/api/settings', require('./routes/publicSettings').default || require('./routes/publicSettings'));
 app.use('/api/categories', require('./routes/categories').default || require('./routes/categories'));
 app.use('/api/admin', require('./routes/admin').default || require('./routes/admin'));
 app.use('/api/b2b', require('./routes/b2b').default || require('./routes/b2b'));
