@@ -26,6 +26,24 @@ const TRACKING_FIELDS = [
     ],
   },
   {
+    group: 'Google Merchant Center',
+    icon: '🛒',
+    fields: [
+      { key: 'merchant_center_id', label: 'Merchant Center ID', placeholder: '123456789' },
+      { key: 'merchant_target_country', label: 'Hedef Ülke', placeholder: 'TR' },
+      { key: 'merchant_target_language', label: 'Hedef Dil', placeholder: 'tr' },
+    ],
+    extra: (
+      <div style={{ marginTop: 12, padding: '8px 12px', background: '#f5f5f5', borderRadius: 6, fontSize: 13 }}>
+        <strong>Feed URL'leri:</strong><br />
+        Google Shopping: <code>/api/feed/google.xml</code><br />
+        Facebook Catalog: <code>/api/feed/facebook.json</code><br />
+        Instagram: <code>/api/feed/instagram.json</code><br />
+        <small>Bu URL'leri Merchant Center / Commerce Manager'da ürün feed'i olarak ekleyin.</small>
+      </div>
+    ),
+  },
+  {
     group: 'TikTok',
     icon: '🎵',
     fields: [
@@ -105,6 +123,7 @@ export default function PixelsTrackingPage() {
                   </Col>
                 ))}
               </Row>
+              {(group as any).extra && <div>{(group as any).extra}</div>}
             </Card>
           ))}
         </Form>
