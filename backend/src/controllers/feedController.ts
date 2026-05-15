@@ -103,7 +103,7 @@ export class FeedController {
     <g:availability>${product.quantity > 0 ? 'in_stock' : (product.quantity === 0 ? 'out_of_stock' : 'in_stock')}</g:availability>
     <g:condition>new</g:condition>
     <g:brand><![CDATA[${langStore}]]></g:brand>
-    <g:mpn>${product.sku || product.id}</g:multi_pack>
+    <g:mpn>${product.sku || product.id}</g:mpn>
     <g:product_type><![CDATA[${product.category || 'Jewelry'}]]></g:product_type>
     <g:google_product_category>188</g:google_product_category>
     <g:identifier_exists>FALSE</g:identifier_exists>
