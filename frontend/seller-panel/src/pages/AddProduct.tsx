@@ -23,6 +23,7 @@ const LANGUAGES = [
     { key: 'en', label: 'English', flag: '🇬🇧' },
     { key: 'tr', label: 'Türkçe', flag: '🇹🇷' },
     { key: 'it', label: 'Italiano', flag: '🇮🇹' },
+    { key: 'es', label: 'Español', flag: '🇪🇸' },
     { key: 'ar', label: 'العربية', flag: '🇸🇦' }
 ];
 

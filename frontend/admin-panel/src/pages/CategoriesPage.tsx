@@ -1,13 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Card, Button, Space, Modal, Form, Input, Switch, message, Tag } from 'antd';
+import { Table, Card, Button, Space, Modal, Form, Input, Switch, message, Tag, Tabs } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { AdminAPI } from '../services/api';
+
+const { TabPane } = Tabs;
+
+const LANGUAGES = [
+  { key: 'en', label: 'English', flag: '🇺🇸' },
+  { key: 'tr', label: 'Türkçe', flag: '🇹🇷' },
+  { key: 'it', label: 'Italiano', flag: '🇮🇹' },
+  { key: 'es', label: 'Español', flag: '🇪🇸' },
+  { key: 'ar', label: 'العربية', flag: '🇸🇦' },
+];
 
 export const CategoriesPage: React.FC = () => {
     const [categories, setCategories] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [editingCategory, setEditingCategory] = useState<any>(null);
+    const [activeLang, setActiveLang] = useState('en');
     const [form] = Form.useForm();
 
     const fetchCategories = async () => {
@@ -31,12 +42,23 @@ export const CategoriesPage: React.FC = () => {
         setEditingCategory(null);
         form.resetFields();
         form.setFieldsValue({ isActive: true });
+        setActiveLang('en');
         setIsModalVisible(true);
     };
 
     const handleEdit = (record: any) => {
         setEditingCategory(record);
-        form.setFieldsValue(record);
+        const translations = record.translations || {};
+        form.setFieldsValue({
+            name: record.name,
+            slug: record.slug,
+            description: record.description,
+            isActive: record.isActive,
+            ...Object.entries(translations).flatMap(([lang, t]: [string, any]) => [
+                [`trans_name_${lang}`, t.name || ''],
+                [`trans_desc_${lang}`, t.description || ''],
+            ]),
+        });
         setIsModalVisible(true);
     };
 
@@ -56,12 +78,27 @@ export const CategoriesPage: React.FC = () => {
     };
 
     const parseSubmit = async (values: any) => {
+        const translations: Record<string, any> = {};
+        for (const lang of LANGUAGES) {
+            const tName = values[`trans_name_${lang.key}`];
+            const tDesc = values[`trans_desc_${lang.key}`];
+            translations[lang.key] = { name: tName || '', description: tDesc || '' };
+        }
+
+        const payload = {
+            name: values.name,
+            slug: values.slug,
+            description: values.description,
+            isActive: values.isActive,
+            translations,
+        };
+
         try {
             if (editingCategory) {
-                await AdminAPI.updateCategory(editingCategory.id, values);
+                await AdminAPI.updateCategory(editingCategory.id, payload);
                 message.success('Category updated successfully');
             } else {
-                await AdminAPI.createCategory(values);
+                await AdminAPI.createCategory(payload);
                 message.success('Category created successfully');
             }
             setIsModalVisible(false);
@@ -75,7 +112,15 @@ export const CategoriesPage: React.FC = () => {
     const columns = [
         { title: 'Kategori Adı', dataIndex: 'name', key: 'name' },
         { title: 'Slug', dataIndex: 'slug', key: 'slug' },
-        { title: 'Açıklama', dataIndex: 'description', key: 'description' },
+        { title: 'Açıklama', dataIndex: 'description', key: 'description', ellipsis: true },
+        {
+            title: 'Çeviriler',
+            key: 'translations',
+            render: (_: any, record: any) => {
+                const t = record.translations || {};
+                return LANGUAGES.map(l => t[l.key]?.name ? `${l.flag}${t[l.key].name}` : null).filter(Boolean).join(', ');
+            }
+        },
         {
             title: 'Durum',
             dataIndex: 'isActive',
@@ -109,6 +154,7 @@ export const CategoriesPage: React.FC = () => {
                 open={isModalVisible}
                 onCancel={() => setIsModalVisible(false)}
                 onOk={() => form.submit()}
+                width={700}
             >
                 <Form form={form} layout="vertical" onFinish={parseSubmit}>
                     <Form.Item name="name" label="Kategori Adı" rules={[{ required: true }]}>
@@ -124,12 +170,25 @@ export const CategoriesPage: React.FC = () => {
                     </Form.Item>
 
                     <Form.Item name="description" label="Açıklama">
-                        <Input.TextArea rows={3} />
+                        <Input.TextArea rows={2} />
                     </Form.Item>
 
                     <Form.Item name="isActive" label="Aktif mi?" valuePropName="checked">
                         <Switch />
                     </Form.Item>
+
+                    <Tabs activeKey={activeLang} onChange={setActiveLang} type="card">
+                        {LANGUAGES.map(lang => (
+                            <TabPane tab={<span>{lang.flag} {lang.label}</span>} key={lang.key}>
+                                <Form.Item name={`trans_name_${lang.key}`} label={`${lang.label} - Ad`}>
+                                    <Input placeholder={`Category name in ${lang.label}`} />
+                                </Form.Item>
+                                <Form.Item name={`trans_desc_${lang.key}`} label={`${lang.label} - Açıklama`}>
+                                    <Input.TextArea rows={2} placeholder={`Description in ${lang.label}`} />
+                                </Form.Item>
+                            </TabPane>
+                        ))}
+                    </Tabs>
                 </Form>
             </Modal>
         </Card>

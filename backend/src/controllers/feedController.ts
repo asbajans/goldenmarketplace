@@ -5,7 +5,7 @@ import Store from '../models/Store';
 import { GlobalSetting } from '../models/GlobalSetting';
 
 const SITE_URL = process.env.SITE_URL || 'https://goldencrafters.com';
-const LANGUAGES = ['en', 'tr', 'it', 'ar'];
+const LANGUAGES = ['en', 'tr', 'it', 'ar', 'es'];
 
 export class FeedController {
     /**

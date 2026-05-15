@@ -166,8 +166,8 @@ export class AdminController {
 
     static async createCategory(req: Request, res: Response): Promise<Response> {
         try {
-            const { name, slug, description, isActive } = req.body;
-            const category = await Category.create({ name, slug, description, isActive });
+            const { name, slug, description, isActive, translations } = req.body;
+            const category = await Category.create({ name, slug, description, isActive, translations: translations || {} });
             return res.status(201).json(category);
         } catch (error: any) {
             return res.status(400).json({ error: error.message || 'Failed to create category' });
@@ -177,12 +177,12 @@ export class AdminController {
     static async updateCategory(req: Request, res: Response): Promise<Response> {
         try {
             const { id } = req.params;
-            const { name, slug, description, isActive } = req.body;
+            const { name, slug, description, isActive, translations } = req.body;
 
             const category = await Category.findByPk(id);
             if (!category) return res.status(404).json({ error: 'Category not found' });
 
-            await category.update({ name, slug, description, isActive });
+            await category.update({ name, slug, description, isActive, translations: translations || {} });
             return res.json(category);
         } catch (error: any) {
             return res.status(400).json({ error: error.message || 'Failed to update category' });

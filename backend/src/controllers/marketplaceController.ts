@@ -10,6 +10,22 @@ const goldenFilter: WhereOptions = {
   )
 };
 
+function applyTranslation(product: any, lang: string): any {
+  if (!product) return product;
+  const json = product.toJSON ? product.toJSON() : product;
+  const translations = json.translations || {};
+  const defaultLang = json.defaultLanguage || 'en';
+  const trans = translations[lang] || {};
+
+  return {
+    ...json,
+    title: trans.title || json.title,
+    description: trans.description || json.description,
+    _lang: lang,
+    _defaultLang: defaultLang,
+  };
+}
+
 export class MarketplaceController {
   
   /**
@@ -27,6 +43,7 @@ export class MarketplaceController {
       const sort = req.query.sort as string;
       const minPrice = req.query.minPrice ? parseFloat(req.query.minPrice as string) : null;
       const maxPrice = req.query.maxPrice ? parseFloat(req.query.maxPrice as string) : null;
+      const lang = (req.query.lang as string) || 'en';
 
       const where: WhereOptions = {
         isActive: true,
@@ -35,20 +52,18 @@ export class MarketplaceController {
       
       if (search) where.title = { [Op.iLike]: `%${search}%` };
       if (category) {
-        // Multi-language category search: match across all locale variants
         const categoryVariants: Record<string, string[]> = {
-          rings: ['rings', 'yüzük', 'yuzuk', 'anelli', 'anelli', 'خواتم', 'khatim'],
-          necklaces: ['necklaces', 'kolye', 'collane', 'قلائد', 'qalayed'],
-          bracelets: ['bracelets', 'bilezik', 'bracciali', 'أساور', 'asawer'],
-          earrings: ['earrings', 'küpe', 'kupe', 'orecchini', 'أقراط', 'aqrat'],
-          pendants: ['pendants', 'kolye ucu', 'kolye-ucu', 'ciondoli', 'pendenti', 'دلايات', 'dulaya'],
-          sets: ['sets', 'takı seti', 'taki seti', 'taki-seti', 'set', 'مجموعات', 'majmueat'],
+          rings: ['rings', 'yüzük', 'yuzuk', 'anelli', 'anelli', 'خواتم', 'khatim', 'anillos'],
+          necklaces: ['necklaces', 'kolye', 'collane', 'قلائد', 'qalayed', 'collares'],
+          bracelets: ['bracelets', 'bilezik', 'bracciali', 'أساور', 'asawer', 'pulseras'],
+          earrings: ['earrings', 'küpe', 'kupe', 'orecchini', 'أقراط', 'aqrat', 'aretes'],
+          pendants: ['pendants', 'kolye ucu', 'kolye-ucu', 'ciondoli', 'pendenti', 'دلايات', 'dulaya', 'colgantes'],
+          sets: ['sets', 'takı seti', 'taki seti', 'taki-seti', 'set', 'مجموعات', 'majmueat', 'juegos'],
         };
 
         const catLower = category.toLowerCase().trim();
         let allTerms: string[] = [catLower, category];
 
-        // Find matching variant group
         for (const [, terms] of Object.entries(categoryVariants)) {
           if (terms.some(t => t === catLower || t.includes(catLower) || catLower.includes(t))) {
             allTerms = [...new Set([...allTerms, ...terms])];
@@ -56,7 +71,6 @@ export class MarketplaceController {
           }
         }
 
-        // Search across all language variants
         where.category = {
           [Op.or]: allTerms.map(term => ({ [Op.iLike]: `%${term}%` }))
         };
@@ -84,15 +98,17 @@ export class MarketplaceController {
 
       const { count, rows: products } = await Product.findAndCountAll({
         where,
-        attributes: ['id', 'title', 'slug', 'category', 'priceTRY', 'priceUSD', 'images', 'createdAt'],
+        attributes: ['id', 'title', 'slug', 'category', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'description', 'discountRate'],
         include: [includeStore],
         limit,
         offset,
         order
       });
 
+      const translated = products.map(p => applyTranslation(p, lang));
+
       return res.json({
-        data: products,
+        data: translated,
         pagination: { page, limit, total: count, pages: Math.ceil(count / limit) }
       });
     } catch (error) {
@@ -107,9 +123,11 @@ export class MarketplaceController {
   static async getProductBySlug(req: Request, res: Response) {
     try {
       const { slug } = req.params;
+      const lang = (req.query.lang as string) || 'en';
 
       const product = await Product.findOne({
         where: { slug, isActive: true },
+        attributes: ['id', 'title', 'description', 'slug', 'category', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'sku', 'quantity', 'weight', 'marketplaces', 'features'],
         include: [
           {
             model: Store,
@@ -125,7 +143,7 @@ export class MarketplaceController {
       });
 
       if (!product) return res.status(404).json({ error: 'Product not found' });
-      return res.json(product);
+      return res.json(applyTranslation(product, lang));
     } catch (error) {
       console.error('[Marketplace] getProductBySlug error:', error);
       return res.status(500).json({ error: 'Failed to fetch product details' });
