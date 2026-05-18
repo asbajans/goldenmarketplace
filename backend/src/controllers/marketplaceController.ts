@@ -243,12 +243,31 @@ export class MarketplaceController {
         raw: true
       });
 
-      return res.json({
-        data: results.map((r: any) => ({
-          name: r.category,
-          count: parseInt(r.count)
-        }))
-      });
+      // Map raw category strings to category records (if available) to pick translations
+      const CategoryModel = require('../models').Category || require('../models/Category').default;
+
+      const mapped = await Promise.all(results.map(async (r: any) => {
+        const raw = r.category;
+        let displayName = raw;
+        let slug = raw;
+
+        try {
+          const cat = await CategoryModel.findOne({ where: { slug: raw } });
+          if (cat) {
+            const json = cat.toJSON();
+            const translations = json.translations || {};
+            const lang = (_req.query.lang as string) || 'en';
+            displayName = translations[lang]?.name || json.name || raw;
+            slug = json.slug || raw;
+          }
+        } catch (e) {
+          // ignore lookup errors and fall back to raw
+        }
+
+        return { name: displayName, slug, count: parseInt(r.count) };
+      }));
+
+      return res.json({ data: mapped });
     } catch (error) {
       console.error('[Marketplace] getCategories error:', error);
       return res.status(500).json({ error: 'Failed to fetch categories' });
