@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
-import { Card, Tabs, Input, Button, message, Row, Col, List, Switch, Select, Upload, Modal, Table, Tag } from 'antd';
-import { SaveOutlined, PlusOutlined, DeleteOutlined, EditOutlined, UploadOutlined } from '@ant-design/icons';
+﻿import { useState, useEffect } from 'react';
+import { Card, Tabs, Input, Button, message, Row, Col, List, Switch, Modal, Table, Tag } from 'antd';
+import { SaveOutlined, PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { AdminAPI } from '../services/api';
 
 const { TextArea } = Input;
 const { TabPane } = Tabs;
-const { Option } = Select;
 
 const LANGUAGES = [
   { key: 'en', label: 'English', flag: '🇺🇸' },
@@ -15,56 +14,110 @@ const LANGUAGES = [
   { key: 'ar', label: 'العربية', flag: '🇸🇦' },
 ];
 
+const PAGE_KEYS = ['homepage', 'about', 'blog', 'footer'];
+const PAGE_LABELS: Record<string, string> = {
+  homepage: 'Ana Sayfa',
+  about: 'Hakkımızda',
+  blog: 'Blog',
+  footer: 'Footer'
+};
+
+const initialTranslations = LANGUAGES.reduce((acc, lang) => {
+  acc[lang.key] = { title: '', subtitle: '', excerpt: '', content: '' };
+  return acc;
+}, {} as Record<string, any>);
+
+function ensureSliderTranslations(item: any) {
+  const translations = item.translations || {};
+  const normalized = { ...translations };
+
+  LANGUAGES.forEach(lang => {
+    normalized[lang.key] = {
+      title: translations[lang.key]?.title || item.title || '',
+      subtitle: translations[lang.key]?.subtitle || item.subtitle || '',
+    };
+  });
+
+  return {
+    ...item,
+    translations: normalized,
+    imageUrl: item.imageUrl || '',
+    link: item.link || '',
+    videoUrl: item.videoUrl || '',
+    order: item.order || 0,
+  };
+}
+
+function ensureBlogTranslations(item: any) {
+  const translations = item.translations || {};
+  const normalized = { ...translations };
+
+  LANGUAGES.forEach(lang => {
+    normalized[lang.key] = {
+      title: translations[lang.key]?.title || item.title || '',
+      excerpt: translations[lang.key]?.excerpt || item.excerpt || '',
+      content: translations[lang.key]?.content || item.content || '',
+    };
+  });
+
+  return {
+    ...item,
+    translations: normalized,
+    slug: item.slug || '',
+    imageUrl: item.imageUrl || '',
+    isActive: item.isActive !== false,
+    order: item.order || 0,
+  };
+}
+
 export default function ContentManagementPage() {
   const [activeTab, setActiveTab] = useState('pages');
   const [saving, setSaving] = useState(false);
-  
-  // Page contents state
+
   const [pageContents, setPageContents] = useState<Record<string, Record<string, { title: string; subtitle: string; description: string }>>>({});
   const [activePage, setActivePage] = useState('homepage');
   const [activeLang, setActiveLang] = useState('en');
-  
-  // Slider state
+
   const [sliders, setSliders] = useState<any[]>([]);
   const [sliderModal, setSliderModal] = useState(false);
   const [editingSlider, setEditingSlider] = useState<any>(null);
-  const [sliderForm, setSliderForm] = useState({ title: '', subtitle: '', imageUrl: '', link: '' });
-  
-  // Menu state
+  const [sliderLang, setSliderLang] = useState('en');
+  const [sliderForm, setSliderForm] = useState({ imageUrl: '', link: '', videoUrl: '', translations: { ...initialTranslations }, order: 0 });
+
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [menuModal, setMenuModal] = useState(false);
   const [editingMenu, setEditingMenu] = useState<any>(null);
   const [menuForm, setMenuForm] = useState({ key: '', label: '', href: '', order: 0, visible: true });
-  
-  // Categories state
-  const [categories, setCategories] = useState<any[]>([]);
-  const [categoryModal, setCategoryModal] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<any>(null);
-  const [categoryForm, setCategoryForm] = useState({ name: '', icon: '', order: 0, isActive: true });
+
+  const [blogPosts, setBlogPosts] = useState<any[]>([]);
+  const [blogModal, setBlogModal] = useState(false);
+  const [editingBlog, setEditingBlog] = useState<any>(null);
+  const [blogLang, setBlogLang] = useState('en');
+  const [blogForm, setBlogForm] = useState({ slug: '', imageUrl: '', isActive: true, order: 0, translations: { ...initialTranslations } });
 
   useEffect(() => {
     loadPageContents();
     loadSliders();
     loadMenuItems();
-    loadCategories();
+    loadBlogPosts();
   }, []);
 
   const loadPageContents = async () => {
     try {
       const allSettings = await AdminAPI.getSettings();
       const contents: Record<string, Record<string, any>> = {};
-      
-      const pageKeys = ['homepage', 'about', 'blog', 'footer'];
-      for (const page of pageKeys) {
+
+      PAGE_KEYS.forEach(page => {
         contents[page] = {};
-        for (const lang of LANGUAGES) {
+        LANGUAGES.forEach(lang => {
           contents[page][lang.key] = {
             title: allSettings[`${page}_title_${lang.key}`] || '',
             subtitle: allSettings[`${page}_subtitle_${lang.key}`] || '',
             description: allSettings[`${page}_desc_${lang.key}`] || '',
           };
-        }
-      }
+        });
+      });
+
       setPageContents(contents);
     } catch (error) {
       console.error('Failed to load page contents:', error);
@@ -101,12 +154,11 @@ export default function ContentManagementPage() {
     }));
   };
 
-  // Slider functions
   const loadSliders = async () => {
     try {
       const settings = await AdminAPI.getSettings();
       const sliderData = settings.homepage_sliders ? JSON.parse(settings.homepage_sliders) : [];
-      setSliders(sliderData);
+      setSliders(sliderData.map((item: any) => ensureSliderTranslations(item)));
     } catch (error) {
       console.error('Failed to load sliders:', error);
     }
@@ -127,19 +179,51 @@ export default function ContentManagementPage() {
   const openSliderModal = (slider?: any) => {
     if (slider) {
       setEditingSlider(slider);
-      setSliderForm({ title: slider.title, subtitle: slider.subtitle, imageUrl: slider.imageUrl, link: slider.link });
+      setSliderForm({
+        imageUrl: slider.imageUrl || '',
+        link: slider.link || '',
+        videoUrl: slider.videoUrl || '',
+        translations: slider.translations || { ...initialTranslations },
+        order: slider.order || 0,
+      });
     } else {
       setEditingSlider(null);
-      setSliderForm({ title: '', subtitle: '', imageUrl: '', link: '' });
+      setSliderForm({
+        imageUrl: '',
+        link: '',
+        videoUrl: '',
+        translations: { ...initialTranslations },
+        order: sliders.length + 1,
+      });
     }
+    setSliderLang('en');
     setSliderModal(true);
   };
 
+  const updateSliderTranslation = (field: 'title' | 'subtitle', value: string) => {
+    setSliderForm(prev => ({
+      ...prev,
+      translations: {
+        ...prev.translations,
+        [sliderLang]: {
+          ...prev.translations[sliderLang],
+          [field]: value,
+        }
+      }
+    }));
+  };
+
   const saveSlider = () => {
+    const item = {
+      ...sliderForm,
+      translations: sliderForm.translations,
+      id: editingSlider?.id || Date.now(),
+    };
+
     if (editingSlider) {
-      setSliders(prev => prev.map(s => s.id === editingSlider.id ? { ...s, ...sliderForm } : s));
+      setSliders(prev => prev.map(s => s.id === editingSlider.id ? item : s));
     } else {
-      setSliders(prev => [...prev, { id: Date.now(), ...sliderForm, order: sliders.length + 1 }]);
+      setSliders(prev => [...prev, item]);
     }
     setSliderModal(false);
     saveSliders();
@@ -150,7 +234,6 @@ export default function ContentManagementPage() {
     saveSliders();
   };
 
-  // Menu functions
   const loadMenuItems = async () => {
     try {
       const settings = await AdminAPI.getSettings();
@@ -204,51 +287,85 @@ export default function ContentManagementPage() {
     saveMenuItems();
   };
 
-  // Category functions
-  const loadCategories = async () => {
+  const loadBlogPosts = async () => {
     try {
-      const cats = await AdminAPI.getCategories();
-      setCategories(cats.data || []);
+      const settings = await AdminAPI.getSettings();
+      const posts = settings.blog_posts ? JSON.parse(settings.blog_posts) : [];
+      setBlogPosts(posts.map((item: any) => ensureBlogTranslations(item)));
     } catch (error) {
-      console.error('Failed to load categories:', error);
+      console.error('Failed to load blog posts:', error);
     }
   };
 
-  const openCategoryModal = (cat?: any) => {
-    if (cat) {
-      setEditingCategory(cat);
-      setCategoryForm({ name: cat.name, icon: cat.icon || '', order: cat.order || 0, isActive: cat.isActive !== false });
+  const saveBlogPosts = async (posts: any[]) => {
+    setSaving(true);
+    try {
+      await AdminAPI.updateSettings({ blog_posts: JSON.stringify(posts) });
+      message.success('Blog yazıları kaydedildi!');
+    } catch (error) {
+      message.error('Blog kaydetme hatası');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openBlogModal = (post?: any) => {
+    if (post) {
+      setEditingBlog(post);
+      setBlogForm({
+        slug: post.slug || '',
+        imageUrl: post.imageUrl || '',
+        isActive: post.isActive !== false,
+        order: post.order || 0,
+        translations: post.translations || { ...initialTranslations },
+      });
     } else {
-      setEditingCategory(null);
-      setCategoryForm({ name: '', icon: '', order: categories.length + 1, isActive: true });
+      setEditingBlog(null);
+      setBlogForm({
+        slug: '',
+        imageUrl: '',
+        isActive: true,
+        order: blogPosts.length + 1,
+        translations: { ...initialTranslations },
+      });
     }
-    setCategoryModal(true);
+    setBlogLang('en');
+    setBlogModal(true);
   };
 
-  const saveCategory = async () => {
-    try {
-      if (editingCategory) {
-        await AdminAPI.updateCategory(editingCategory.id, categoryForm);
-        message.success('Kategori güncellendi!');
-      } else {
-        await AdminAPI.createCategory(categoryForm);
-        message.success('Kategori eklendi!');
+  const updateBlogTranslation = (field: 'title' | 'excerpt' | 'content', value: string) => {
+    setBlogForm(prev => ({
+      ...prev,
+      translations: {
+        ...prev.translations,
+        [blogLang]: {
+          ...prev.translations[blogLang],
+          [field]: value,
+        }
       }
-      setCategoryModal(false);
-      loadCategories();
-    } catch (error) {
-      message.error('Kategori kaydetme hatası');
-    }
+    }));
   };
 
-  const deleteCategory = async (id: string) => {
-    try {
-      await AdminAPI.deleteCategory(id);
-      message.success('Kategori silindi!');
-      loadCategories();
-    } catch (error) {
-      message.error('Kategori silme hatası');
-    }
+  const saveBlog = () => {
+    const post = {
+      ...blogForm,
+      translations: blogForm.translations,
+      id: editingBlog?.id || Date.now(),
+    };
+
+    const updated = editingBlog
+      ? blogPosts.map(p => p.id === editingBlog.id ? post : p)
+      : [...blogPosts, post];
+
+    setBlogPosts(updated);
+    setBlogModal(false);
+    saveBlogPosts(updated);
+  };
+
+  const deleteBlogPost = (id: number) => {
+    const updated = blogPosts.filter(p => p.id !== id);
+    setBlogPosts(updated);
+    saveBlogPosts(updated);
   };
 
   const currentPageContent = pageContents[activePage]?.[activeLang] || { title: '', subtitle: '', description: '' };
@@ -261,7 +378,7 @@ export default function ContentManagementPage() {
         <Row gutter={24}>
           <Col span={6}>
             <Card size="small" title="Sayfalar">
-              {['homepage', 'about', 'blog', 'footer'].map(page => (
+              {PAGE_KEYS.map(page => (
                 <div
                   key={page}
                   onClick={() => setActivePage(page)}
@@ -274,7 +391,7 @@ export default function ContentManagementPage() {
                     marginBottom: 4,
                   }}
                 >
-                  {{ homepage: 'Ana Sayfa', about: 'Hakkımızda', blog: 'Blog', footer: 'Footer' }[page]}
+                  {PAGE_LABELS[page]}
                 </div>
               ))}
             </Card>
@@ -324,9 +441,14 @@ export default function ContentManagementPage() {
                 ]}
               >
                 <List.Item.Meta
-                  avatar={<img src={slider.imageUrl} alt={slider.title} style={{ width: 100, height: 60, objectFit: 'cover' }} />}
-                  title={slider.title}
-                  description={slider.subtitle}
+                  avatar={<img src={slider.imageUrl} alt={slider.translations?.[activeLang]?.title || ''} style={{ width: 100, height: 60, objectFit: 'cover' }} />}
+                  title={slider.translations?.[activeLang]?.title || 'Untitled'}
+                  description={
+                    <div>
+                      <div>{slider.translations?.[activeLang]?.subtitle || ''}</div>
+                      {slider.videoUrl && <div style={{ color: '#888', marginTop: 6 }}>Video: {slider.videoUrl}</div>}
+                    </div>
+                  }
                 />
               </List.Item>
             )}
@@ -349,8 +471,8 @@ export default function ContentManagementPage() {
               { title: 'Etiket', dataIndex: 'label' },
               { title: 'Link', dataIndex: 'href' },
               { title: 'Sıra', dataIndex: 'order', width: 80 },
-              { 
-                title: 'Görünür', 
+              {
+                title: 'Görünür',
                 dataIndex: 'visible',
                 width: 100,
                 render: (val, record) => <Switch checked={val !== false} onChange={() => toggleMenuVisible(record.key)} />
@@ -362,42 +484,6 @@ export default function ContentManagementPage() {
                   <>
                     <Button size="small" icon={<EditOutlined />} onClick={() => openMenuModal(record)} style={{ marginRight: 8 }} />
                     <Button size="small" danger icon={<DeleteOutlined />} onClick={() => deleteMenuItem(record.key)} />
-                  </>
-                )
-              }
-            ]}
-          />
-        </Card>
-      ),
-    },
-    {
-      key: 'categories',
-      label: '📁 Kategoriler',
-      children: (
-        <Card
-          title="Kategori Yönetimi"
-          extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => openCategoryModal()}>Yeni Kategori</Button>}
-        >
-          <Table
-            dataSource={categories}
-            rowKey="id"
-            columns={[
-              { title: 'İkon', dataIndex: 'icon', width: 80, render: icon => icon || '✦' },
-              { title: 'Kategori Adı', dataIndex: 'name' },
-              { title: 'Sıra', dataIndex: 'order', width: 80 },
-              { 
-                title: 'Durum', 
-                dataIndex: 'isActive',
-                width: 100,
-                render: val => <Tag color={val !== false ? 'green' : 'red'}>{val !== false ? 'Aktif' : 'Pasif'}</Tag>
-              },
-              {
-                title: 'İşlem',
-                width: 150,
-                render: (_, record) => (
-                  <>
-                    <Button size="small" icon={<EditOutlined />} onClick={() => openCategoryModal(record)} style={{ marginRight: 8 }} />
-                    <Button size="small" danger icon={<DeleteOutlined />} onClick={() => deleteCategory(record.id)} />
                   </>
                 )
               }
@@ -421,6 +507,44 @@ export default function ContentManagementPage() {
         </Card>
       ),
     },
+    {
+      key: 'blog',
+      label: '📝 Blog Yazıları',
+      children: (
+        <Card
+          title="Blog Yazıları"
+          extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => openBlogModal()}>Yeni Yazı</Button>}
+        >
+          <Table
+            dataSource={blogPosts}
+            rowKey="id"
+            columns={[
+              {
+                title: 'Başlık',
+                render: (_: any, record: any) => record.translations?.[activeLang]?.title || record.slug || '—'
+              },
+              { title: 'Slug', dataIndex: 'slug' },
+              {
+                title: 'Durum',
+                dataIndex: 'isActive',
+                width: 100,
+                render: (val: boolean) => <Tag color={val ? 'green' : 'red'}>{val ? 'Aktif' : 'Pasif'}</Tag>
+              },
+              {
+                title: 'İşlem',
+                width: 180,
+                render: (_: any, record: any) => (
+                  <>
+                    <Button size="small" icon={<EditOutlined />} onClick={() => openBlogModal(record)} style={{ marginRight: 8 }} />
+                    <Button size="small" danger icon={<DeleteOutlined />} onClick={() => deleteBlogPost(record.id)} />
+                  </>
+                )
+              }
+            ]}
+          />
+        </Card>
+      ),
+    },
   ];
 
   return (
@@ -428,7 +552,6 @@ export default function ContentManagementPage() {
       <h2 style={{ marginBottom: 24 }}>İçerik Yönetimi</h2>
       <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
 
-      {/* Slider Modal */}
       <Modal
         title={editingSlider ? 'Slider Düzenle' : 'Yeni Slider'}
         open={sliderModal}
@@ -436,16 +559,27 @@ export default function ContentManagementPage() {
         onCancel={() => setSliderModal(false)}
       >
         <div style={{ marginBottom: 16 }}>
+          <Tabs activeKey={sliderLang} onChange={setSliderLang} type="card">
+            {LANGUAGES.map(lang => (
+              <TabPane tab={<span>{lang.flag} {lang.label}</span>} key={lang.key} />
+            ))}
+          </Tabs>
+        </div>
+        <div style={{ marginBottom: 16 }}>
           <label>Başlık</label>
-          <Input value={sliderForm.title} onChange={e => setSliderForm({ ...sliderForm, title: e.target.value })} />
+          <Input value={sliderForm.translations[sliderLang]?.title || ''} onChange={e => updateSliderTranslation('title', e.target.value)} />
         </div>
         <div style={{ marginBottom: 16 }}>
           <label>Alt Başlık</label>
-          <Input value={sliderForm.subtitle} onChange={e => setSliderForm({ ...sliderForm, subtitle: e.target.value })} />
+          <Input value={sliderForm.translations[sliderLang]?.subtitle || ''} onChange={e => updateSliderTranslation('subtitle', e.target.value)} />
         </div>
         <div style={{ marginBottom: 16 }}>
           <label>Görsel URL</label>
           <Input value={sliderForm.imageUrl} onChange={e => setSliderForm({ ...sliderForm, imageUrl: e.target.value })} />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label>Video URL (YouTube)</label>
+          <Input value={sliderForm.videoUrl} onChange={e => setSliderForm({ ...sliderForm, videoUrl: e.target.value })} />
         </div>
         <div style={{ marginBottom: 16 }}>
           <label>Link</label>
@@ -453,7 +587,6 @@ export default function ContentManagementPage() {
         </div>
       </Modal>
 
-      {/* Menu Modal */}
       <Modal
         title={editingMenu ? 'Menü Düzenle' : 'Yeni Menü'}
         open={menuModal}
@@ -474,24 +607,43 @@ export default function ContentManagementPage() {
         </div>
       </Modal>
 
-      {/* Category Modal */}
       <Modal
-        title={editingCategory ? 'Kategori Düzenle' : 'Yeni Kategori'}
-        open={categoryModal}
-        onOk={saveCategory}
-        onCancel={() => setCategoryModal(false)}
+        title={editingBlog ? 'Blog Yazısı Düzenle' : 'Yeni Blog Yazısı'}
+        open={blogModal}
+        onOk={saveBlog}
+        onCancel={() => setBlogModal(false)}
+        width={800}
       >
         <div style={{ marginBottom: 16 }}>
-          <label>Kategori Adı</label>
-          <Input value={categoryForm.name} onChange={e => setCategoryForm({ ...categoryForm, name: e.target.value })} />
+          <label>URL Slug</label>
+          <Input value={blogForm.slug} onChange={e => setBlogForm({ ...blogForm, slug: e.target.value })} />
         </div>
         <div style={{ marginBottom: 16 }}>
-          <label>İkon (emoji)</label>
-          <Input value={categoryForm.icon} onChange={e => setCategoryForm({ ...categoryForm, icon: e.target.value })} />
+          <label>Kapak Görseli URL</label>
+          <Input value={blogForm.imageUrl} onChange={e => setBlogForm({ ...blogForm, imageUrl: e.target.value })} />
         </div>
         <div style={{ marginBottom: 16 }}>
-          <label>Sıra</label>
-          <Input type="number" value={categoryForm.order} onChange={e => setCategoryForm({ ...categoryForm, order: parseInt(e.target.value) || 0 })} />
+          <label>Aktif mi?</label>
+          <Switch checked={blogForm.isActive} onChange={checked => setBlogForm({ ...blogForm, isActive: checked })} />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <Tabs activeKey={blogLang} onChange={setBlogLang} type="card">
+            {LANGUAGES.map(lang => (
+              <TabPane tab={<span>{lang.flag} {lang.label}</span>} key={lang.key} />
+            ))}
+          </Tabs>
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label>Başlık</label>
+          <Input value={blogForm.translations[blogLang]?.title || ''} onChange={e => updateBlogTranslation('title', e.target.value)} />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label>Önizleme Metni</label>
+          <TextArea rows={3} value={blogForm.translations[blogLang]?.excerpt || ''} onChange={e => updateBlogTranslation('excerpt', e.target.value)} />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label>İçerik</label>
+          <TextArea rows={8} value={blogForm.translations[blogLang]?.content || ''} onChange={e => updateBlogTranslation('content', e.target.value)} />
         </div>
       </Modal>
     </div>

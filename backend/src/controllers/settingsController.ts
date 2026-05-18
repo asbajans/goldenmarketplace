@@ -1,7 +1,17 @@
 import { Request, Response } from 'express';
 import { GlobalSetting } from '../models/GlobalSetting';
 
-const PUBLIC_PREFIXES = ['facebook_', 'google_', 'tiktok_', 'instagram_', 'meta_'];
+const PUBLIC_PREFIXES = [
+    'facebook_',
+    'google_',
+    'tiktok_',
+    'instagram_',
+    'meta_',
+    'homepage_',
+    'about_',
+    'blog_',
+    'footer_'
+];
 
 function isPublicKey(key: string): boolean {
     return PUBLIC_PREFIXES.some(prefix => key.startsWith(prefix));

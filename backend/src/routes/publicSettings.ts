@@ -3,11 +3,9 @@ import { GlobalSetting } from '../models/GlobalSetting';
 
 const router = Router();
 
-const PUBLIC_PREFIXES = ['facebook_', 'google_', 'tiktok_', 'instagram_', 'meta_'];
-
 /**
  * GET /api/settings/public
- * Public endpoint for tracking/pixel settings. No auth required.
+ * Public endpoint for settings that are marked as public. No auth required.
  */
 router.get('/public', async (_req: Request, res: Response) => {
     try {
@@ -15,11 +13,8 @@ router.get('/public', async (_req: Request, res: Response) => {
             where: { isPublic: true }
         });
 
-        // Filter to only return tracking-related keys
         const filtered = settings.reduce((acc, s) => {
-            if (PUBLIC_PREFIXES.some(prefix => s.key.startsWith(prefix))) {
-                acc[s.key] = s.value;
-            }
+            acc[s.key] = s.value;
             return acc;
         }, {} as Record<string, string>);
 

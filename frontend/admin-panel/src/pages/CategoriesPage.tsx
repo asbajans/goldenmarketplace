@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Table, Card, Button, Space, Modal, Form, Input, Switch, message, Tag, Tabs } from 'antd';
+﻿import React, { useEffect, useState } from 'react';
+import { Table, Card, Button, Space, Modal, Form, Input, Switch, message, Tabs, Tag } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { AdminAPI } from '../services/api';
 
@@ -12,6 +12,22 @@ const LANGUAGES = [
   { key: 'es', label: 'Español', flag: '🇪🇸' },
   { key: 'ar', label: 'العربية', flag: '🇸🇦' },
 ];
+
+const emptyTranslations = LANGUAGES.reduce((acc, lang) => {
+  acc[lang.key] = { name: '', description: '' };
+  return acc;
+}, {} as Record<string, any>);
+
+const normalizeTranslations = (translations: any) => {
+  const normalized = { ...emptyTranslations };
+  Object.entries(translations || {}).forEach(([lang, data]) => {
+    normalized[lang] = {
+      ...normalized[lang],
+      ...(data || {}),
+    };
+  });
+  return normalized;
+};
 
 export const CategoriesPage: React.FC = () => {
     const [categories, setCategories] = useState<any[]>([]);
@@ -41,24 +57,21 @@ export const CategoriesPage: React.FC = () => {
     const handleAdd = () => {
         setEditingCategory(null);
         form.resetFields();
-        form.setFieldsValue({ isActive: true });
+        form.setFieldsValue({ isActive: true, translations: normalizeTranslations({}) });
         setActiveLang('en');
         setIsModalVisible(true);
     };
 
     const handleEdit = (record: any) => {
         setEditingCategory(record);
-        const translations = record.translations || {};
         form.setFieldsValue({
             name: record.name,
             slug: record.slug,
             description: record.description,
-            isActive: record.isActive,
-            ...Object.entries(translations).flatMap(([lang, t]: [string, any]) => [
-                [`trans_name_${lang}`, t.name || ''],
-                [`trans_desc_${lang}`, t.description || ''],
-            ]),
+            isActive: record.isActive !== false,
+            translations: normalizeTranslations(record.translations),
         });
+        setActiveLang('en');
         setIsModalVisible(true);
     };
 
@@ -78,22 +91,15 @@ export const CategoriesPage: React.FC = () => {
     };
 
     const parseSubmit = async (values: any) => {
-        const translations: Record<string, any> = {};
-        for (const lang of LANGUAGES) {
-            const tName = values[`trans_name_${lang.key}`];
-            const tDesc = values[`trans_desc_${lang.key}`];
-            translations[lang.key] = { name: tName || '', description: tDesc || '' };
-        }
-
-        const payload = {
-            name: values.name,
-            slug: values.slug,
-            description: values.description,
-            isActive: values.isActive,
-            translations,
-        };
-
         try {
+            const payload = {
+                name: values.name,
+                slug: values.slug,
+                description: values.description,
+                isActive: values.isActive,
+                translations: values.translations || {},
+            };
+
             if (editingCategory) {
                 await AdminAPI.updateCategory(editingCategory.id, payload);
                 message.success('Category updated successfully');
@@ -112,15 +118,7 @@ export const CategoriesPage: React.FC = () => {
     const columns = [
         { title: 'Kategori Adı', dataIndex: 'name', key: 'name' },
         { title: 'Slug', dataIndex: 'slug', key: 'slug' },
-        { title: 'Açıklama', dataIndex: 'description', key: 'description', ellipsis: true },
-        {
-            title: 'Çeviriler',
-            key: 'translations',
-            render: (_: any, record: any) => {
-                const t = record.translations || {};
-                return LANGUAGES.map(l => t[l.key]?.name ? `${l.flag}${t[l.key].name}` : null).filter(Boolean).join(', ');
-            }
-        },
+        { title: 'Açıklama', dataIndex: 'description', key: 'description' },
         {
             title: 'Durum',
             dataIndex: 'isActive',
@@ -152,17 +150,13 @@ export const CategoriesPage: React.FC = () => {
             <Modal
                 title={editingCategory ? 'Kategori Düzenle' : 'Yeni Kategori'}
                 open={isModalVisible}
-                onCancel={() => setIsModalVisible(false)}
                 onOk={() => form.submit()}
-                width={700}
+                onCancel={() => setIsModalVisible(false)}
+                width={800}
             >
                 <Form form={form} layout="vertical" onFinish={parseSubmit}>
                     <Form.Item name="name" label="Kategori Adı" rules={[{ required: true }]}>
-                        <Input onChange={(e) => {
-                            if (!editingCategory) {
-                                form.setFieldsValue({ slug: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-') });
-                            }
-                        }} />
+                        <Input />
                     </Form.Item>
 
                     <Form.Item name="slug" label="URL Slug" rules={[{ required: true }]}>
@@ -170,25 +164,28 @@ export const CategoriesPage: React.FC = () => {
                     </Form.Item>
 
                     <Form.Item name="description" label="Açıklama">
-                        <Input.TextArea rows={2} />
+                        <Input.TextArea rows={3} />
+                    </Form.Item>
+
+                    <div style={{ marginBottom: 16 }}>
+                        <Tabs activeKey={activeLang} onChange={setActiveLang} type="card">
+                            {LANGUAGES.map(lang => (
+                                <TabPane tab={<span>{lang.flag} {lang.label}</span>} key={lang.key} />
+                            ))}
+                        </Tabs>
+                    </div>
+
+                    <Form.Item name={['translations', activeLang, 'name']} label={`Kategori Adı (${activeLang.toUpperCase()})`} rules={[{ required: true }]}>
+                        <Input />
+                    </Form.Item>
+
+                    <Form.Item name={['translations', activeLang, 'description']} label={`Açıklama (${activeLang.toUpperCase()})`}>
+                        <Input.TextArea rows={3} />
                     </Form.Item>
 
                     <Form.Item name="isActive" label="Aktif mi?" valuePropName="checked">
                         <Switch />
                     </Form.Item>
-
-                    <Tabs activeKey={activeLang} onChange={setActiveLang} type="card">
-                        {LANGUAGES.map(lang => (
-                            <TabPane tab={<span>{lang.flag} {lang.label}</span>} key={lang.key}>
-                                <Form.Item name={`trans_name_${lang.key}`} label={`${lang.label} - Ad`}>
-                                    <Input placeholder={`Category name in ${lang.label}`} />
-                                </Form.Item>
-                                <Form.Item name={`trans_desc_${lang.key}`} label={`${lang.label} - Açıklama`}>
-                                    <Input.TextArea rows={2} placeholder={`Description in ${lang.label}`} />
-                                </Form.Item>
-                            </TabPane>
-                        ))}
-                    </Tabs>
                 </Form>
             </Modal>
         </Card>
