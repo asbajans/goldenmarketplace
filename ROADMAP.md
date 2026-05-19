@@ -9,7 +9,7 @@
 ## Öncelik: YÜKSEK (Bu Sprint)
 - [x] **CORS wildcard düzeltmesi** — Fonksiyon-based origin validator ile değiştirildi, duplicate domain'ler temizlendi, goldencrafters.com eklendi.
 - [ ] **Controller error handling** — Tüm controller'lar `next(err)` pattern'ine geçirilmeli. Şu an try/catch + direkt response yapılıyor, central error handler bypass ediliyor.
-- [x] **Env validation** — Joi ile JWT_SECRET, DB_HOST, DB_NAME, DB_USER zorunlu alan kontrolü eklendi.
+- [x] **Env validation** — Joi ile uyarı seviyesinde kontrol eklendi (non-blocking, process.exit yok).
 - [x] **Duplicate middleware temizliği** — `adminAuth.ts` kaldırıldı (authMiddleware.ts'deki adminMiddleware yeterli).
 - [ ] **Test altyapısı** — Jest kurulu ama sıfır test var. İlk adım olarak service layer unit test'leri yazılmalı (goldPriceService, bankTransferService).
 

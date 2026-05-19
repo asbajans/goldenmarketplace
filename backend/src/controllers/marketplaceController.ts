@@ -43,6 +43,7 @@ export class MarketplaceController {
       const sort = req.query.sort as string;
       const minPrice = req.query.minPrice ? parseFloat(req.query.minPrice as string) : null;
       const maxPrice = req.query.maxPrice ? parseFloat(req.query.maxPrice as string) : null;
+      const hideOutOfStock = req.query.hideOutOfStock === 'true';
       const lang = (req.query.lang as string) || 'en';
 
       const where: WhereOptions = {
@@ -50,6 +51,7 @@ export class MarketplaceController {
         ...goldenFilter
       };
       
+      if (hideOutOfStock) where.quantity = { [Op.gt]: 0 };
       if (search) where.title = { [Op.iLike]: `%${search}%` };
       if (category) {
         const categoryVariants: Record<string, string[]> = {
@@ -252,7 +254,7 @@ export class MarketplaceController {
         let slug = raw;
 
         try {
-          const cat = await CategoryModel.findOne({ where: { slug: raw } });
+          const cat = await CategoryModel.findOne({ where: { [Op.or]: [{ slug: raw }, { name: raw }] } });
           if (cat) {
             const json = cat.toJSON();
             const translations = json.translations || {};

@@ -182,7 +182,9 @@ export class AdminController {
             const category = await Category.findByPk(id);
             if (!category) return res.status(404).json({ error: 'Category not found' });
 
-            await category.update({ name, slug, description, isActive, translations: translations || {} });
+            const existingTranslations = category.get('translations') || {};
+            const mergedTranslations = { ...(typeof existingTranslations === 'object' ? existingTranslations : {}), ...(translations || {}) };
+            await category.update({ name, slug, description, isActive, translations: mergedTranslations });
             return res.json(category);
         } catch (error: any) {
             return res.status(400).json({ error: error.message || 'Failed to update category' });
