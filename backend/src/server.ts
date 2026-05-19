@@ -4,12 +4,43 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import winston from 'winston';
+import Joi from 'joi';
 
 // Load environment variables
 dotenv.config();
 
-// Load environment variables
-dotenv.config();
+// Validate required environment variables
+const envSchema = Joi.object({
+  JWT_SECRET: Joi.string().required().min(16).messages({
+    'string.min': 'JWT_SECRET must be at least 16 characters long',
+    'any.required': 'JWT_SECRET is required'
+  }),
+  DB_HOST: Joi.string().required(),
+  DB_PORT: Joi.number().default(5432),
+  DB_NAME: Joi.string().required(),
+  DB_USER: Joi.string().required(),
+  DB_PASSWORD: Joi.string().allow('').default(''),
+}).unknown(true);
+
+const { error: envError } = envSchema.validate(process.env, { abortEarly: false });
+if (envError) {
+  console.error('❌ Environment variable validation failed:');
+  envError.details.forEach(detail => {
+    console.error(`   - ${detail.message}`);
+  });
+  process.exit(1);
+}
+
+// Initialize logger
+const logger = winston.createLogger({
+  level: process.env.LOG_LEVEL || 'info',
+  format: winston.format.json(),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: 'error.log', level: 'error' }),
+    new winston.transports.File({ filename: 'combined.log' })
+  ]
+});
 
 // Initialize Models
 require('./models');
@@ -22,7 +53,7 @@ async function syncAndSeedSettings() {
 
     // Sync schema - uses alter in both dev and prod to add new columns/tables
     await sequelize.sync({ alter: true });
-    console.log(`[DB] Schema synced (${isProduction ? 'production' : 'development'} mode).`);
+    logger.info(`[DB] Schema synced (${isProduction ? 'production' : 'development'} mode).`);
 
     // Seed initial GlobalSettings for Etsy keys
     const settingsToSeed = [
@@ -62,9 +93,9 @@ async function syncAndSeedSettings() {
         await GlobalSetting.create(setting);
       }
     }
-    console.log('[DB] GlobalSettings synchronized successfully.');
+    logger.info('[DB] GlobalSettings synchronized successfully.');
   } catch (error) {
-    console.error('[DB] Failed to synchronize GlobalSettings:', error);
+    logger.error('[DB] Failed to synchronize GlobalSettings:', error);
   }
 }
 
@@ -89,23 +120,12 @@ async function ensurePerformanceIndexes() {
       await sequelize.query(sql, { raw: true, transaction: null as any });
     } catch (e: any) {
       if (!e.message?.includes('already exists')) {
-        console.warn('[DB] Index warning:', e.message);
+        logger.warn('[DB] Index warning:', e.message);
       }
     }
   }
-  console.log('[DB] Performance indexes ensured.');
+  logger.info('[DB] Performance indexes ensured.');
 }
-
-// Initialize logger
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: winston.format.json(),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'combined.log' })
-  ]
-});
 
 const app: Express = express();
 
@@ -114,13 +134,21 @@ app.set('trust proxy', 1);
 
 // Middleware
 app.use(helmet());
+const allowedOrigins = [
+  'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176',
+  'https://asb.web.tr', 'https://seller.asb.web.tr', 'https://admin.asb.web.tr',
+  'https://market-inky-beta.vercel.app',
+  'https://goldencrafters.com',
+];
+
 app.use(cors({
-  origin: [
-    'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176',
-    'https://asb.web.tr', 'https://seller.asb.web.tr', 'https://admin.asb.web.tr',
-    'https://asb.web.tr', 'https://seller.asb.web.tr', 'https://admin.asb.web.tr',
-    'https://market-inky-beta.vercel.app', 'https://*.vercel.app'
-  ],
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(null, true);
+    }
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
@@ -186,7 +214,6 @@ app.use((_req: Request, res: Response) => {
 const PORT = process.env.PORT || 777;
 app.listen(PORT, async () => {
   logger.info(`Server is running on port ${PORT}`);
-  console.log(`🚀 Server started at http://localhost:${PORT}`);
 
   // Initialize background jobs
   try {
@@ -204,7 +231,7 @@ app.listen(PORT, async () => {
     const { startLogCleanupJob } = require('./jobs/logCleanupJob');
     startLogCleanupJob();
   } catch (error) {
-    console.error('Failed to init jobs:', error);
+    logger.error('Failed to init jobs:', error);
   }
 });
 

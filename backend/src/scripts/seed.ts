@@ -7,6 +7,11 @@ import sequelize from '../config/database';
 
 dotenv.config();
 
+if (process.env.NODE_ENV === 'production') {
+    console.error('❌ Seed script cannot run in production. It drops all data.');
+    process.exit(1);
+}
+
 const seed = async () => {
     try {
         console.log('🔄 Connecting to database...');
