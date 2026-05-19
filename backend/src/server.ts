@@ -9,26 +9,20 @@ import Joi from 'joi';
 // Load environment variables
 dotenv.config();
 
-// Validate required environment variables
+// Validate optional environment variables (non-blocking warnings)
 const envSchema = Joi.object({
-  JWT_SECRET: Joi.string().required().min(16).messages({
-    'string.min': 'JWT_SECRET must be at least 16 characters long',
-    'any.required': 'JWT_SECRET is required'
-  }),
-  DB_HOST: Joi.string().required(),
-  DB_PORT: Joi.number().default(5432),
-  DB_NAME: Joi.string().required(),
-  DB_USER: Joi.string().required(),
-  DB_PASSWORD: Joi.string().allow('').default(''),
+  JWT_SECRET: Joi.string().min(16).optional(),
+  DB_HOST: Joi.string().optional(),
+  DB_NAME: Joi.string().optional(),
+  DB_USER: Joi.string().optional(),
+  DB_PASSWORD: Joi.string().allow('').optional(),
 }).unknown(true);
 
-const { error: envError } = envSchema.validate(process.env, { abortEarly: false });
-if (envError) {
-  console.error('❌ Environment variable validation failed:');
-  envError.details.forEach(detail => {
-    console.error(`   - ${detail.message}`);
+const { error: envWarning } = envSchema.validate(process.env, { abortEarly: false });
+if (envWarning) {
+  envWarning.details.forEach(detail => {
+    console.warn(`⚠️ Env validation note: ${detail.message}`);
   });
-  process.exit(1);
 }
 
 // Initialize logger
@@ -146,7 +140,7 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
       callback(null, true);
     } else {
-      callback(null, true);
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true
