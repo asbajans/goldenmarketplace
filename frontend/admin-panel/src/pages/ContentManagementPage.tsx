@@ -164,10 +164,11 @@ export default function ContentManagementPage() {
     }
   };
 
-  const saveSliders = async () => {
+  const saveSliders = async (items?: any[]) => {
     setSaving(true);
     try {
-      await AdminAPI.updateSettings({ homepage_sliders: JSON.stringify(sliders) });
+      const data = items ?? sliders;
+      await AdminAPI.updateSettings({ homepage_sliders: JSON.stringify(data) });
       message.success('Slider kaydedildi!');
     } catch (error) {
       message.error('Slider kaydetme hatası');
@@ -220,18 +221,19 @@ export default function ContentManagementPage() {
       id: editingSlider?.id || Date.now(),
     };
 
-    if (editingSlider) {
-      setSliders(prev => prev.map(s => s.id === editingSlider.id ? item : s));
-    } else {
-      setSliders(prev => [...prev, item]);
-    }
+    const updated = editingSlider
+      ? sliders.map(s => s.id === editingSlider.id ? item : s)
+      : [...sliders, item];
+
+    setSliders(updated);
     setSliderModal(false);
-    saveSliders();
+    saveSliders(updated);
   };
 
   const deleteSlider = (id: number) => {
-    setSliders(prev => prev.filter(s => s.id !== id));
-    saveSliders();
+    const updated = sliders.filter(s => s.id !== id);
+    setSliders(updated);
+    saveSliders(updated);
   };
 
   const loadMenuItems = async () => {
@@ -244,10 +246,11 @@ export default function ContentManagementPage() {
     }
   };
 
-  const saveMenuItems = async () => {
+  const saveMenuItems = async (items?: any[]) => {
     setSaving(true);
     try {
-      await AdminAPI.updateSettings({ homepage_menu: JSON.stringify(menuItems) });
+      const data = items ?? menuItems;
+      await AdminAPI.updateSettings({ homepage_menu: JSON.stringify(data) });
       message.success('Menü kaydedildi!');
     } catch (error) {
       message.error('Menü kaydetme hatası');
@@ -268,23 +271,25 @@ export default function ContentManagementPage() {
   };
 
   const saveMenuItem = () => {
-    if (editingMenu) {
-      setMenuItems(prev => prev.map(m => m.key === editingMenu.key ? { ...m, ...menuForm } : m));
-    } else {
-      setMenuItems(prev => [...prev, { ...menuForm, key: menuForm.key || Date.now().toString() }]);
-    }
+    const updated = editingMenu
+      ? menuItems.map(m => m.key === editingMenu.key ? { ...m, ...menuForm } : m)
+      : [...menuItems, { ...menuForm, key: menuForm.key || Date.now().toString() }];
+
+    setMenuItems(updated);
     setMenuModal(false);
-    saveMenuItems();
+    saveMenuItems(updated);
   };
 
   const deleteMenuItem = (key: string) => {
-    setMenuItems(prev => prev.filter(m => m.key !== key));
-    saveMenuItems();
+    const updated = menuItems.filter(m => m.key !== key);
+    setMenuItems(updated);
+    saveMenuItems(updated);
   };
 
   const toggleMenuVisible = (key: string) => {
-    setMenuItems(prev => prev.map(m => m.key === key ? { ...m, visible: !m.visible } : m));
-    saveMenuItems();
+    const updated = menuItems.map(m => m.key === key ? { ...m, visible: !m.visible } : m);
+    setMenuItems(updated);
+    saveMenuItems(updated);
   };
 
   const loadBlogPosts = async () => {
