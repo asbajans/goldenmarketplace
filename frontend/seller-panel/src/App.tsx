@@ -14,7 +14,8 @@ import {
   AppstoreOutlined,
   SyncOutlined,
   InboxOutlined,
-  CarOutlined
+  CarOutlined,
+  LinkOutlined
 } from '@ant-design/icons';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
@@ -29,6 +30,8 @@ import IntegrationSettings from './pages/IntegrationSettings';
 import B2BMarket from './pages/B2BMarket';
 import B2BRequests from './pages/B2BRequests';
 import StoreStorefront from './pages/StoreStorefront';
+import ExternalFeeds from './pages/ExternalFeeds';
+import FeedDetail from './pages/FeedDetail';
 import Variations from './pages/Variations';
 import Orders from './pages/Orders';
 import Shipments from './pages/Shipments';
@@ -130,6 +133,12 @@ const App: React.FC = () => {
       onClick: () => navigate('/shipments')
     },
     {
+      key: '/feeds',
+      icon: <LinkOutlined />,
+      label: 'Harici Feed\'ler',
+      onClick: () => navigate('/feeds')
+    },
+    {
       key: '/subscription',
       icon: <CreditCardOutlined />,
       label: 'Abonelik',
@@ -216,6 +225,8 @@ const App: React.FC = () => {
             <Route path="/products/edit/:id" element={<AddProduct onSuccess={() => navigate('/products')} />} />
             <Route path="/b2b/market" element={<B2BMarket />} />
             <Route path="/b2b/requests" element={<B2BRequests />} />
+            <Route path="/feeds" element={<ExternalFeeds />} />
+            <Route path="/feeds/:id" element={<FeedDetail />} />
             <Route path="/variations" element={<Variations />} />
             {/* Public store page — accessible from shared links */}
             <Route path="/store/:storeSlug" element={<StoreStorefront />} />

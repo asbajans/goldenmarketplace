@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Space, message, Modal, Tabs, Tag, Switch, Statistic, Card, Row, Col, Typography, Input, Checkbox } from 'antd';
+import { Table, Button, Space, message, Modal, Tabs, Tag, Switch, Statistic, Card, Row, Col, Typography, Input, Checkbox, Popconfirm } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined, DollarOutlined, GoldOutlined, SearchOutlined } from '@ant-design/icons';
 import { getProducts, deleteProduct, getAutoSyncStatus, setAutoSyncStatus, triggerManualSync, Product } from '../api/product';
 import client from '../api/client';
@@ -18,6 +18,7 @@ const ProductList: React.FC = () => {
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedMarketplaces, setSelectedMarketplaces] = useState<string[]>([]);
+    const [totalCount, setTotalCount] = useState(0);
 
     useEffect(() => {
         fetchProducts(searchTerm, selectedMarketplaces);
@@ -69,14 +70,16 @@ const ProductList: React.FC = () => {
     const fetchProducts = async (search?: string, marketplaces?: string[]) => {
         setLoading(true);
         try {
-            // Only pass marketplaces if at least one is selected
             const marketplaceParams = marketplaces && marketplaces.length > 0 ? marketplaces : undefined;
-            const data = await getProducts(search, marketplaceParams);
-            // data might be array or { data: [] } depending on backend response format
-            // In productController: res.status(200).json({ data: rows, pagination: ... })
-            // In getProducts: return response.data.data
-            // So data is array.
-            setProducts(data || []);
+            const response = await client.get('/products', {
+                params: { limit: 100, search, marketplaces: marketplaceParams?.join(',') }
+            });
+            const data = response.data?.data || [];
+            const pagination = response.data?.pagination;
+            setProducts(data);
+            if (pagination?.total !== undefined) {
+                setTotalCount(pagination.total);
+            }
         } catch (error) {
             console.error(error);
             message.error('Ürünler yüklenirken hata oluştu.');
@@ -85,14 +88,28 @@ const ProductList: React.FC = () => {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        try {
-            await deleteProduct(id);
-            message.success('Ürün silindi.');
-            fetchProducts();
-        } catch (error) {
-            message.error('Silme işlemi başarısız.');
-        }
+    const handleDelete = async (id: string, title: string) => {
+        Modal.confirm({
+            title: 'Ürünü Sil',
+            content: (
+                <div>
+                    <p>"{title}" ürününü silmek istediğinize emin misiniz?</p>
+                    <p style={{ color: '#ff4d4f', fontWeight: 600 }}>Bu işlem geri alınamaz.</p>
+                </div>
+            ),
+            okText: 'Evet, Sil',
+            okType: 'danger',
+            cancelText: 'İptal',
+            onOk: async () => {
+                try {
+                    await deleteProduct(id);
+                    message.success('Ürün silindi.');
+                    fetchProducts();
+                } catch (error) {
+                    message.error('Silme işlemi başarısız.');
+                }
+            }
+        });
     };
 
     const handleEdit = (product: Product) => {
@@ -167,7 +184,7 @@ const ProductList: React.FC = () => {
             render: (_: any, record: Product) => (
                 <Space>
                     <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} />
-                    <Button icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id)} />
+                    <Button icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id, record.title)} />
                 </Space>
             )
         }
@@ -203,7 +220,7 @@ const ProductList: React.FC = () => {
     const tabItems = [
         {
             key: 'my-products',
-            label: `Kendi Ürünlerim (${myProducts.length})`,
+            label: `Kendi Ürünlerim (${totalCount})`,
             children: <Table {...tableProps(myProducts)} />
         },
         {

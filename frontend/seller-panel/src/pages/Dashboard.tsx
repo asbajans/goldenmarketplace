@@ -28,19 +28,17 @@ const Dashboard: React.FC = () => {
     } catch (e) {}
 
     useEffect(() => {
-        // Read store slug from user object in localStorage (set at login)
         try {
             const u = JSON.parse(localStorage.getItem('user') || 'null');
             if (u?.store?.storeSlug) {
                 setStoreSlug(u.store.storeSlug);
-            } else if (u?.store?.id) {
-                // Fallback: fetch from products endpoint's pagination for product count
-                client.get('/products?limit=1').then(res => {
-                    if (res.data?.pagination?.total !== undefined) {
-                        setStats(s => ({ ...s, products: res.data.pagination.total }));
-                    }
-                }).catch(() => {});
             }
+            // Fetch product count regardless
+            client.get('/products?limit=1').then(res => {
+                if (res.data?.pagination?.total !== undefined) {
+                    setStats(s => ({ ...s, products: res.data.pagination.total }));
+                }
+            }).catch(() => {});
         } catch {}
     }, []);
 

@@ -17,8 +17,12 @@ const REQUIRED_FIELDS = [
     { key: 'category', label: 'Kategori' },
     { key: 'milyem', label: 'Milyem / Ayar (Zorunlu, Örn: 585)' },
     { key: 'gramWeight', label: 'Gram (Zorunlu)' },
+    { key: 'effectiveMilyem', label: 'Efektif Milyem (İşçilik Dahil)' },
+    { key: 'profitMargin', label: 'Kâr Marjı (%)' },
+    { key: 'priceMultiplier', label: 'Fiyat Çarpanı' },
     { key: 'quantity', label: 'Stok Miktarı' },
     { key: 'description', label: 'Açıklama' },
+    { key: 'b2bDiscount', label: 'B2B İskonto (%)' },
     { key: 'tags', label: 'Etiketler (Virgülle Ayrılmış)' },
 ];
 

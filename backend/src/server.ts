@@ -181,6 +181,15 @@ app.use('/api/external-orders', require('./routes/externalOrders').default || re
 app.use('/api/cart', require('./routes/cart').default || require('./routes/cart'));
 app.use('/api/wishlist', require('./routes/wishlist').default || require('./routes/wishlist'));
 app.use('/api/addresses', require('./routes/addresses').default || require('./routes/addresses'));
+app.use('/api/feeds', require('./routes/externalFeeds').default || require('./routes/externalFeeds'));
+
+// Start feed auto-sync scheduler
+try {
+  const { startFeedSyncScheduler } = require('./jobs/feedSyncJob');
+  startFeedSyncScheduler();
+} catch (err) {
+  console.warn('[Server] Feed sync scheduler could not be started:', err);
+}
 
 // Error handling middleware
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

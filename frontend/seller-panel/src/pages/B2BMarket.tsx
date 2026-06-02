@@ -133,7 +133,7 @@ const B2BMarket: React.FC = () => {
             Diğer satıcıların B2B'ye açık ürünlerini kendi mağazana ekle
           </Text>
         </div>
-        <Badge count={filtered.length} overflowCount={999} style={{ backgroundColor: '#52c41a' }}>
+        <Badge count={pagination.total} overflowCount={999} style={{ backgroundColor: '#52c41a' }}>
           <Tag color="green" icon={<GoldOutlined />} style={{ fontSize: 13, padding: '4px 12px' }}>
             Toplam Ürün
           </Tag>

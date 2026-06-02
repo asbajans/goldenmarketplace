@@ -93,7 +93,7 @@ export class ProductController {
     try {
       const {
         title, description, category, sku, quantity,
-        images, videoUrl, marketplaces, marketplaceConfig, gramWeight, milyem, effectiveMilyem, profitMargin,
+        images, videoUrl, marketplaces, marketplaceConfig, gramWeight, milyem, effectiveMilyem, profitMargin, priceMultiplier,
         isB2BEnabled, b2bDiscount, discountRate,
         hasVariants, variantAttributes, variants,
         translations, defaultLanguage = 'en'
@@ -146,8 +146,9 @@ export class ProductController {
         }
       }
 
-      // Calculate prices from gram + effectiveMilyem + profit margin
-      const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(gramWeight, finalEffectiveMilyem, profitMargin || 0);
+      // Calculate prices from gram + effectiveMilyem + profit margin + price multiplier
+      const finalPriceMultiplier = priceMultiplier || 1;
+      const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(gramWeight, finalEffectiveMilyem, profitMargin || 0, finalPriceMultiplier);
 
       // Handle B2B fields
       const finalB2bDiscount = isB2BEnabled ? (b2bDiscount || 0) : 0;
@@ -175,6 +176,7 @@ export class ProductController {
         effectiveMilyem: finalEffectiveMilyem,
         gramHas,
         profitMargin: profitMargin || 0,
+        priceMultiplier: finalPriceMultiplier,
         priceTRY,
         priceUSD,
         isB2BEnabled: !!isB2BEnabled,
@@ -261,7 +263,7 @@ export class ProductController {
       const { id } = req.params;
       const {
         title, description, category, quantity,
-        images, videoUrl, marketplaces, marketplaceConfig, gramWeight, milyem, effectiveMilyem, profitMargin,
+        images, videoUrl, marketplaces, marketplaceConfig, gramWeight, milyem, effectiveMilyem, profitMargin, priceMultiplier,
         isB2BEnabled, b2bDiscount, discountRate,
         hasVariants, variantAttributes, variants
       } = req.body;
@@ -295,6 +297,7 @@ export class ProductController {
 
       let finalPriceTRY, finalPriceUSD, finalB2bPrice;
       const finalProfitMargin = profitMargin !== undefined ? profitMargin : product.profitMargin;
+      const finalPriceMultiplier = priceMultiplier !== undefined ? priceMultiplier : product.priceMultiplier;
       const finalGramWeight = isCloned ? product.gramWeight : (gramWeight || product.gramWeight);
       const finalMilyem = isCloned ? product.milyem : (milyem || product.milyem);
       const rawEffective = isCloned ? product.effectiveMilyem : (effectiveMilyem || product.effectiveMilyem);
@@ -316,9 +319,9 @@ export class ProductController {
          const currentGold = await goldPriceService.getCurrentGoldPrice();
          finalPriceUSD = Math.round((finalPriceTRY / currentGold.usdTryRate) * 100) / 100;
          finalB2bPrice = 0;
-      } else {
+       } else {
         const calcRes = await goldPriceService.calculateProductPrice(
-          Number(finalGramWeight), Number(finalEffectiveMilyem), Number(finalProfitMargin)
+          Number(finalGramWeight), Number(finalEffectiveMilyem), Number(finalProfitMargin), Number(finalPriceMultiplier)
         );
         finalPriceTRY = calcRes.priceTRY;
         finalPriceUSD = calcRes.priceUSD;
@@ -349,6 +352,7 @@ export class ProductController {
         effectiveMilyem: finalEffectiveMilyem,
         gramHas: finalGramHas,
         profitMargin: finalProfitMargin,
+        priceMultiplier: finalPriceMultiplier,
         priceTRY: finalPriceTRY,
         priceUSD: finalPriceUSD,
         isB2BEnabled: finalIsB2BEnabled,
@@ -461,7 +465,7 @@ export class ProductController {
    */
   static async calculateGoldPrice(req: Request, res: Response) {
     try {
-      const { gramWeight, milyem, profitMargin } = req.body;
+      const { gramWeight, milyem, profitMargin, priceMultiplier } = req.body;
 
       if (!gramWeight || gramWeight <= 0 || !milyem) {
         return res.status(400).json({
@@ -470,12 +474,13 @@ export class ProductController {
       }
 
       const gold = await goldPriceService.getCurrentGoldPrice();
-      const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(gramWeight, milyem, profitMargin || 0);
+      const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(gramWeight, milyem, profitMargin || 0, priceMultiplier || 1);
 
       return res.status(200).json({
         gramWeight,
         milyem,
         profitMargin: profitMargin || 0,
+        priceMultiplier: priceMultiplier || 1,
         gold24KGramTRY: gold.pricePerGramTRY,
         priceTRY,
         priceUSD
@@ -554,12 +559,13 @@ export class ProductController {
           for (const product of nonClones) {
              const usedMilyem = Number(product.effectiveMilyem || product.milyem);
              const { priceTRY } = goldPriceService.calculatePrice(
-                 Number(product.gramWeight),
-                 usedMilyem,
-                 Number(product.profitMargin || 0),
-                 gold.pricePerGramTRY
-             );
-             const gramHas = Math.round(Number(product.gramWeight) * (usedMilyem / 1000) * 10000) / 10000;
+                  Number(product.gramWeight),
+                  usedMilyem,
+                  Number(product.profitMargin || 0),
+                  gold.pricePerGramTRY,
+                  Number(product.priceMultiplier || 1)
+              );
+              const gramHas = Math.round(Number(product.gramWeight) * (usedMilyem / 1000) * 10000) / 10000;
              const b2bPrice = product.isB2BEnabled ? Math.round(priceTRY * (1 - (product.b2bDiscount || 0) / 100) * 100) / 100 : 0;
              const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
              await product.update({ priceTRY, b2bPrice, priceUSD, gramHas });

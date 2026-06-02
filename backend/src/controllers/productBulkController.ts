@@ -95,6 +95,7 @@ export const importBulkProducts = async (req: Request, res: Response) => {
                 // default values
                 const EffectiveMilyem = Number(prodData.effectiveMilyem) || milyem;
                 const profitMargin = Number(prodData.profitMargin || 0);
+                const priceMultiplier = Number(prodData.priceMultiplier || 1);
                 const quantity = Number(prodData.quantity || 10);
                 const description = prodData.description || '';
                 const category = prodData.category || 'Takı';
@@ -126,6 +127,7 @@ export const importBulkProducts = async (req: Request, res: Response) => {
                     effectiveMilyem: EffectiveMilyem,
                     gramHas: gramWeight * (EffectiveMilyem / 1000),
                     profitMargin,
+                    priceMultiplier,
                     priceTRY: 0, // Will be calculated by gold price cron or explicitly later
                     priceUSD: 0,
                     isB2BEnabled: Boolean(isB2BEnabled), // from external checkbox

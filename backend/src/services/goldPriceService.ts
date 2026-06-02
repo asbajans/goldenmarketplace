@@ -159,7 +159,8 @@ export class GoldPriceService {
         Number(product.gramWeight),
         usedMilyem,
         Number(product.profitMargin || 0),
-        gold.pricePerGramTRY
+        gold.pricePerGramTRY,
+        Number(product.priceMultiplier || 1)
       );
       const gramHas = Math.round(Number(product.gramWeight) * (usedMilyem / 1000) * 10000) / 10000;
       const b2bPrice = product.isB2BEnabled ? Math.round(priceTRY * (1 - (product.b2bDiscount || 0) / 100) * 100) / 100 : 0;
@@ -189,20 +190,20 @@ export class GoldPriceService {
   }
 
   /**
-   * Calculate product price from gram weight, milyem, and profit margin
+   * Calculate product price from gram weight, milyem, profit margin, and price multiplier
    */
-  calculatePrice(gramWeight: number, milyem: number, profitMargin: number = 0, goldPricePerGram: number): { priceTRY: number } {
+  calculatePrice(gramWeight: number, milyem: number, profitMargin: number = 0, goldPricePerGram: number, priceMultiplier: number = 1): { priceTRY: number } {
     const materialCost = gramWeight * (milyem / 1000) * goldPricePerGram;
-    const priceTRY = materialCost * (1 + profitMargin / 100);
+    const priceTRY = materialCost * (1 + profitMargin / 100) * priceMultiplier;
     return { priceTRY: Math.round(priceTRY * 100) / 100 };
   }
 
   /**
    * Calculate product price using current gold price from DB
    */
-  async calculateProductPrice(gramWeight: number, milyem: number, profitMargin: number = 0): Promise<{ priceTRY: number; priceUSD: number }> {
+  async calculateProductPrice(gramWeight: number, milyem: number, profitMargin: number = 0, priceMultiplier: number = 1): Promise<{ priceTRY: number; priceUSD: number }> {
     const gold = await this.getCurrentGoldPrice();
-    const { priceTRY } = this.calculatePrice(gramWeight, milyem, profitMargin, gold.pricePerGramTRY);
+    const { priceTRY } = this.calculatePrice(gramWeight, milyem, profitMargin, gold.pricePerGramTRY, priceMultiplier);
     return { priceTRY, priceUSD: Math.round((priceTRY / gold.usdTryRate) * 100) / 100 };
   }
 

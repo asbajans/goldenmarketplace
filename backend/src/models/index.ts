@@ -17,6 +17,8 @@ import Order from './Order';
 import { OrderItem } from './Order';
 import Wishlist from './Wishlist';
 import UserAddress from './UserAddress';
+import ExternalFeed from './ExternalFeed';
+import FeedSyncLog from './FeedSyncLog';
 
 // User <-> Store (One-to-One)
 User.hasOne(Store, { foreignKey: 'userId', as: 'store' });
@@ -85,6 +87,18 @@ Wishlist.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 User.hasMany(UserAddress, { foreignKey: 'userId', as: 'addresses' });
 UserAddress.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
+// ExternalFeed <-> Store (One-to-Many)
+Store.hasMany(ExternalFeed, { foreignKey: 'storeId', as: 'externalFeeds' });
+ExternalFeed.belongsTo(Store, { foreignKey: 'storeId', as: 'store' });
+
+// ExternalFeed -> FeedSyncLog (One-to-Many)
+ExternalFeed.hasMany(FeedSyncLog, { foreignKey: 'feedId', as: 'syncLogs' });
+FeedSyncLog.belongsTo(ExternalFeed, { foreignKey: 'feedId', as: 'feed' });
+
+// Product -> ExternalFeed (belongs to)
+Product.belongsTo(ExternalFeed, { foreignKey: 'feedSourceId', as: 'feedSource' });
+ExternalFeed.hasMany(Product, { foreignKey: 'feedSourceId', as: 'feedProducts' });
+
 // Export all models
 export {
     User,
@@ -105,5 +119,7 @@ export {
     Order,
     OrderItem,
     Wishlist,
-    UserAddress
+    UserAddress,
+    ExternalFeed,
+    FeedSyncLog
 };

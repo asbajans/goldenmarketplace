@@ -213,11 +213,12 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         });
     };
 
-    const calculateLivePrice = useCallback((gramWeight?: number, milyem?: number, effectiveMilyem?: number, profitMargin?: number, b2bDiscount?: number) => {
+    const calculateLivePrice = useCallback((gramWeight?: number, milyem?: number, effectiveMilyem?: number, profitMargin?: number, priceMultiplier?: number, b2bDiscount?: number) => {
         const gw = gramWeight || 0;
         const ml = milyem || 0;
         const em = (effectiveMilyem && effectiveMilyem >= ml) ? effectiveMilyem : ml;
         const pm = profitMargin || 0;
+        const pmul = priceMultiplier || 1;
         const bd = b2bDiscount || 0;
 
         if (gw > 0) {
@@ -235,7 +236,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             setB2bPrice(0);
         } else if (gw > 0 && em > 0 && gold24KGramTRY > 0) {
             const materialCost = gw * (em / 1000) * gold24KGramTRY;
-            const tl = materialCost * (1 + pm / 100);
+            const tl = materialCost * (1 + pm / 100) * pmul;
             const usd = tl / usdTryRate;
             const b2b = tl * (1 - bd / 100);
             setPriceTRY(Math.round(tl * 100) / 100);
@@ -345,6 +346,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 title: translations[activeLanguage]?.title || values.title || '',
                 description: translations[activeLanguage]?.description || values.description || '',
                 profitMargin: values.profitMargin || 0,
+                priceMultiplier: values.priceMultiplier || 1,
                 quantity: Number(values.quantity || 0),
                 gramWeight: values.gramWeight || 1,
                 milyem: values.milyem || 916,
@@ -416,6 +418,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 gramWeight: initialValues?.gramWeight || 1,
                 milyem: initialValues?.milyem || 916,
                 profitMargin: initialValues?.profitMargin || 0,
+                priceMultiplier: initialValues?.priceMultiplier || 1,
                 marketplaces: initialValues?.marketplaces || ['golden'],
                 hasVariants: initialValues?.hasVariants || false,
                 ...initialValues
@@ -423,8 +426,8 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             onFinish={onFinish}
             onValuesChange={(changed, allValues) => {
                 if (changed.gramWeight !== undefined || changed.milyem !== undefined ||
-                    changed.effectiveMilyem !== undefined || changed.profitMargin !== undefined || changed.b2bDiscount !== undefined || changed.hasVariants !== undefined) {
-                    calculateLivePrice(allValues.gramWeight, allValues.milyem, allValues.effectiveMilyem, allValues.profitMargin, allValues.b2bDiscount);
+                    changed.effectiveMilyem !== undefined || changed.profitMargin !== undefined || changed.priceMultiplier !== undefined || changed.b2bDiscount !== undefined || changed.hasVariants !== undefined) {
+                    calculateLivePrice(allValues.gramWeight, allValues.milyem, allValues.effectiveMilyem, allValues.profitMargin, allValues.priceMultiplier, allValues.b2bDiscount);
                     if (changed.hasVariants !== undefined) {
                         setHasVariants(changed.hasVariants);
                     }
@@ -588,7 +591,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 </Row>
                 
                 <Row gutter={16}>
-                    <Col span={8}>
+                    <Col span={6}>
                         <Form.Item
                             name="profitMargin"
                             label={<><PercentageOutlined /> Kâr Marjı (%)</>}
@@ -604,7 +607,25 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                             />
                         </Form.Item>
                     </Col>
-                    <Col span={8}>
+                    <Col span={6}>
+                        <Form.Item
+                            name="priceMultiplier"
+                            label={
+                              <Tooltip title="Fiyat çarpanı: Hesaplanan fiyatı bu değerle çarpar. Örn: 1.5 = %50 fazla.">
+                                Fiyat Çarpanı <InfoCircleOutlined style={{ color: '#d4a017', fontSize: 11 }} />
+                              </Tooltip>
+                            }
+                        >
+                            <InputNumber
+                                style={{ width: '100%' }}
+                                min={0.01}
+                                max={100}
+                                step={0.1}
+                                placeholder="1.0"
+                            />
+                        </Form.Item>
+                    </Col>
+                    <Col span={6}>
                         {!hasVariants ? (
                         <Form.Item name="quantity" label="Stok Adedi" rules={[{ required: true }]}>
                             <InputNumber style={{ width: '100%' }} min={0} placeholder="0" disabled={isCloned} />

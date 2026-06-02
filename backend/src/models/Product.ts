@@ -20,6 +20,7 @@ interface ProductAttributes {
   effectiveMilyem?: number;
   gramHas?: number;
   profitMargin: number;
+  priceMultiplier: number;
   priceTRY: number;
   priceUSD: number;
   isB2BEnabled: boolean;
@@ -38,6 +39,7 @@ interface ProductAttributes {
   tags?: string[];
   originalStoreName?: string;
   originalProductId?: string;
+  feedSourceId?: string;
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -58,6 +60,7 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public effectiveMilyem?: number;
   public gramHas?: number;
   public profitMargin!: number;
+  public priceMultiplier!: number;
   public priceTRY!: number;
   public priceUSD!: number;
   public isB2BEnabled!: boolean;
@@ -76,6 +79,7 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public tags?: string[];
   public originalStoreName?: string;
   public originalProductId?: string;
+  public feedSourceId?: string;
   public isActive!: boolean;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -156,6 +160,12 @@ Product.init(
       allowNull: false,
       defaultValue: 0,
       comment: 'Profit margin percentage applied on top of gold price'
+    },
+    priceMultiplier: {
+      type: DataTypes.DECIMAL(5, 2),
+      allowNull: false,
+      defaultValue: 1.00,
+      comment: 'Price multiplier applied after profit margin (1.0 = no multiplier)'
     },
     priceTRY: {
       type: DataTypes.DECIMAL(15, 2),
@@ -254,6 +264,11 @@ Product.init(
       allowNull: true,
       comment: 'Reference to the B2B supplier product for automatic pricing & stock sync'
     },
+    feedSourceId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      comment: 'Reference to the external feed this product was imported from'
+    },
     isActive: {
       type: DataTypes.BOOLEAN,
       defaultValue: true
@@ -287,5 +302,24 @@ Product.init(
     ]
   }
 );
+
+// Hooks: keep Store.totalProducts in sync (use require to avoid circular dep)
+Product.afterCreate(async (product) => {
+  try {
+    const Store = require('./Store').default;
+    await Store.increment('totalProducts', { by: 1, where: { id: product.storeId } });
+  } catch (err) {
+    console.error('[Product Hook] afterCreate increment error:', err);
+  }
+});
+
+Product.afterDestroy(async (product) => {
+  try {
+    const Store = require('./Store').default;
+    await Store.decrement('totalProducts', { by: 1, where: { id: product.storeId } });
+  } catch (err) {
+    console.error('[Product Hook] afterDestroy decrement error:', err);
+  }
+});
 
 export default Product;
