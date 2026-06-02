@@ -20,7 +20,7 @@ interface ProductAttributes {
   effectiveMilyem?: number;
   gramHas?: number;
   profitMargin: number;
-  priceMultiplier: number;
+  priceMultiplier?: number;
   priceTRY: number;
   priceUSD: number;
   isB2BEnabled: boolean;

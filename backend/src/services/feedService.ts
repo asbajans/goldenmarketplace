@@ -4,7 +4,6 @@ import { parseStringPromise } from 'xml2js';
 import ExternalFeed from '../models/ExternalFeed';
 import FeedSyncLog from '../models/FeedSyncLog';
 import Product from '../models/Product';
-import Store from '../models/Store';
 import goldPriceService from './goldPriceService';
 
 interface MappedProduct {

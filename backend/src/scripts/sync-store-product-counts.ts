@@ -21,7 +21,7 @@ async function main() {
     await sequelize.authenticate();
     console.log('[SyncCounts] Database connected.');
 
-    const result = await sequelize.query(`
+    await sequelize.query(`
       UPDATE stores s
       SET "totalProducts" = (
         SELECT COUNT(*) FROM products p
