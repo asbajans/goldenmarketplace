@@ -94,15 +94,42 @@ class FeedService {
         };
 
         const found = findArray(result);
-        if (found) return found;
+
+        // Flatten nested image objects (e.g. resimler.resim_N → top-level resim_N)
+        const flattenImages = (items: any[]): any[] => {
+          return items.map((item: any) => {
+            const flat = { ...item };
+            for (const key of Object.keys(flat)) {
+              const val = flat[key];
+              if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
+                // Check if object has resim_N keys
+                const subKeys = Object.keys(val);
+                const isImageGroup = subKeys.some(k => /^resim_\d+$/i.test(k));
+                if (isImageGroup) {
+                  for (const subKey of subKeys) {
+                    if (typeof val[subKey] === 'string' && val[subKey].startsWith('http')) {
+                      flat[subKey] = val[subKey];
+                    }
+                  }
+                  // Also keep the original object for direct mapping
+                  flat[key] = val;
+                }
+              }
+            }
+            return flat;
+          });
+        };
+
+        if (found) return flattenImages(found);
 
         // Fallback: single object wrapper
         if (typeof result === 'object' && result !== null) {
           const keys = Object.keys(result);
           if (keys.length === 1 && typeof result[keys[0]] === 'object') {
-            return Array.isArray(result[keys[0]]) ? result[keys[0]] : [result[keys[0]]];
+            const arr = Array.isArray(result[keys[0]]) ? result[keys[0]] : [result[keys[0]]];
+            return flattenImages(arr);
           }
-          return [result];
+          return flattenImages([result]);
         }
         return [];
       }
@@ -154,35 +181,64 @@ class FeedService {
 
       // Apply field mapping
       for (const [productField, sourceField] of Object.entries(mapping)) {
-        if (sourceField && raw[sourceField] !== undefined) {
-          let value = raw[sourceField];
+        if (!sourceField) continue;
+        let value = raw[sourceField];
 
-          // Handle CDATA-wrapped values (already unwrapped by xml2js)
-          if (typeof value === 'string') {
-            value = value.trim();
+        // Handle dot notation for nested fields (e.g. "resimler.resim_1")
+        if (value === undefined && sourceField.includes('.')) {
+          const parts = sourceField.split('.');
+          let obj: any = raw;
+          for (const part of parts) {
+            if (obj === undefined || obj === null) break;
+            obj = obj[part];
           }
+          value = obj;
+        }
 
-          // Handle image fields: collect all resim_N into images array
-          if (productField.startsWith('image')) {
+        if (value === undefined) continue;
+
+        // Handle CDATA-wrapped values (already unwrapped by xml2js)
+        if (typeof value === 'string') {
+          value = value.trim();
+        }
+
+        // Auto-collect image URLs from any object with resim_N keys
+        if (typeof value === 'object' && value !== null) {
+          const subKeys = Object.keys(value);
+          const isImageGroup = subKeys.some(k => /^resim_\d+$/i.test(k));
+          if (isImageGroup) {
             if (!product.images) product.images = [];
-            if (typeof value === 'string' && value.startsWith('http')) {
-              product.images.push(value);
+            for (const subKey of subKeys) {
+              if (typeof value[subKey] === 'string' && value[subKey].trim().startsWith('http')) {
+                product.images.push(value[subKey].trim());
+              }
             }
             continue;
           }
-
-          product[productField] = value;
         }
+
+        // Handle image fields: collect values starting with http
+        if (typeof value === 'string' && value.startsWith('http') && (
+          productField === 'images' || productField.startsWith('image')
+        )) {
+          if (!product.images) product.images = [];
+          product.images.push(value);
+          continue;
+        }
+
+        product[productField] = value;
       }
 
       // Apply pricing mode
       if (feed.pricingMode === 'fixed') {
         const rawPrice = parseFloat(product.priceTRY as any) || 0;
+        const multiplier = feed.priceMultiplier || 1;
         if (feed.currency === 'USD' && rawPrice > 0) {
-          // USD price: convert to TRY using current rate (will be calculated during sync)
-          product.priceUSD = rawPrice;
+          // USD price: apply multiplier, then convert to TRY during sync
+          product.priceUSD = rawPrice * multiplier;
+          product.priceTRY = 0; // Clear TRY so convertUSDPrices will convert
         } else {
-          product.priceTRY = rawPrice * feed.priceMultiplier;
+          product.priceTRY = rawPrice * multiplier;
         }
       }
 
@@ -364,7 +420,14 @@ class FeedService {
     const buffer = await this.fetchFeed(feed);
     const data = await this.parseFeed(buffer, feed.fileFormat);
     const headers = data.length > 0 ? Object.keys(data[0]) : [];
-    return { headers, sampleData: data.slice(0, 5), total: data.length };
+    // Also include flattened image keys (resim_1, resim_2, etc.) for easier mapping
+    const extendedHeaders = new Set(headers);
+    for (const item of data) {
+      for (const key of Object.keys(item)) {
+        if (/^resim_\d+$/i.test(key)) extendedHeaders.add(key);
+      }
+    }
+    return { headers: Array.from(extendedHeaders), sampleData: data.slice(0, 5), total: data.length };
   }
 
   /**
