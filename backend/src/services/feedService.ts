@@ -229,6 +229,28 @@ class FeedService {
         product[productField] = value;
       }
 
+      // Auto-detect images from raw data (even if not mapped)
+      if (!product.images || product.images.length === 0) {
+        for (const key of Object.keys(raw)) {
+          const val = raw[key];
+          if (typeof val === 'object' && val !== null) {
+            const subKeys = Object.keys(val);
+            if (subKeys.some(k => /^resim_\d+$/i.test(k))) {
+              product.images = subKeys
+                .map(k => val[k])
+                .filter((v: any) => typeof v === 'string' && v.trim().startsWith('http'))
+                .map((v: string) => v.trim());
+              if (product.images.length > 0) break;
+            }
+          }
+          // Also check top-level resim_N keys (from flattenImages)
+          if (/^resim_\d+$/i.test(key) && typeof val === 'string' && val.startsWith('http')) {
+            if (!product.images) product.images = [];
+            product.images.push(val.trim());
+          }
+        }
+      }
+
       // Apply pricing mode
       if (feed.pricingMode === 'fixed') {
         const rawPrice = parseFloat(product.priceTRY as any) || 0;
