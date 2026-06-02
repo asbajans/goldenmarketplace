@@ -80,7 +80,8 @@ const ExternalFeeds: React.FC = () => {
       isActive: true,
       defaultQuantity: 1,
       defaultIsB2BEnabled: false,
-      defaultProfitMargin: 0
+      defaultProfitMargin: 0,
+      defaultMarketplaces: ['golden']
     });
     setModalVisible(true);
   };
@@ -428,6 +429,20 @@ const ExternalFeeds: React.FC = () => {
         <Col span={8}>
           <Form.Item name="defaultIsB2BEnabled" label="B2B'ye Açık" valuePropName="checked">
             <Switch />
+          </Form.Item>
+        </Col>
+      </Row>
+      <Row gutter={16}>
+        <Col span={12}>
+          <Form.Item name="defaultMarketplaces" label="Mağazalar">
+            <Select mode="multiple" placeholder="Ürünlerin görüneceği mağazalar">
+              <Option value="golden">Golden Marketplace</Option>
+              <Option value="etsy">Etsy</Option>
+              <Option value="trendyol">Trendyol</Option>
+              <Option value="hepsiburada">Hepsiburada</Option>
+              <Option value="n11">N11</Option>
+              <Option value="pazarama">Pazarama</Option>
+            </Select>
           </Form.Item>
         </Col>
       </Row>

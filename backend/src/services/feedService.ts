@@ -381,6 +381,7 @@ class FeedService {
             priceUSD: prod.priceUSD || 0,
             quantity: prod.quantity || 0,
             images: prod.images || [],
+            marketplaces: feed.defaultMarketplaces || ['golden'],
             isB2BEnabled: feed.defaultIsB2BEnabled || false,
             isActive: prod.isActive !== undefined ? prod.isActive : true,
             feedSourceId: feed.id,

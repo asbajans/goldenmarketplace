@@ -105,18 +105,24 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             setSelectedMarketplaces(initialValues.marketplaces);
         }
 
-        if (initialValues?.translations) {
-            setTranslations(initialValues.translations);
-        }
-        if (initialValues?.defaultLanguage) {
-            setActiveLanguage(initialValues.defaultLanguage);
-        }
-        
-        // Set form values when editing existing product
         if (initialValues?.id) {
-            // If translations exists, populate English title to main title field
             const translationTitle = initialValues?.translations?.en?.title || initialValues?.title || '';
             const translationDesc = initialValues?.translations?.en?.description || initialValues?.description || '';
+            
+            // Populate translations if not set (e.g. feed-imported products)
+            if (!initialValues?.translations) {
+                setTranslations(prev => ({
+                    ...prev,
+                    en: { ...prev.en, title: translationTitle, description: translationDesc },
+                    tr: { ...prev.tr, title: initialValues?.title || '', description: initialValues?.description || '' }
+                }));
+            } else {
+                setTranslations(initialValues.translations);
+            }
+            
+            if (initialValues?.defaultLanguage) {
+                setActiveLanguage(initialValues.defaultLanguage);
+            }
             
             setTimeout(() => {
                 form.setFieldsValue({

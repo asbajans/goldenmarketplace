@@ -18,6 +18,7 @@ interface ExternalFeedAttributes {
   defaultCategory?: string;
   defaultIsB2BEnabled?: boolean;
   defaultQuantity?: number;
+  defaultMarketplaces?: string[];
   fieldMapping?: any;
   autoSync: boolean;
   updateInterval: 'manual' | 'hourly' | 'daily' | 'weekly';
@@ -45,6 +46,7 @@ class ExternalFeed extends Model<ExternalFeedAttributes> implements ExternalFeed
   public defaultCategory?: string;
   public defaultIsB2BEnabled?: boolean;
   public defaultQuantity?: number;
+  public defaultMarketplaces?: string[];
   public fieldMapping?: any;
   public autoSync!: boolean;
   public updateInterval!: 'manual' | 'hourly' | 'daily' | 'weekly';
@@ -131,6 +133,11 @@ ExternalFeed.init(
       type: DataTypes.INTEGER,
       allowNull: true,
       defaultValue: 1
+    },
+    defaultMarketplaces: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: ['golden']
     },
     fieldMapping: {
       type: DataTypes.JSONB,
