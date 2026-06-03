@@ -10,6 +10,39 @@ const goldenFilter: WhereOptions = {
   )
 };
 
+// Fallback translations for category strings that aren't linked to the Category model.
+// Used when a product's categoryId is null and only the raw category string is available.
+const FALLBACK_CATEGORY_TRANSLATIONS: Record<string, Record<string, string>> = {
+  Genel: { en: 'General', tr: 'Genel', it: 'Generale', es: 'General', ar: 'عام' },
+  General: { en: 'General', tr: 'Genel', it: 'Generale', es: 'General', ar: 'عام' },
+  Bilezik: { en: 'Bracelets', tr: 'Bilezik', it: 'Bracciali', es: 'Pulseras', ar: 'أساور' },
+  Bracelets: { en: 'Bracelets', tr: 'Bilezik', it: 'Bracciali', es: 'Pulseras', ar: 'أساور' },
+  bracelet: { en: 'Bracelets', tr: 'Bilezik', it: 'Bracciali', es: 'Pulseras', ar: 'أساور' },
+  Yüzük: { en: 'Rings', tr: 'Yüzük', it: 'Anelli', es: 'Anillos', ar: 'خواتم' },
+  Rings: { en: 'Rings', tr: 'Yüzük', it: 'Anelli', es: 'Anillos', ar: 'خواتم' },
+  rings: { en: 'Rings', tr: 'Yüzük', it: 'Anelli', es: 'Anillos', ar: 'خواتم' },
+  Kolye: { en: 'Necklaces', tr: 'Kolye', it: 'Collane', es: 'Collares', ar: 'قلائد' },
+  Necklaces: { en: 'Necklaces', tr: 'Kolye', it: 'Collane', es: 'Collares', ar: 'قلائد' },
+  necklaces: { en: 'Necklaces', tr: 'Kolye', it: 'Collane', es: 'Collares', ar: 'قلائد' },
+  Küpe: { en: 'Earrings', tr: 'Küpe', it: 'Orecchini', es: 'Aretes', ar: 'أقراط' },
+  Earrings: { en: 'Earrings', tr: 'Küpe', it: 'Orecchini', es: 'Aretes', ar: 'أقراط' },
+  earrings: { en: 'Earrings', tr: 'Küpe', it: 'Orecchini', es: 'Aretes', ar: 'أقراط' },
+  'Kolye Ucu': { en: 'Pendants', tr: 'Kolye Ucu', it: 'Ciondoli', es: 'Colgantes', ar: 'دلايات' },
+  Pendants: { en: 'Pendants', tr: 'Kolye Ucu', it: 'Ciondoli', es: 'Colgantes', ar: 'دلايات' },
+  pendants: { en: 'Pendants', tr: 'Kolye Ucu', it: 'Ciondoli', es: 'Colgantes', ar: 'دلايات' },
+  'Takı Seti': { en: 'Sets', tr: 'Takı Seti', it: 'Set', es: 'Juegos', ar: 'مجموعات' },
+  Sets: { en: 'Sets', tr: 'Takı Seti', it: 'Set', es: 'Juegos', ar: 'مجموعات' },
+  sets: { en: 'Sets', tr: 'Takı Seti', it: 'Set', es: 'Juegos', ar: 'مجموعات' },
+};
+
+function resolveCategoryName(rawCategory: string, categoryRef: any, lang: string): string {
+  if (categoryRef) {
+    const catTranslations = categoryRef.translations || {};
+    return catTranslations[lang]?.name || categoryRef.name || rawCategory;
+  }
+  return FALLBACK_CATEGORY_TRANSLATIONS[rawCategory]?.[lang] || rawCategory;
+}
+
 function applyTranslation(product: any, lang: string): any {
   if (!product) return product;
   const json = product.toJSON ? product.toJSON() : product;
@@ -17,11 +50,7 @@ function applyTranslation(product: any, lang: string): any {
   const defaultLang = json.defaultLanguage || 'en';
   const trans = translations[lang] || {};
 
-  let categoryName = json.category || '';
-  if (json.categoryRef) {
-    const catTranslations = json.categoryRef.translations || {};
-    categoryName = catTranslations[lang]?.name || json.categoryRef.name || categoryName;
-  }
+  const categoryName = resolveCategoryName(json.category, json.categoryRef, lang);
 
   const { categoryRef, ...rest } = json;
 
@@ -308,22 +337,20 @@ export class MarketplaceController {
       // Legacy raw-string categories
       for (const r of stringResults as any[]) {
         const raw = r.category;
-        let displayName = raw;
         let slug = raw;
 
         try {
           const cat = await Category.findOne({ where: { [Op.or]: [{ slug: raw }, { name: raw }] } });
-          if (cat) {
-            const json = cat.toJSON();
-            const translations = json.translations || {};
-            displayName = translations[lang]?.name || json.name || raw;
-            slug = json.slug || raw;
-          }
+          if (cat) slug = cat.slug;
         } catch (e) {
           // ignore
         }
 
-        mapped.push({ name: displayName, slug, count: parseInt(r.count) });
+        mapped.push({
+          name: resolveCategoryName(raw, null, lang),
+          slug,
+          count: parseInt(r.count)
+        });
       }
 
       // Deduplicate by slug (prefer categoryId-resolved entries first)

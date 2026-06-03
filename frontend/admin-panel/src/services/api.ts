@@ -120,6 +120,11 @@ export const AdminAPI = {
     // Orders
     getOrders: (params?: any) => api.get('/orders', { params }).then((res) => res.data),
     getOrderStats: () => api.get('/stats/orders').then((res) => res.data),
+
+    // AI Settings
+    getAISettings: () => api.get('/ai/admin/settings').then((res) => res.data),
+    updateAISettings: (data: any) => api.put('/ai/admin/settings', data).then((res) => res.data),
+    testAIConnection: () => api.post('/ai/admin/settings/test').then((res) => res.data),
 };
 
 export default api;

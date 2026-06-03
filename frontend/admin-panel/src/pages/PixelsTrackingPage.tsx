@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Card, Form, Input, Button, message, Row, Col, Typography, Divider } from 'antd';
-import { SaveOutlined, ApiOutlined } from '@ant-design/icons';
+import { Card, Form, Input, Button, message, Row, Col, Typography } from 'antd';
+import { SaveOutlined } from '@ant-design/icons';
 import { AdminAPI } from '../services/api';
 
 const { Text, Title } = Typography;

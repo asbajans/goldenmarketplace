@@ -19,6 +19,7 @@ import Wishlist from './Wishlist';
 import UserAddress from './UserAddress';
 import ExternalFeed from './ExternalFeed';
 import FeedSyncLog from './FeedSyncLog';
+import ProductAITask from './ProductAITask';
 
 // User <-> Store (One-to-One)
 User.hasOne(Store, { foreignKey: 'userId', as: 'store' });
@@ -103,6 +104,10 @@ ExternalFeed.hasMany(Product, { foreignKey: 'feedSourceId', as: 'feedProducts' }
 Product.belongsTo(Category, { foreignKey: 'categoryId', as: 'categoryRef' });
 Category.hasMany(Product, { foreignKey: 'categoryId', as: 'products' });
 
+// ProductAITask associations
+ProductAITask.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+ProductAITask.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
 // Export all models
 export {
     User,
@@ -125,5 +130,6 @@ export {
     Wishlist,
     UserAddress,
     ExternalFeed,
-    FeedSyncLog
+    FeedSyncLog,
+    ProductAITask
 };

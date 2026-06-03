@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Card, Form, Input, Button, message, Divider, Spin, InputNumber, Alert, Statistic, Row, Col } from 'antd';
-import { DollarOutlined, SyncOutlined, GoldOutlined } from '@ant-design/icons';
+import { Card, Form, Input, Button, message, Divider, Spin, InputNumber, Alert, Statistic, Row, Col, Select, Space } from 'antd';
+import { DollarOutlined, SyncOutlined, GoldOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { AdminAPI } from '../services/api';
 
 interface GoldPriceInfo {
@@ -12,16 +12,21 @@ interface GoldPriceInfo {
 
 export default function SettingsPage() {
     const [form] = Form.useForm();
+    const [aiForm] = Form.useForm();
     const [goldForm] = Form.useForm();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [savingGold, setSavingGold] = useState(false);
+    const [savingAI, setSavingAI] = useState(false);
+    const [testingAI, setTestingAI] = useState(false);
+    const [aiTestResult, setAITestResult] = useState<{ success: boolean; message: string } | null>(null);
     const [goldPrice, setGoldPrice] = useState<GoldPriceInfo | null>(null);
     const [syncResult, setSyncResult] = useState<string | null>(null);
 
     useEffect(() => {
         fetchSettings();
         fetchGoldPrice();
+        fetchAISettings();
     }, []);
 
     const fetchSettings = async () => {
@@ -37,6 +42,41 @@ export default function SettingsPage() {
             message.error('Ayarlar yüklenemedi.');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchAISettings = async () => {
+        try {
+            const data = await AdminAPI.getAISettings();
+            aiForm.setFieldsValue(data);
+        } catch { /* noop */ }
+    };
+
+    const handleSaveAI = async (values: any) => {
+        try {
+            setSavingAI(true);
+            await AdminAPI.updateAISettings(values);
+            message.success('AI ayarları kaydedildi!');
+        } catch (error: any) {
+            message.error(error.response?.data?.error || 'AI ayarları kaydedilemedi.');
+        } finally {
+            setSavingAI(false);
+        }
+    };
+
+    const handleTestAI = async () => {
+        try {
+            setTestingAI(true);
+            setAITestResult(null);
+            const res = await AdminAPI.testAIConnection();
+            setAITestResult(res);
+            if (res.success) message.success('Bağlantı başarılı!');
+            else message.error(res.message);
+        } catch (error: any) {
+            setAITestResult({ success: false, message: error.message });
+            message.error('Bağlantı testi başarısız.');
+        } finally {
+            setTestingAI(false);
         }
     };
 
@@ -186,6 +226,89 @@ export default function SettingsPage() {
                         onClose={() => setSyncResult(null)}
                     />
                 )}
+            </Card>
+
+            {/* AI Settings */}
+            <Card
+                title={<><RobotOutlined style={{ color: '#722ed1', marginRight: 8 }} />AI Ayarları</>}
+                bordered={false}
+                style={{ marginBottom: 24 }}
+            >
+                <Alert
+                    type="info"
+                    showIcon
+                    style={{ marginBottom: 20 }}
+                    message="AI servis ayarlarını yapılandırın. Satıcıların abonelik paketlerine göre AI özellikleri otomatik olarak açılıp kapanır."
+                />
+                <Form
+                    form={aiForm}
+                    layout="vertical"
+                    onFinish={handleSaveAI}
+                >
+                    <Row gutter={16}>
+                        <Col span={8}>
+                            <Form.Item name="ai_provider" label="AI Sağlayıcı" rules={[{ required: true }]}>
+                                <Select>
+                                    <Select.Option value="openai">OpenAI</Select.Option>
+                                    <Select.Option value="openrouter">OpenRouter</Select.Option>
+                                    <Select.Option value="gemini">Gemini</Select.Option>
+                                </Select>
+                            </Form.Item>
+                        </Col>
+                        <Col span={8}>
+                            <Form.Item name="ai_api_key" label="API Anahtarı">
+                                <Input.Password placeholder="sk-..." />
+                            </Form.Item>
+                        </Col>
+                        <Col span={8}>
+                            <Form.Item name="ai_model" label="Model">
+                                <Input placeholder="gpt-4o-mini" />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+
+                    <Divider orientation="left">Kredi Paketleri</Divider>
+                    <p style={{ color: '#888', marginBottom: 16 }}>
+                        Satıcıların satın alabileceği AI kredi paketleri. Format: {'[{"credits":100,"price":50}]'}
+                    </p>
+                    <Form.Item name="ai_credit_packs">
+                        <Input.TextArea rows={3} placeholder='[{"credits":100,"price":50},{"credits":500,"price":200}]' />
+                    </Form.Item>
+
+                    <Row gutter={16}>
+                        <Col span={6}>
+                            <Form.Item name="ai_translation_cost" label="Çeviri Maliyeti (kredi)">
+                                <InputNumber min={0} style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Col>
+                        <Col span={6}>
+                            <Form.Item name="ai_content_cost" label="İçerik Maliyeti (kredi)">
+                                <InputNumber min={0} style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+
+                    <Space>
+                        <Button type="primary" htmlType="submit" loading={savingAI} icon={<RobotOutlined />}>
+                            AI Ayarlarını Kaydet
+                        </Button>
+                        <Button onClick={handleTestAI} loading={testingAI}>
+                            Test Bağlantı
+                        </Button>
+                    </Space>
+
+                    {aiTestResult && (
+                        <Alert
+                            type={aiTestResult.success ? 'success' : 'error'}
+                            message={aiTestResult.message}
+                            showIcon
+                            icon={aiTestResult.success ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+                            style={{ marginTop: 16 }}
+                            closable
+                            onClose={() => setAITestResult(null)}
+                        />
+                    )}
+                </Form>
             </Card>
 
             {/* Etsy Settings */}

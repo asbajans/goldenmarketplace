@@ -182,6 +182,8 @@ app.use('/api/cart', require('./routes/cart').default || require('./routes/cart'
 app.use('/api/wishlist', require('./routes/wishlist').default || require('./routes/wishlist'));
 app.use('/api/addresses', require('./routes/addresses').default || require('./routes/addresses'));
 app.use('/api/feeds', require('./routes/externalFeeds').default || require('./routes/externalFeeds'));
+app.use('/api/ai', require('./routes/ai').default || require('./routes/ai'));
+app.use('/api/image-proxy', require('./routes/imageProxy').default || require('./routes/imageProxy'));
 
 // Start feed auto-sync scheduler
 try {

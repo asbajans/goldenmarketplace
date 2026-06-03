@@ -4,7 +4,10 @@ import { parseStringPromise } from 'xml2js';
 import ExternalFeed from '../models/ExternalFeed';
 import FeedSyncLog from '../models/FeedSyncLog';
 import Product from '../models/Product';
+import Store from '../models/Store';
 import goldPriceService from './goldPriceService';
+import { queueBatchAITranslation } from '../jobs/aiTranslationJob';
+import planAccessService from './planAccessService';
 
 interface MappedProduct {
   title: string;
@@ -25,12 +28,13 @@ interface MappedProduct {
 }
 
 interface SyncResult {
-  total: number;
+  total?: number;
   added: number;
   updated: number;
-  skipped: number;
   failed: number;
+  skipped: number;
   errors: string[];
+  aiQueued?: number;
 }
 
 class FeedService {
@@ -432,6 +436,32 @@ class FeedService {
       result.errors.push(err.message);
       await log.update({ status: 'failed', completedAt: new Date(), summary: result });
       await feed.update({ lastSyncResult: result });
+    }
+
+    // Trigger AI translation for synced products (non-blocking)
+    try {
+      if (result.added > 0 || result.updated > 0) {
+        const store = await Store.findByPk(feed.storeId);
+        if (store) {
+          const access = await planAccessService.checkAIAccess(store.userId, 1);
+          if (access.allowed) {
+            const syncedProducts = await Product.findAll({
+              where: { feedSourceId: feed.id },
+              attributes: ['id'],
+              order: [['createdAt', 'DESC']],
+              limit: result.added + result.updated
+            });
+            const productIds = syncedProducts.map(p => p.id);
+            if (productIds.length > 0) {
+              await queueBatchAITranslation(productIds, store.userId, 'both');
+              result.aiQueued = productIds.length;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // AI queue is best-effort
+      console.error('[FeedSync] Failed to queue AI tasks:', e);
     }
 
     return result;

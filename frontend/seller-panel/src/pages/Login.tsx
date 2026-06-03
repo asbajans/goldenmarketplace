@@ -12,7 +12,7 @@ const Login: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
 
     const handleGoogleLogin = async () => {
         try {
-            const googleWindow = window.open(
+            window.open(
                 `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/google/callback')}&response_type=code&scope=email%20profile&access_type=offline`,
                 'Google Login',
                 'width=500,height=600'

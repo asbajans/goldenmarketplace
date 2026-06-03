@@ -103,10 +103,45 @@ class AIService {
   // Common usecases
   async translateText(text: string, targetLanguage: string): Promise<string> {
     const res = await this.generateContent(
-      `You are an expert translator. Translate the given text to ${targetLanguage}. Return ONLY the translated string, no quotes or surrounding text.`,
+      `You are an expert translator for a jewelry e-commerce site. Translate the given text to ${targetLanguage}. Keep the translation natural and persuasive for shoppers. Maintain any jewelry-specific terminology. Return ONLY the translated string, no quotes or surrounding text.`,
       text
     );
-    return res.success ? res.content : text; // Fallback to original text if fails
+    return res.success ? res.content : text;
+  }
+
+  async generateProductDescription(title: string, category: string, language: string, keywords?: string): Promise<string> {
+    const res = await this.generateContent(
+      `You are a professional jewelry product description writer for an e-commerce marketplace. 
+Generate a detailed, persuasive product description in ${language} for the following item.
+The description should be 2-4 sentences, covering:
+- Product type and material quality
+- Craftsmanship and design details
+- Ideal for gifting or special occasions
+- Any care or wearing tips if applicable
+
+Use natural, flowing language appropriate for the target language.
+Do NOT include HTML tags, markdown, or meta text. Return ONLY the description text.`,
+      `Title: ${title}\nCategory: ${category}${keywords ? `\nKeywords: ${keywords}` : ''}`
+    );
+    return res.success ? res.content : title;
+  }
+
+  async translateProduct(title: string, description: string, languages: string[]): Promise<Record<string, { title: string; description: string }>> {
+    const result: Record<string, { title: string; description: string }> = {};
+    for (const lang of languages) {
+      const translatedTitle = await this.translateText(title, this.getLanguageName(lang));
+      const translatedDesc = description ? await this.translateText(description, this.getLanguageName(lang)) : '';
+      result[lang] = { title: translatedTitle, description: translatedDesc };
+    }
+    return result;
+  }
+
+  private getLanguageName(code: string): string {
+    const map: Record<string, string> = {
+      en: 'English', tr: 'Turkish', it: 'Italian', es: 'Spanish', ar: 'Arabic',
+      de: 'German', fr: 'French', pt: 'Portuguese', ru: 'Russian', zh: 'Chinese'
+    };
+    return map[code] || code;
   }
 
   async generateSEOMeta(productTitle: string, category: string, description: string): Promise<{ title: string, description: string }> {

@@ -13,6 +13,7 @@ import {
     ShopOutlined, CheckCircleOutlined, ThunderboltOutlined, MinusCircleOutlined
 } from '@ant-design/icons';
 import { createProduct, updateProduct } from '../api/product';
+import { translateProduct, generateProductContent } from '../api/ai';
 import client from '../api/client';
 
 const { Option } = Select;
@@ -49,6 +50,11 @@ const ALL_PLATFORMS = [
     { key: 'pazarama', name: 'Pazarama', color: '#E4002B' },
 ];
 
+interface AddProductProps {
+    initialValues?: any;
+    onSuccess?: () => void;
+}
+
 const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
@@ -76,6 +82,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [etsyTaxonomyNodes, setEtsyTaxonomyNodes] = useState<any[]>([]);
     const [fetchingEtsyProfiles, setFetchingEtsyProfiles] = useState(false);
     const [activeLanguage, setActiveLanguage] = useState('en');
+    const [aiLoading, setAILoading] = useState<string | null>(null);
     const [translations, setTranslations] = useState<Record<string, any>>({
         en: { title: '', description: '', keywords: '' },
         tr: { title: '', description: '', keywords: '' },
@@ -268,6 +275,44 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         generateTags(title, cat ? cat.name : categoryId);
     };
 
+    const handleAIGenerateContent = async () => {
+        if (!initialValues?.id) {
+            message.warning('Önce ürünü kaydedin, ardından AI ile açıklama oluşturabilirsiniz.');
+            return;
+        }
+        setAILoading('content');
+        try {
+            const res = await generateProductContent(initialValues.id);
+            message.success(res.message || 'AI içerik oluşturma kuyruğa alındı');
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } catch (err: any) {
+            message.error(err?.response?.data?.error || 'AI içerik oluşturma başarısız');
+        } finally {
+            setAILoading(null);
+        }
+    };
+
+    const handleAITranslate = async () => {
+        if (!initialValues?.id) {
+            message.warning('Önce ürünü kaydedin, ardından AI ile çevirebilirsiniz.');
+            return;
+        }
+        setAILoading('translate');
+        try {
+            const res = await translateProduct(initialValues.id);
+            message.success(res.message || 'AI çeviri kuyruğa alındı');
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } catch (err: any) {
+            message.error(err?.response?.data?.error || 'AI çeviri başarısız');
+        } finally {
+            setAILoading(null);
+        }
+    };
+
     const generateTags = (title: string, category: string) => {
         const combined = `${title} ${category}`.toLowerCase();
         const words = combined.split(/[\s,.-]+/).filter(w => w.length > 2);
@@ -394,7 +439,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             setTags([]);
             setFileList([]);
             setVideoFile([]);
-            onSuccess();
+            onSuccess?.();
         } catch (error: any) {
             console.error(error);
             message.error('Hata oluştu: ' + (error.response?.data?.error?.message || 'Bilinmeyen hata'));
@@ -862,6 +907,26 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                             }));
                         }}
                     />
+                    <Space style={{ marginTop: 8 }}>
+                        <Button
+                            size="small"
+                            icon={<ThunderboltOutlined />}
+                            loading={aiLoading === 'content'}
+                            onClick={() => handleAIGenerateContent()}
+                            disabled={isCloned || !initialValues?.id}
+                        >
+                            AI ile Açıklama Oluştur
+                        </Button>
+                        <Button
+                            size="small"
+                            icon={<ThunderboltOutlined />}
+                            loading={aiLoading === 'translate'}
+                            onClick={() => handleAITranslate()}
+                            disabled={isCloned || !initialValues?.id}
+                        >
+                            AI ile Tüm Dillere Çevir
+                        </Button>
+                    </Space>
                 </Form.Item>
             </Card>
 

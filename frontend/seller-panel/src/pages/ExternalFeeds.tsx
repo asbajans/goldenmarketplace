@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import {
   Card, Table, Button, Modal, Form, Input, Select, Switch, message, Tag, Space, Typography,
-  Steps, Descriptions, Divider, Alert, Radio, InputNumber, Row, Col, Tooltip, Popconfirm, Badge
+  Steps, Descriptions, Divider, Alert, Radio, InputNumber, Row, Col, Popconfirm
 } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, SyncOutlined, LinkOutlined,
-  CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined,
-  SettingOutlined, EyeOutlined, ThunderboltOutlined
+  CheckCircleOutlined,
+  SettingOutlined, ThunderboltOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getFeeds, createFeed, updateFeed, deleteFeed, testFeed, syncFeed, ExternalFeed } from '../api/externalFeeds';
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
 const { Option } = Select;
 const { Step } = Steps;
 

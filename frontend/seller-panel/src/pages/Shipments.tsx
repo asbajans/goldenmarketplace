@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
-    Table, Tag, Button, Card, Space, Input, Typography, message, Modal, Form, Tooltip, Badge 
+    Table, Tag, Button, Card, Space, Input, Typography, message, Modal, Form, Tooltip, Badge
 } from 'antd';
 import { 
-    SendOutlined, SearchOutlined, EyeOutlined 
+    SendOutlined
 } from '@ant-design/icons';
 import client from '../api/client';
 import dayjs from 'dayjs';
@@ -90,9 +90,6 @@ const Shipments: React.FC = () => {
     const fetchOrders = async () => {
         setLoading(true);
         try {
-            // Fetch only confirmed, processing, and shipped orders
-            const params: any = { page, limit: pageSize, status: 'confirmed,processing,shipped' };
-            const res = await client.get('/orders', { params });
             // Let's filter locally if backend doesn't support comma-separated status
             // Actually standard findAndCountAll might not support it out of the box unless handled.
             // We'll just fetch all and filter locally for simplicity, or we hope the backend returns them all.

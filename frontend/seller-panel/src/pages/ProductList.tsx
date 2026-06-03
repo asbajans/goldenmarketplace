@@ -1,8 +1,8 @@
 
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Space, message, Modal, Tabs, Tag, Switch, Statistic, Card, Row, Col, Typography, Input, Checkbox, Popconfirm } from 'antd';
-import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined, DollarOutlined, GoldOutlined, SearchOutlined } from '@ant-design/icons';
-import { getProducts, deleteProduct, getAutoSyncStatus, setAutoSyncStatus, triggerManualSync, Product } from '../api/product';
+import { Table, Button, Space, message, Modal, Tabs, Tag, Switch, Typography, Input, Checkbox, Row, Col } from 'antd';
+import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined, DollarOutlined, GoldOutlined } from '@ant-design/icons';
+import { deleteProduct, getAutoSyncStatus, setAutoSyncStatus, triggerManualSync, Product } from '../api/product';
 import client from '../api/client';
 import AddProduct from './AddProduct';
 
@@ -190,21 +190,6 @@ const ProductList: React.FC = () => {
         }
     ];
 
-    // Count products by marketplace presence for accurate filtering
-    const goldenMarketplaceProducts = products.filter(p => {
-      // Products with no marketplaces array or empty array are considered Golden Marketplace only
-      if (!p.marketplaces || p.marketplaces.length === 0) return true;
-      
-      // Check if product is in golden marketplace (either 'golden' or 'goldenmarketplace')
-      return p.marketplaces.some(m => ['golden', 'goldenmarketplace'].includes(m.toLowerCase()));
-    });
-    const etsyProducts = products.filter(p => p.marketplaces?.includes('etsy'));
-    const trendyolProducts = products.filter(p => p.marketplaces?.includes('trendyol'));
-    const amazonProducts = products.filter(p => p.marketplaces?.includes('amazon'));
-    const n11Products = products.filter(p => p.marketplaces?.includes('n11'));
-    const hepsiburadaProducts = products.filter(p => p.marketplaces?.includes('hepsiburada'));
-    const pazaramaProducts = products.filter(p => p.marketplaces?.includes('pazarama'));
-    
     // Original classification remains for tabs
     const myProducts = products.filter(p => !p.originalProductId && !p.originalStoreName);
     const b2bProducts = products.filter(p => p.originalProductId || p.originalStoreName);

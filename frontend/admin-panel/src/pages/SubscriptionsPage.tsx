@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Card, Button, Space, Modal, Form, Input, InputNumber, Switch, message, Tag, Select } from 'antd';
+import { Table, Card, Button, Space, Modal, Form, Input, InputNumber, Switch, message, Tag, Select, Divider } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { AdminAPI } from '../services/api';
 
@@ -149,6 +149,19 @@ export const SubscriptionsPage: React.FC = () => {
                         </Form.Item>
 
                         <Form.Item name="integrationLimit" label="Entegrasyon Limiti" rules={[{ required: true }]}>
+                            <InputNumber min={0} style={{ width: '130px' }} />
+                        </Form.Item>
+                    </Space>
+
+                    <Divider orientation="left">AI Özellikleri</Divider>
+                    <Space size="large" wrap>
+                        <Form.Item name="aiTranslationEnabled" label="AI Çeviri" valuePropName="checked">
+                            <Switch />
+                        </Form.Item>
+                        <Form.Item name="aiContentEnabled" label="AI İçerik Üretimi" valuePropName="checked">
+                            <Switch />
+                        </Form.Item>
+                        <Form.Item name="aiMonthlyCredit" label="Aylık AI Kredisi">
                             <InputNumber min={0} style={{ width: '130px' }} />
                         </Form.Item>
                     </Space>

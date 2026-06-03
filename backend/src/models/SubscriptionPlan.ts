@@ -17,6 +17,9 @@ interface SubscriptionPlanAttributes {
     stripePriceId?: string;
     productLimit: number; // max products a seller can have
     integrationLimit: number; // max marketplaces a seller can connect
+    aiTranslationEnabled?: boolean;
+    aiContentEnabled?: boolean;
+    aiMonthlyCredit?: number;
     features: string[];
     isActive: boolean;
     createdAt?: Date;
@@ -34,6 +37,9 @@ class SubscriptionPlan extends Model<SubscriptionPlanAttributes> implements Subs
     public stripePriceId?: string;
     public productLimit!: number;
     public integrationLimit!: number;
+    public aiTranslationEnabled?: boolean;
+    public aiContentEnabled?: boolean;
+    public aiMonthlyCredit?: number;
     public features!: string[];
     public isActive!: boolean;
     public readonly createdAt!: Date;
@@ -89,6 +95,18 @@ SubscriptionPlan.init(
             type: DataTypes.INTEGER,
             allowNull: false,
             defaultValue: 1
+        },
+        aiTranslationEnabled: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false
+        },
+        aiContentEnabled: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false
+        },
+        aiMonthlyCredit: {
+            type: DataTypes.INTEGER,
+            defaultValue: 0
         },
         features: {
             type: DataTypes.JSON,

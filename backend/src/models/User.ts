@@ -19,6 +19,9 @@ interface UserAttributes {
   subscriptionStatus?: 'active' | 'inactive' | 'past_due' | 'canceled' | 'trialing';
   subscriptionPlan?: string;
   subscriptionEndDate?: Date;
+  aiCreditsUsedThisMonth?: number;
+  aiCreditBalance?: number;
+  aiCreditsLastResetAt?: Date;
   pendingStoreName?: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -37,6 +40,9 @@ class User extends Model<UserAttributes> implements UserAttributes {
   public subscriptionStatus?: 'active' | 'inactive' | 'past_due' | 'canceled' | 'trialing';
   public subscriptionPlan?: string;
   public subscriptionEndDate?: Date;
+  public aiCreditsUsedThisMonth?: number;
+  public aiCreditBalance?: number;
+  public aiCreditsLastResetAt?: Date;
   public pendingStoreName?: string;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -98,6 +104,18 @@ User.init(
     },
     pendingStoreName: {
       type: DataTypes.STRING,
+      allowNull: true
+    },
+    aiCreditsUsedThisMonth: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0
+    },
+    aiCreditBalance: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0
+    },
+    aiCreditsLastResetAt: {
+      type: DataTypes.DATE,
       allowNull: true
     }
   },

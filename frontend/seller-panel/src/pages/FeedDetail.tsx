@@ -2,15 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Card, Descriptions, Tag, Button, message, Spin, Space, Typography, Table, Divider,
-  Statistic, Row, Col, Alert, Tooltip
+  Statistic, Row, Col, Alert
 } from 'antd';
 import {
   ArrowLeftOutlined, SyncOutlined, CheckCircleOutlined,
-  CloseCircleOutlined, ClockCircleOutlined, LinkOutlined
+  CloseCircleOutlined, LinkOutlined
 } from '@ant-design/icons';
 import { getFeed, syncFeed, getFeedLogs, ExternalFeed, FeedSyncLog } from '../api/externalFeeds';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const FeedDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -177,7 +177,7 @@ const FeedDetail: React.FC = () => {
                 valueStyle={{ color: '#52c41a' }} />
               <Statistic title="Güncellenen" value={lastResult?.updated || 0} suffix="ürün"
                 valueStyle={{ color: '#1677ff' }} />
-              {lastResult?.failed > 0 && (
+              {lastResult && lastResult.failed > 0 && (
                 <Statistic title="Hatalı" value={lastResult.failed} suffix="ürün"
                   valueStyle={{ color: '#ff4d4f' }} />
               )}

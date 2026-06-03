@@ -217,7 +217,7 @@ export class AdminController {
 
     static async createSubscriptionPlan(req: Request, res: Response): Promise<Response> {
         try {
-            const { name, description, monthlyPrice, yearlyPrice, currency, interval, productLimit, integrationLimit, features, stripePriceId, isActive } = req.body;
+            const { name, description, monthlyPrice, yearlyPrice, currency, interval, productLimit, integrationLimit, aiTranslationEnabled, aiContentEnabled, aiMonthlyCredit, features, stripePriceId, isActive } = req.body;
             const plan = await SubscriptionPlan.create({
                 name,
                 description,
@@ -227,6 +227,9 @@ export class AdminController {
                 interval,
                 productLimit,
                 integrationLimit,
+                aiTranslationEnabled: aiTranslationEnabled || false,
+                aiContentEnabled: aiContentEnabled || false,
+                aiMonthlyCredit: aiMonthlyCredit || 0,
                 features,
                 stripePriceId,
                 isActive: isActive !== undefined ? isActive : true
@@ -240,7 +243,7 @@ export class AdminController {
     static async updateSubscriptionPlan(req: Request, res: Response) {
         try {
             const { id } = req.params;
-            const { name, description, monthlyPrice, yearlyPrice, currency, interval, productLimit, integrationLimit, features, stripePriceId, isActive } = req.body;
+            const { name, description, monthlyPrice, yearlyPrice, currency, interval, productLimit, integrationLimit, aiTranslationEnabled, aiContentEnabled, aiMonthlyCredit, features, stripePriceId, isActive } = req.body;
             const plan = await SubscriptionPlan.findByPk(id);
             if (!plan) {
                 return res.status(404).json({ error: 'Plan not found' });
@@ -254,6 +257,9 @@ export class AdminController {
                 interval,
                 productLimit,
                 integrationLimit,
+                aiTranslationEnabled: aiTranslationEnabled !== undefined ? aiTranslationEnabled : plan.aiTranslationEnabled,
+                aiContentEnabled: aiContentEnabled !== undefined ? aiContentEnabled : plan.aiContentEnabled,
+                aiMonthlyCredit: aiMonthlyCredit !== undefined ? aiMonthlyCredit : plan.aiMonthlyCredit,
                 features,
                 stripePriceId,
                 isActive

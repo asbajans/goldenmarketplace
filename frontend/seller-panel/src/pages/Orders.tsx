@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-    Table, Tag, Button, Card, Space, Input, Select, DatePicker, 
+    Table, Tag, Button, Card, Space, Input, Select,
     Typography, Row, Col, Statistic, message, Modal, Form, Tooltip, Badge
 } from 'antd';
 import { 
@@ -8,7 +8,6 @@ import {
     CheckCircleOutlined, CloseCircleOutlined, SendOutlined,
     CarOutlined
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
 import client from '../api/client';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -17,7 +16,6 @@ dayjs.extend(relativeTime);
 
 const { Text } = Typography;
 const { Option } = Select;
-const { RangePicker } = DatePicker;
 
 interface OrderItem {
     id: string;
@@ -89,7 +87,6 @@ const sourceLabels: Record<string, string> = {
 };
 
 const Orders: React.FC = () => {
-    const navigate = useNavigate();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const [total, setTotal] = useState(0);
