@@ -257,13 +257,15 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
 
     const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const title = e.target.value;
-        const category = form.getFieldValue('category') || '';
-        generateTags(title, category);
+        const categoryId = form.getFieldValue('categoryId') || '';
+        const cat = categories.find(c => c.id === categoryId);
+        generateTags(title, cat ? cat.name : categoryId);
     };
 
-    const handleCategoryChange = (category: string) => {
+    const handleCategoryChange = (categoryId: string) => {
         const title = form.getFieldValue('title') || '';
-        generateTags(title, category);
+        const cat = categories.find(c => c.id === categoryId);
+        generateTags(title, cat ? cat.name : categoryId);
     };
 
     const generateTags = (title: string, category: string) => {
@@ -347,8 +349,10 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             const rawVideoFiles = videoFile.map(f => f.originFileObj).filter((f): f is RcFile => !!f);
             const base64Videos: string[] = await Promise.all(rawVideoFiles.map(convertToBase64));
 
+            const cat = categories.find(c => c.id === values.categoryId);
             const productPayload = {
                 ...values,
+                category: cat ? cat.name : 'Genel',
                 title: translations[activeLanguage]?.title || values.title || '',
                 description: translations[activeLanguage]?.description || values.description || '',
                 profitMargin: values.profitMargin || 0,
@@ -427,6 +431,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 priceMultiplier: initialValues?.priceMultiplier || 1,
                 marketplaces: initialValues?.marketplaces || ['golden'],
                 hasVariants: initialValues?.hasVariants || false,
+                categoryId: initialValues?.categoryId || (initialValues?.category ? categories.find(c => c.name === initialValues.category)?.id : undefined),
                 ...initialValues
             }}
             onFinish={onFinish}
@@ -481,9 +486,9 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
 
                 <Row gutter={16}>
                     <Col span={12}>
-                        <Form.Item name="category" label="Kategori" rules={[{ required: true, message: 'Kategori seçiniz' }]}>
+                        <Form.Item name="categoryId" label="Kategori" rules={[{ required: true, message: 'Kategori seçiniz' }]}>
                             <Select placeholder="Kategori Seçin" onChange={handleCategoryChange} disabled={isCloned}>
-                                {categories.map(c => <Option key={c.id} value={c.name}>{c.name}</Option>)}
+                                {categories.map(c => <Option key={c.id} value={c.id}>{c.name}</Option>)}
                             </Select>
                         </Form.Item>
                     </Col>
@@ -508,9 +513,11 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                                         <ThunderboltOutlined
                                             style={{ cursor: 'pointer', color: '#d4a017' }}
                                             onClick={() => {
-                                                const cat = (form.getFieldValue('category') || 'PRD').substring(0, 3).toUpperCase();
+                                                const catId = form.getFieldValue('categoryId') || '';
+                                                const cat = categories.find(c => c.id === catId);
+                                                const prefix = cat ? cat.name.substring(0, 3).toUpperCase() : 'PRD';
                                                 const ts = Date.now().toString().slice(-5);
-                                                form.setFieldValue('sku', `${cat}-${ts}`);
+                                                form.setFieldValue('sku', `${prefix}-${ts}`);
                                             }}
                                         />
                                     </Tooltip>

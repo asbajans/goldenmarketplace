@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Product, Store, ProductVariant } from '../models';
+import { Product, Store, ProductVariant, Category } from '../models';
 import { Op, Sequelize, WhereOptions } from 'sequelize';
 
 // Reusable golden marketplace filter as a raw SQL literal condition.
@@ -17,10 +17,19 @@ function applyTranslation(product: any, lang: string): any {
   const defaultLang = json.defaultLanguage || 'en';
   const trans = translations[lang] || {};
 
+  let categoryName = json.category || '';
+  if (json.categoryRef) {
+    const catTranslations = json.categoryRef.translations || {};
+    categoryName = catTranslations[lang]?.name || json.categoryRef.name || categoryName;
+  }
+
+  const { categoryRef, ...rest } = json;
+
   return {
-    ...json,
+    ...rest,
     title: trans.title || json.title,
     description: trans.description || json.description,
+    _categoryName: categoryName,
     _lang: lang,
     _defaultLang: defaultLang,
   };
@@ -100,8 +109,11 @@ export class MarketplaceController {
 
       const { count, rows: products } = await Product.findAndCountAll({
         where,
-        attributes: ['id', 'title', 'slug', 'category', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'description', 'discountRate'],
-        include: [includeStore],
+        attributes: ['id', 'title', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'description', 'discountRate'],
+        include: [
+          includeStore,
+          { model: Category, as: 'categoryRef', attributes: ['id', 'name', 'translations', 'slug'] }
+        ],
         limit,
         offset,
         order
@@ -129,7 +141,7 @@ export class MarketplaceController {
 
       const product = await Product.findOne({
         where: { slug, isActive: true },
-        attributes: ['id', 'title', 'description', 'slug', 'category', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'sku', 'quantity', 'gramWeight', 'marketplaces'],
+        attributes: ['id', 'title', 'description', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'sku', 'quantity', 'gramWeight', 'marketplaces'],
         include: [
           {
             model: Store,
@@ -140,7 +152,8 @@ export class MarketplaceController {
             model: ProductVariant,
             as: 'variants',
             attributes: ['id', 'sku', 'attributes', 'priceTRY', 'priceUSD', 'quantity']
-          }
+          },
+          { model: Category, as: 'categoryRef', attributes: ['id', 'name', 'translations', 'slug'] }
         ]
       });
 
@@ -208,7 +221,10 @@ export class MarketplaceController {
           isActive: true,
           ...goldenFilter
         },
-        attributes: ['id', 'title', 'slug', 'category', 'priceTRY', 'priceUSD', 'images', 'createdAt'],
+        attributes: ['id', 'title', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage'],
+        include: [
+          { model: Category, as: 'categoryRef', attributes: ['id', 'name', 'translations', 'slug'] }
+        ],
         limit,
         offset,
         order: [['createdAt', 'DESC']]
@@ -216,7 +232,7 @@ export class MarketplaceController {
 
       return res.json({
         store,
-        data: products,
+        data: products.map(p => applyTranslation(p, req.query.lang as string || 'en')),
         pagination: { page, limit, total: count, pages: Math.ceil(count / limit) }
       });
     } catch (error) {
@@ -231,45 +247,94 @@ export class MarketplaceController {
    */
   static async getCategories(_req: Request, res: Response) {
     try {
-      const results = await Product.findAll({
-        where: {
-          isActive: true,
-          ...goldenFilter
-        },
-        attributes: [
-          [Sequelize.fn('DISTINCT', Sequelize.col('category')), 'category'],
-          [Sequelize.fn('COUNT', Sequelize.col('id')), 'count']
-        ],
-        group: ['category'],
-        order: [[Sequelize.literal('count'), 'DESC']],
-        raw: true
-      });
+      const lang = (_req.query.lang as string) || 'en';
 
-      // Map raw category strings to category records (if available) to pick translations
-      const CategoryModel = require('../models').Category || require('../models/Category').default;
+      // 1) Categories by categoryId (clean path — products linked to admin categories)
+      const [idResults, stringResults] = await Promise.all([
+        Product.findAll({
+          where: {
+            isActive: true,
+            [Op.and]: [
+              Sequelize.literal('"categoryId" IS NOT NULL AND CAST("marketplaces" AS text) ILIKE \'%golden%\'')
+            ]
+          },
+          attributes: [
+            'categoryId',
+            [Sequelize.fn('COUNT', Sequelize.col('id')), 'count']
+          ],
+          group: ['categoryId'],
+          order: [[Sequelize.literal('count'), 'DESC']],
+          raw: true
+        }),
+        // 2) Legacy: products with only a raw category string (no categoryId)
+        Product.findAll({
+          where: {
+            isActive: true,
+            [Op.and]: [
+              Sequelize.literal('"categoryId" IS NULL AND CAST("marketplaces" AS text) ILIKE \'%golden%\'')
+            ]
+          },
+          attributes: [
+            [Sequelize.fn('DISTINCT', Sequelize.col('category')), 'category'],
+            [Sequelize.fn('COUNT', Sequelize.col('id')), 'count']
+          ],
+          group: ['category'],
+          order: [[Sequelize.literal('count'), 'DESC']],
+          raw: true
+        })
+      ]);
 
-      const mapped = await Promise.all(results.map(async (r: any) => {
+      const mapped: { name: string; slug: string; count: number }[] = [];
+
+      // Resolve categoryId → Category name + translations
+      if (idResults.length > 0) {
+        const catIds: string[] = (idResults as any[]).map((r: any) => r.categoryId).filter(Boolean);
+        const cats = await Category.findAll({ where: { id: catIds } });
+        const catMap = new Map(cats.map(c => [c.id, c]));
+
+        for (const r of idResults as any[]) {
+          const cat = catMap.get(r.categoryId);
+          if (cat) {
+            const trans = cat.translations || {};
+            mapped.push({
+              name: trans[lang]?.name || cat.name,
+              slug: cat.slug,
+              count: parseInt(r.count)
+            });
+          }
+        }
+      }
+
+      // Legacy raw-string categories
+      for (const r of stringResults as any[]) {
         const raw = r.category;
         let displayName = raw;
         let slug = raw;
 
         try {
-          const cat = await CategoryModel.findOne({ where: { [Op.or]: [{ slug: raw }, { name: raw }] } });
+          const cat = await Category.findOne({ where: { [Op.or]: [{ slug: raw }, { name: raw }] } });
           if (cat) {
             const json = cat.toJSON();
             const translations = json.translations || {};
-            const lang = (_req.query.lang as string) || 'en';
             displayName = translations[lang]?.name || json.name || raw;
             slug = json.slug || raw;
           }
         } catch (e) {
-          // ignore lookup errors and fall back to raw
+          // ignore
         }
 
-        return { name: displayName, slug, count: parseInt(r.count) };
-      }));
+        mapped.push({ name: displayName, slug, count: parseInt(r.count) });
+      }
 
-      return res.json({ data: mapped });
+      // Deduplicate by slug (prefer categoryId-resolved entries first)
+      const seen = new Set<string>();
+      const deduped = mapped.filter(c => {
+        if (seen.has(c.slug)) return false;
+        seen.add(c.slug);
+        return true;
+      });
+
+      return res.json({ data: deduped });
     } catch (error) {
       console.error('[Marketplace] getCategories error:', error);
       return res.status(500).json({ error: 'Failed to fetch categories' });

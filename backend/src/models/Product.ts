@@ -14,6 +14,7 @@ interface ProductAttributes {
   slug: string;
   description?: string;
   category: string;
+  categoryId?: string;
   sku: string;
   gramWeight: number;
   milyem: number;
@@ -52,6 +53,7 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public slug!: string;
   public description?: string;
   public category!: string;
+  public categoryId?: string;
   public translations?: any;
   public defaultLanguage?: string;
   public sku!: string;
@@ -115,6 +117,11 @@ Product.init(
     category: {
       type: DataTypes.STRING,
       allowNull: false
+    },
+    categoryId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: { model: 'categories', key: 'id' }
     },
     // @ts-ignore - translations column will be added via migration
     translations: {

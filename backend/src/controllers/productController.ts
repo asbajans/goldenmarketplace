@@ -92,7 +92,7 @@ export class ProductController {
   static async createProduct(req: Request, res: Response) {
     try {
       const {
-        title, description, category, sku, quantity,
+        title, description, category, categoryId, sku, quantity,
         images, videoUrl, marketplaces, marketplaceConfig, gramWeight, milyem, effectiveMilyem, profitMargin, priceMultiplier,
         isB2BEnabled, b2bDiscount, discountRate,
         hasVariants, variantAttributes, variants,
@@ -166,6 +166,7 @@ export class ProductController {
         slug: title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
         description,
         category,
+        categoryId: categoryId || null,
         // @ts-ignore - translations field added via migration
         translations: translations || {},
         // @ts-ignore - defaultLanguage field added via migration
@@ -262,7 +263,7 @@ export class ProductController {
     try {
       const { id } = req.params;
       const {
-        title, description, category, quantity,
+        title, description, category, categoryId, quantity,
         images, videoUrl, marketplaces, marketplaceConfig, gramWeight, milyem, effectiveMilyem, profitMargin, priceMultiplier,
         isB2BEnabled, b2bDiscount, discountRate,
         hasVariants, variantAttributes, variants
@@ -347,6 +348,7 @@ export class ProductController {
         title: isCloned ? product.title : (title || product.title),
         description: isCloned ? product.description : (description || product.description),
         category: isCloned ? product.category : (category || product.category),
+        categoryId: isCloned ? product.categoryId : (categoryId !== undefined ? categoryId : product.categoryId),
         gramWeight: finalGramWeight,
         milyem: finalMilyem,
         effectiveMilyem: finalEffectiveMilyem,

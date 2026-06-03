@@ -99,6 +99,10 @@ FeedSyncLog.belongsTo(ExternalFeed, { foreignKey: 'feedId', as: 'feed' });
 Product.belongsTo(ExternalFeed, { foreignKey: 'feedSourceId', as: 'feedSource' });
 ExternalFeed.hasMany(Product, { foreignKey: 'feedSourceId', as: 'feedProducts' });
 
+// Product -> Category (belongs to)
+Product.belongsTo(Category, { foreignKey: 'categoryId', as: 'categoryRef' });
+Category.hasMany(Product, { foreignKey: 'categoryId', as: 'products' });
+
 // Export all models
 export {
     User,

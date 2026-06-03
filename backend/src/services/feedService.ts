@@ -394,6 +394,7 @@ class FeedService {
             slug,
             description: prod.description || '',
             category: prod.category || feed.defaultCategory || 'Genel',
+            categoryId: prod.categoryId || feed.defaultCategoryId || undefined,
             sku: prod.sku,
             gramWeight: prod.gramWeight || 1,
             milyem: prod.milyem || 585,

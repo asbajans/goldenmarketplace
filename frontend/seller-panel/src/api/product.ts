@@ -13,6 +13,7 @@ export interface Product {
     priceUSD: number;
     quantity: number;
     category: string;
+    categoryId?: string;
     sku: string;
     images?: string[];
     videoUrl?: string;

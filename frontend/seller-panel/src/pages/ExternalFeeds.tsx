@@ -46,11 +46,23 @@ const ExternalFeeds: React.FC = () => {
   const [testResult, setTestResult] = useState<{ headers: string[]; sampleData: any[]; total: number } | null>(null);
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [categories, setCategories] = useState<any[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchFeeds();
+    fetchCategories();
   }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const { default: client } = await import('../api/client');
+      const { data } = await client.get('/categories');
+      setCategories(Array.isArray(data) ? data : []);
+    } catch {
+      // silent
+    }
+  };
 
   const fetchFeeds = async () => {
     setLoading(true);
@@ -417,8 +429,13 @@ const ExternalFeeds: React.FC = () => {
       <Divider>Varsayılan Ürün Değerleri</Divider>
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item name="defaultCategory" label="Varsayılan Kategori">
+          <Form.Item name="defaultCategory" label="Varsayılan Kategori (metin)">
             <Input placeholder="Örn: Pırlanta Takı" />
+          </Form.Item>
+          <Form.Item name="defaultCategoryId" label="Varsayılan Kategori ID">
+            <Select placeholder="Admin kategorisi seçin" allowClear>
+              {categories.map(c => <Option key={c.id} value={c.id}>{c.name}</Option>)}
+            </Select>
           </Form.Item>
         </Col>
         <Col span={8}>

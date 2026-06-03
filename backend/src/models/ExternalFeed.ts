@@ -16,6 +16,7 @@ interface ExternalFeedAttributes {
   defaultProfitMargin?: number;
   priceMultiplier: number;
   defaultCategory?: string;
+  defaultCategoryId?: string;
   defaultIsB2BEnabled?: boolean;
   defaultQuantity?: number;
   defaultMarketplaces?: string[];
@@ -44,6 +45,7 @@ class ExternalFeed extends Model<ExternalFeedAttributes> implements ExternalFeed
   public defaultProfitMargin?: number;
   public priceMultiplier!: number;
   public defaultCategory?: string;
+  public defaultCategoryId?: string;
   public defaultIsB2BEnabled?: boolean;
   public defaultQuantity?: number;
   public defaultMarketplaces?: string[];
@@ -123,6 +125,11 @@ ExternalFeed.init(
     defaultCategory: {
       type: DataTypes.STRING,
       allowNull: true
+    },
+    defaultCategoryId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: { model: 'categories', key: 'id' }
     },
     defaultIsB2BEnabled: {
       type: DataTypes.BOOLEAN,
