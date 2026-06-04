@@ -122,9 +122,24 @@ export const AdminAPI = {
     getOrderStats: () => api.get('/stats/orders').then((res) => res.data),
 
     // AI Settings
-    getAISettings: () => api.get('/ai/admin/settings').then((res) => res.data),
-    updateAISettings: (data: any) => api.put('/ai/admin/settings', data).then((res) => res.data),
-    testAIConnection: () => api.post('/ai/admin/settings/test').then((res) => res.data),
+    getAISettings: () => {
+        const token = localStorage.getItem('token');
+        return axios.get(`${API_URL}/ai/admin/settings`, {
+            headers: { Authorization: `Bearer ${token}` }
+        }).then((res) => res.data);
+    },
+    updateAISettings: (data: any) => {
+        const token = localStorage.getItem('token');
+        return axios.put(`${API_URL}/ai/admin/settings`, data, {
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+        }).then((res) => res.data);
+    },
+    testAIConnection: () => {
+        const token = localStorage.getItem('token');
+        return axios.post(`${API_URL}/ai/admin/settings/test`, {}, {
+            headers: { Authorization: `Bearer ${token}` }
+        }).then((res) => res.data);
+    },
 };
 
 export default api;
