@@ -49,13 +49,13 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       maxRedirects: 3,
     });
 
-    const contentType = response.headers['content-type'];
+    const contentType = String(response.headers['content-type'] || '');
     if (contentType && !contentType.startsWith('image/')) {
       res.status(400).json({ error: 'URL does not point to an image' });
       return;
     }
 
-    let contentLength = parseInt(response.headers['content-length'] || '0', 10);
+    let contentLength = parseInt(String(response.headers['content-length'] || '0'), 10);
     if (contentLength > MAX_FILE_SIZE) {
       res.status(413).json({ error: 'Image too large' });
       return;
