@@ -397,7 +397,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             const cat = categories.find(c => c.id === values.categoryId);
             const productPayload = {
                 ...values,
-                category: cat ? cat.name : 'Genel',
+                category: cat ? cat.slug : 'genel',
                 title: translations[activeLanguage]?.title || values.title || '',
                 description: translations[activeLanguage]?.description || values.description || '',
                 profitMargin: values.profitMargin || 0,

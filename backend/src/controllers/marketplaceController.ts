@@ -92,28 +92,33 @@ export class MarketplaceController {
       if (hideOutOfStock) where.quantity = { [Op.gt]: 0 };
       if (search) where.title = { [Op.iLike]: `%${search}%` };
       if (category) {
-        const categoryVariants: Record<string, string[]> = {
-          rings: ['rings', 'yüzük', 'yuzuk', 'anelli', 'anelli', 'خواتم', 'khatim', 'anillos'],
-          necklaces: ['necklaces', 'kolye', 'collane', 'قلائد', 'qalayed', 'collares'],
-          bracelets: ['bracelets', 'bilezik', 'bracciali', 'أساور', 'asawer', 'pulseras'],
-          earrings: ['earrings', 'küpe', 'kupe', 'orecchini', 'أقراط', 'aqrat', 'aretes'],
-          pendants: ['pendants', 'kolye ucu', 'kolye-ucu', 'ciondoli', 'pendenti', 'دلايات', 'dulaya', 'colgantes'],
-          sets: ['sets', 'takı seti', 'taki seti', 'taki-seti', 'set', 'مجموعات', 'majmueat', 'juegos'],
-        };
+        const catBySlug = await Category.findOne({ where: { slug: category } });
+        if (catBySlug) {
+          where.categoryId = catBySlug.id;
+        } else {
+          const categoryVariants: Record<string, string[]> = {
+            rings: ['rings', 'yüzük', 'yuzuk', 'anelli', 'anelli', 'خواتم', 'khatim', 'anillos'],
+            necklaces: ['necklaces', 'kolye', 'collane', 'قلائد', 'qalayed', 'collares'],
+            bracelets: ['bracelets', 'bilezik', 'bracciali', 'أساور', 'asawer', 'pulseras'],
+            earrings: ['earrings', 'küpe', 'kupe', 'orecchini', 'أقراط', 'aqrat', 'aretes'],
+            pendants: ['pendants', 'kolye ucu', 'kolye-ucu', 'ciondoli', 'pendenti', 'دلايات', 'dulaya', 'colgantes'],
+            sets: ['sets', 'takı seti', 'taki seti', 'taki-seti', 'set', 'مجموعات', 'majmueat', 'juegos'],
+          };
 
-        const catLower = category.toLowerCase().trim();
-        let allTerms: string[] = [catLower, category];
+          const catLower = category.toLowerCase().trim();
+          let allTerms: string[] = [catLower, category];
 
-        for (const [, terms] of Object.entries(categoryVariants)) {
-          if (terms.some(t => t === catLower || t.includes(catLower) || catLower.includes(t))) {
-            allTerms = [...new Set([...allTerms, ...terms])];
-            break;
+          for (const [, terms] of Object.entries(categoryVariants)) {
+            if (terms.some(t => t === catLower || t.includes(catLower) || catLower.includes(t))) {
+              allTerms = [...new Set([...allTerms, ...terms])];
+              break;
+            }
           }
-        }
 
-        where.category = {
-          [Op.or]: allTerms.map(term => ({ [Op.iLike]: `%${term}%` }))
-        };
+          where.category = {
+            [Op.or]: allTerms.map(term => ({ [Op.iLike]: `%${term}%` }))
+          };
+        }
       }
       if (minPrice !== null || maxPrice !== null) {
         where.priceTRY = {};
