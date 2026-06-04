@@ -134,9 +134,9 @@ export const AdminAPI = {
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
         }).then((res) => res.data);
     },
-    testAIConnection: () => {
+    testAIConnection: (data?: any) => {
         const token = localStorage.getItem('token');
-        return axios.post(`${API_URL}/ai/admin/settings/test`, {}, {
+        return axios.post(`${API_URL}/ai/admin/settings/test`, data || {}, {
             headers: { Authorization: `Bearer ${token}` }
         }).then((res) => res.data);
     },

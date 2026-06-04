@@ -37,11 +37,16 @@ export class AIController {
     }
   }
 
-  static async testAIConnection(_req: Request, res: Response) {
+  static async testAIConnection(req: Request, res: Response) {
     try {
       const result = await aiService.generateContent(
         'You are a helpful assistant. Reply with exactly: OK',
-        'Test connection'
+        'Test connection',
+        {
+          apiKey: req.body.api_key || req.body.ai_api_key,
+          provider: req.body.provider || req.body.ai_provider,
+          model: req.body.model || req.body.ai_model,
+        }
       );
       return res.json({ success: result.success, message: result.success ? 'Connection successful' : result.error });
     } catch (error: any) {

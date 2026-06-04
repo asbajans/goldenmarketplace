@@ -25,8 +25,11 @@ class AIService {
     return { provider, apiKey, model };
   }
 
-  async generateContent(systemPrompt: string, userPrompt: string): Promise<AIResponse> {
-    const { provider, apiKey, model } = await this.getSettings();
+  async generateContent(systemPrompt: string, userPrompt: string, overrides?: { provider?: string; apiKey?: string; model?: string }): Promise<AIResponse> {
+    const dbSettings = await this.getSettings();
+    const provider = overrides?.provider || dbSettings.provider;
+    const apiKey = overrides?.apiKey || dbSettings.apiKey;
+    const model = overrides?.model || dbSettings.model;
 
     if (!apiKey) {
       return { success: false, content: '', error: 'AI API Key not configured.' };

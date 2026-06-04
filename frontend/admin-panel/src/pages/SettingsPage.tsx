@@ -68,7 +68,8 @@ export default function SettingsPage() {
         try {
             setTestingAI(true);
             setAITestResult(null);
-            const res = await AdminAPI.testAIConnection();
+            const values = aiForm.getFieldsValue();
+            const res = await AdminAPI.testAIConnection(values);
             setAITestResult(res);
             if (res.success) message.success('Bağlantı başarılı!');
             else message.error(res.message);
