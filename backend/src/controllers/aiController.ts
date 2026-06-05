@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { Product } from '../models';
+import { Op } from 'sequelize';
+import { Product, Store } from '../models';
 import ProductAITask from '../models/ProductAITask';
 import GlobalSetting from '../models/GlobalSetting';
 import aiService from '../services/aiService';
@@ -202,6 +203,110 @@ export class AIController {
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
     }
+  }
+
+  // ─── Synchronous All-Languages Description Generation ───
+
+  static async generateAllDescriptionsSync(req: Request, res: Response) {
+    try {
+      const userId = (req as any).user.id;
+      const { title, category, tags } = req.body;
+
+      if (!title || !category) {
+        return res.status(400).json({ error: 'title and category are required' });
+      }
+
+      const access = await planAccessService.checkAIAccess(userId, 2);
+      if (!access.allowed) {
+        return res.status(403).json({ error: access.message, credits: access });
+      }
+
+      const tagsStr = Array.isArray(tags) ? tags.join(', ') : (tags || '');
+      const allDescriptions = await aiService.generateAllDescriptions(title, category, tagsStr);
+
+      if (Object.keys(allDescriptions).length === 0) {
+        return res.status(500).json({ error: 'AI açıklama oluşturamadı' });
+      }
+
+      await planAccessService.deductCredits(userId, 2);
+      return res.json({ translations: allDescriptions });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  // ─── Cleanup Descriptions ───
+
+  static async cleanupDescriptions(req: Request, res: Response) {
+    try {
+      const userId = (req as any).user.id;
+      const { keyword, action } = req.body;
+
+      if (!action || !['clear_matching', 'clear_all'].includes(action)) {
+        return res.status(400).json({ error: 'action must be "clear_matching" or "clear_all"' });
+      }
+
+      const store = await Store.findOne({ where: { userId } });
+      if (!store) return res.status(404).json({ error: 'Store not found' });
+      const storeId = store.id;
+
+      let count = 0;
+
+      if (action === 'clear_all') {
+        const products = await Product.findAll({ where: { storeId } });
+        for (const p of products) {
+          const pt = p as any;
+          pt.description = '';
+          pt.translations = pt.translations ? this.clearAllDescriptions(pt.translations) : pt.translations;
+          await pt.save();
+        }
+        count = products.length;
+      } else if (action === 'clear_matching') {
+        if (!keyword) {
+          return res.status(400).json({ error: 'keyword is required for clear_matching action' });
+        }
+        const products = await Product.findAll({
+          where: {
+            storeId,
+            description: { [Op.iLike]: `%${keyword}%` }
+          }
+        });
+        for (const p of products) {
+          const pt = p as any;
+          const desc = (p.description || '').toLowerCase();
+          const kw = keyword.toLowerCase();
+          pt.description = desc.includes(kw) ? '' : p.description;
+          pt.translations = pt.translations ? this.clearMatchingFromTranslations(pt.translations, kw) : pt.translations;
+          await pt.save();
+        }
+        count = products.length;
+      }
+
+      return res.json({ cleaned: count, message: `${count} ürünün açıklaması temizlendi` });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  private static clearAllDescriptions(translations: any): any {
+    const result: any = {};
+    for (const key of Object.keys(translations)) {
+      result[key] = { ...translations[key], description: '' };
+    }
+    return result;
+  }
+
+  private static clearMatchingFromTranslations(translations: any, keyword: string): any {
+    const result: any = {};
+    for (const key of Object.keys(translations)) {
+      const t = translations[key];
+      const desc = (t?.description || '').toLowerCase();
+      result[key] = {
+        ...t,
+        description: desc.includes(keyword) ? '' : (t?.description || ''),
+      };
+    }
+    return result;
   }
 
   // ─── Bulk AI ───

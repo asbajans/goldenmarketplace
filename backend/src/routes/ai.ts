@@ -16,6 +16,10 @@ router.get('/products/:id/ai-status', authMiddleware, AIController.getProductAIS
 
 // Synchronous AI (no queue, real-time)
 router.post('/generate-description', authMiddleware, AIController.generateDescriptionSync);
+router.post('/generate-all-descriptions', authMiddleware, AIController.generateAllDescriptionsSync);
+
+// Cleanup AI
+router.post('/cleanup-descriptions', authMiddleware, AIController.cleanupDescriptions);
 
 // Seller AI task list
 router.get('/tasks', authMiddleware, AIController.listAITasks);

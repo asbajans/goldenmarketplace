@@ -24,3 +24,9 @@ export const bulkAITranslate = (productIds: string[], taskType = 'both') =>
 
 export const generateDescriptionSync = (title: string, category: string, tags?: string[]) =>
   client.post('/ai/generate-description', { title, category, tags }).then(res => res.data);
+
+export const generateAllDescriptionsSync = (title: string, category: string, tags?: string[]) =>
+  client.post('/ai/generate-all-descriptions', { title, category, tags }).then(res => res.data);
+
+export const cleanupDescriptions = (keyword: string, action: 'clear_matching' | 'clear_all') =>
+  client.post('/ai/cleanup-descriptions', { keyword, action }).then(res => res.data);

@@ -13,7 +13,7 @@ import {
     ShopOutlined, CheckCircleOutlined, ThunderboltOutlined, MinusCircleOutlined
 } from '@ant-design/icons';
 import { createProduct, updateProduct } from '../api/product';
-import { translateProduct, generateDescriptionSync, getProductAIStatus } from '../api/ai';
+import { generateDescriptionSync, generateAllDescriptionsSync } from '../api/ai';
 import client from '../api/client';
 
 const { Option } = Select;
@@ -83,7 +83,6 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [fetchingEtsyProfiles, setFetchingEtsyProfiles] = useState(false);
     const [activeLanguage, setActiveLanguage] = useState('en');
     const [aiLoading, setAILoading] = useState<string | null>(null);
-    const [aiTaskStatus, setAiTaskStatus] = useState<{ status: string; taskType: string; progress: number } | null>(null);
     const [translations, setTranslations] = useState<Record<string, any>>({
         en: { title: '', description: '', keywords: '' },
         tr: { title: '', description: '', keywords: '' },
@@ -140,40 +139,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 });
             }, 100);
         }
-
-        if (initialValues?.id) {
-            fetchAIStatus(initialValues.id);
-        }
     }, []);
-
-    const fetchAIStatus = async (productId: string) => {
-        try {
-            const tasks = await getProductAIStatus(productId);
-            const latest = tasks?.[0];
-            if (latest && latest.status !== 'completed' && latest.status !== 'failed') {
-                setAiTaskStatus({ status: latest.status, taskType: latest.taskType, progress: latest.progress || 0 });
-                // poll until done
-                const poll = async () => {
-                    try {
-                        const updated = await getProductAIStatus(productId);
-                        const u = updated?.[0];
-                        if (!u) return;
-                        if (u.status === 'completed' || u.status === 'failed') {
-                            setAiTaskStatus({ status: u.status, taskType: u.taskType, progress: 100 });
-                            if (u.status === 'completed') {
-                                message.success('AI işlemi tamamlandı! Sayfa yenileniyor...');
-                                setTimeout(() => window.location.reload(), 1500);
-                            }
-                            return;
-                        }
-                        setAiTaskStatus({ status: u.status, taskType: u.taskType, progress: u.progress || 0 });
-                        setTimeout(poll, 3000);
-                    } catch { /* stop */ }
-                };
-                setTimeout(poll, 3000);
-            }
-        } catch { /* ignore */ }
-    };
 
     useEffect(() => {
         if (selectedMarketplaces.includes('etsy') && etsyShippingProfiles.length === 0) {
@@ -336,44 +302,36 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         }
     };
 
-    const handleAITranslate = async () => {
-        if (!initialValues?.id) {
-            message.warning('Önce ürünü kaydedin, ardından AI ile çevirebilirsiniz.');
+    const handleAIGenerateAllDescriptions = async () => {
+        const title = translations[activeLanguage]?.title || form.getFieldValue('title');
+        if (!title) {
+            message.warning('Önce ürün adını girin.');
             return;
         }
-        setAILoading('translate');
+        const categoryId = form.getFieldValue('categoryId');
+        const cat = categories.find(c => c.id === categoryId);
+        const categoryName = cat?.name || categoryId || 'Genel';
+
+        setAILoading('all');
         try {
-            const res = await translateProduct(initialValues.id);
-            message.success(res.message || 'AI çeviri kuyruğa alındı');
-            checkTranslationStatus(initialValues.id);
+            const res = await generateAllDescriptionsSync(title, categoryName, tags);
+            if (res.translations) {
+                setTranslations(prev => {
+                    const updated = { ...prev };
+                    for (const lang of Object.keys(res.translations)) {
+                        if (updated[lang]) {
+                            updated[lang] = { ...updated[lang], description: res.translations[lang] };
+                        }
+                    }
+                    return updated;
+                });
+                message.success('Tüm dillerde açıklama oluşturuldu!');
+            }
         } catch (err: any) {
-            message.error(err?.response?.data?.error || 'AI çeviri başarısız');
+            message.error(err?.response?.data?.error || 'Açıklamalar oluşturulamadı');
         } finally {
             setAILoading(null);
         }
-    };
-
-    const checkTranslationStatus = (productId: string) => {
-        const poll = async () => {
-            try {
-                const tasks = await getProductAIStatus(productId);
-                const latestTask = tasks?.[0];
-                if (!latestTask) return;
-                if (latestTask.status === 'completed') {
-                    message.success('Çeviri tamamlandı! Sayfa yenileniyor...');
-                    setTimeout(() => window.location.reload(), 1500);
-                    return;
-                }
-                if (latestTask.status === 'failed') {
-                    message.error(latestTask.result?.error || 'Çeviri başarısız oldu.');
-                    return;
-                }
-                setTimeout(poll, 3000);
-            } catch {
-                // stop polling on error
-            }
-        };
-        setTimeout(poll, 2000);
     };
 
     const generateTags = (title: string, category: string) => {
@@ -978,26 +936,17 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                             onClick={() => handleAIGenerateContent()}
                             disabled={isCloned}
                         >
-                            AI ile Açıklama Oluştur
+                            AI ile Açıklama Oluştur ({LANGUAGES.find(l => l.key === activeLanguage)?.label || activeLanguage})
                         </Button>
                         <Button
                             size="small"
                             icon={<ThunderboltOutlined />}
-                            loading={aiLoading === 'translate'}
-                            onClick={() => handleAITranslate()}
-                            disabled={isCloned || !initialValues?.id}
+                            loading={aiLoading === 'all'}
+                            onClick={() => handleAIGenerateAllDescriptions()}
+                            disabled={isCloned}
                         >
-                            AI ile Tüm Dillere Çevir
+                            AI ile Tüm Dillere Açıklama Oluştur
                         </Button>
-                        {aiTaskStatus && (
-                            <Tag color={aiTaskStatus.status === 'completed' ? 'green' : aiTaskStatus.status === 'failed' ? 'red' : 'processing'}>
-                                {aiTaskStatus.status === 'processing' || aiTaskStatus.status === 'pending'
-                                    ? `${aiTaskStatus.taskType === 'translate' ? 'Çeviri' : 'İçerik'} işleniyor... (%${aiTaskStatus.progress})`
-                                    : aiTaskStatus.status === 'completed'
-                                        ? 'İşlem tamamlandı'
-                                        : 'İşlem başarısız'}
-                            </Tag>
-                        )}
                     </Space>
                 </Form.Item>
             </Card>

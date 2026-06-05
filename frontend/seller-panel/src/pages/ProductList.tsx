@@ -1,9 +1,9 @@
 
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Space, message, Modal, Tabs, Tag, Switch, Typography, Input, Checkbox, Row, Col, Tooltip } from 'antd';
+import { Table, Button, Space, message, Modal, Tabs, Tag, Switch, Typography, Input, Checkbox, Row, Col, Tooltip, Select } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined, DollarOutlined, GoldOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { deleteProduct, getAutoSyncStatus, setAutoSyncStatus, triggerManualSync, Product } from '../api/product';
-import { bulkAITranslate } from '../api/ai';
+import { bulkAITranslate, cleanupDescriptions } from '../api/ai';
 import client from '../api/client';
 import AddProduct from './AddProduct';
 import AITaskProgress from './AITaskProgress';
@@ -24,6 +24,10 @@ const ProductList: React.FC = () => {
     const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
     const [translateLoading, setTranslateLoading] = useState(false);
     const [aiProgressVisible, setAiProgressVisible] = useState(false);
+    const [cleanupModalOpen, setCleanupModalOpen] = useState(false);
+    const [cleanupKeyword, setCleanupKeyword] = useState('');
+    const [cleanupAction, setCleanupAction] = useState<'clear_matching' | 'clear_all'>('clear_matching');
+    const [cleanupLoading, setCleanupLoading] = useState(false);
 
     useEffect(() => {
         fetchProducts(searchTerm, selectedMarketplaces);
@@ -148,6 +152,25 @@ const ProductList: React.FC = () => {
             message.error(err?.response?.data?.error || 'Toplu çeviri başlatılamadı');
         } finally {
             setTranslateLoading(false);
+        }
+    };
+
+    const handleCleanup = async () => {
+        if (cleanupAction === 'clear_matching' && !cleanupKeyword.trim()) {
+            message.warning('Lütfen temizlenecek kelimeyi girin.');
+            return;
+        }
+        setCleanupLoading(true);
+        try {
+            const res = await cleanupDescriptions(cleanupKeyword.trim(), cleanupAction);
+            message.success(res.message || `${res.cleaned} ürün temizlendi`);
+            setCleanupModalOpen(false);
+            setCleanupKeyword('');
+            fetchProducts();
+        } catch (err: any) {
+            message.error(err?.response?.data?.error || 'Temizleme başarısız');
+        } finally {
+            setCleanupLoading(false);
         }
     };
 
@@ -315,24 +338,31 @@ const ProductList: React.FC = () => {
                              />
                          </div>
 
-                         <Button type="default" icon={<SyncOutlined spin={syncing} />} onClick={handleManualSync} loading={syncing}>
-                             Fiyatları Senkronize Et
-                         </Button>
-                          <Tooltip title={selectedRowKeys.length === 0 ? 'Önce ürünleri seçin' : ''}>
-                              <Button
-                                  type="default"
-                                  icon={<ThunderboltOutlined />}
-                                  onClick={handleBulkTranslate}
-                                  loading={translateLoading}
-                                  disabled={selectedRowKeys.length === 0}
-                                  style={{ borderColor: '#722ed1', color: '#722ed1' }}
-                              >
-                                  AI ile Çevir ({selectedRowKeys.length})
-                              </Button>
-                          </Tooltip>
-                          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-                              Yeni Ürün Ekle
+                          <Button type="default" icon={<SyncOutlined spin={syncing} />} onClick={handleManualSync} loading={syncing}>
+                              Fiyatları Senkronize Et
                           </Button>
+                           <Tooltip title={selectedRowKeys.length === 0 ? 'Önce ürünleri seçin' : ''}>
+                               <Button
+                                   type="default"
+                                   icon={<ThunderboltOutlined />}
+                                   onClick={handleBulkTranslate}
+                                   loading={translateLoading}
+                                   disabled={selectedRowKeys.length === 0}
+                                   style={{ borderColor: '#722ed1', color: '#722ed1' }}
+                               >
+                                   AI ile Çevir ({selectedRowKeys.length})
+                               </Button>
+                           </Tooltip>
+                           <Button
+                               type="default"
+                               onClick={() => setCleanupModalOpen(true)}
+                               style={{ borderColor: '#ff4d4f', color: '#ff4d4f' }}
+                           >
+                               Açıklamaları Temizle
+                           </Button>
+                           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+                               Yeni Ürün Ekle
+                           </Button>
                       </Space>
                  </Col>
              </Row>
@@ -350,6 +380,43 @@ const ProductList: React.FC = () => {
                     initialValues={editingProduct}
                     onSuccess={() => handleModalClose(true)}
                 />
+            </Modal>
+
+            <Modal
+                title="Açıklamaları Temizle"
+                open={cleanupModalOpen}
+                onCancel={() => { setCleanupModalOpen(false); setCleanupKeyword(''); }}
+                onOk={handleCleanup}
+                confirmLoading={cleanupLoading}
+                okText="Temizle"
+                okButtonProps={{ danger: true }}
+            >
+                <div style={{ marginBottom: 16 }}>
+                    <Text>Bu işlem ürün açıklamalarını kalıcı olarak temizler.</Text>
+                </div>
+                <div style={{ marginBottom: 12 }}>
+                    <Text strong>Eylem</Text>
+                    <Select
+                        value={cleanupAction}
+                        onChange={v => setCleanupAction(v)}
+                        style={{ width: '100%', marginTop: 4 }}
+                        options={[
+                            { label: 'Kelime/ifade içerenleri temizle', value: 'clear_matching' },
+                            { label: 'Tüm ürünlerin açıklamalarını temizle', value: 'clear_all' }
+                        ]}
+                    />
+                </div>
+                {cleanupAction === 'clear_matching' && (
+                    <div>
+                        <Text strong>Temizlenecek kelime veya cümle</Text>
+                        <Input
+                            value={cleanupKeyword}
+                            onChange={e => setCleanupKeyword(e.target.value)}
+                            placeholder="Örn: &amp;amp;lt;, gratis, ürün açıklaması"
+                            style={{ marginTop: 4 }}
+                        />
+                    </div>
+                )}
             </Modal>
 
             <AITaskProgress

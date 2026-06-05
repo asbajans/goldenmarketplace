@@ -147,6 +147,49 @@ Do NOT include HTML tags, markdown, or meta text. Return ONLY the description te
     return map[code] || code;
   }
 
+  async generateAllDescriptions(title: string, category: string, tags?: string): Promise<Record<string, string>> {
+    const languages = [
+      { code: 'tr', name: 'Turkish' },
+      { code: 'en', name: 'English' },
+      { code: 'it', name: 'Italian' },
+      { code: 'es', name: 'Spanish' },
+      { code: 'ar', name: 'Arabic' },
+    ];
+
+    const langList = languages.map(l => `${l.code}: ${l.name}`).join(', ');
+    const res = await this.generateContent(
+      `You are a professional jewelry product description writer for an e-commerce marketplace.
+Generate a short, persuasive product description (2-4 sentences) for EACH of the following languages: ${langList}.
+
+Return a valid JSON object where keys are language codes and values are the description strings.
+Example format: {"tr": "Türkçe açıklama...", "en": "English description...", "it": "Descrizione italiana...", "es": "Descripción en español...", "ar": "وصف باللغة العربية..."}
+
+Cover: product type, material quality, craftsmanship, gifting occasions.
+Do NOT wrap the JSON in markdown code blocks. Return ONLY raw JSON.`,
+      `Title: ${title}\nCategory: ${category}${tags ? `\nKeywords: ${tags}` : ''}`
+    );
+
+    if (res.success) {
+      try {
+        const parsed = JSON.parse(res.content);
+        const result: Record<string, string> = {};
+        for (const l of languages) {
+          if (parsed[l.code] && typeof parsed[l.code] === 'string' && parsed[l.code].length > 5) {
+            result[l.code] = parsed[l.code];
+          }
+        }
+        if (Object.keys(result).length >= 3) return result;
+      } catch { /* fallback to per-language */ }
+    }
+
+    const result: Record<string, string> = {};
+    for (const l of languages) {
+      const desc = await this.generateProductDescription(title, category, l.name, tags);
+      if (desc && desc !== title) result[l.code] = desc;
+    }
+    return result;
+  }
+
   async generateSEOMeta(productTitle: string, category: string, description: string): Promise<{ title: string, description: string }> {
      const res = await this.generateContent(
        `You are an SEO expert for an e-commerce jewelry store. Create a JSON object with 'title' (max 60 chars) and 'description' (max 160 chars) based on the input. Return raw JSON without markdown formatting.`,
