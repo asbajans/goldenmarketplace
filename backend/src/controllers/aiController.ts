@@ -257,7 +257,7 @@ export class AIController {
         for (const p of products) {
           const pt = p as any;
           pt.description = '';
-          pt.translations = pt.translations ? this.clearAllDescriptions(pt.translations) : pt.translations;
+          pt.translations = pt.translations ? AIController.clearAllDescriptions(pt.translations) : pt.translations;
           await pt.save();
         }
         count = products.length;
@@ -276,7 +276,7 @@ export class AIController {
           const desc = (p.description || '').toLowerCase();
           const kw = keyword.toLowerCase();
           pt.description = desc.includes(kw) ? '' : p.description;
-          pt.translations = pt.translations ? this.clearMatchingFromTranslations(pt.translations, kw) : pt.translations;
+          pt.translations = pt.translations ? AIController.clearMatchingFromTranslations(pt.translations, kw) : pt.translations;
           await pt.save();
         }
         count = products.length;
