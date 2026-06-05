@@ -387,10 +387,24 @@ export class AdminController {
             if (!product) return res.status(404).json({ error: 'Product not found' });
 
             const {
-                title, description, category, gramWeight, milyem, effectiveMilyem,
+                title, description, category, categoryId, gramWeight, milyem, effectiveMilyem,
                 profitMargin, isB2BEnabled, b2bDiscount, quantity, isActive,
                 images, marketplaces
             } = req.body;
+
+            // If categoryId is provided, derive the raw category string from the Category record
+            let finalCategory = category ?? product.category;
+            let finalCategoryId = categoryId !== undefined ? categoryId : product.categoryId;
+            if (categoryId) {
+                const Category = require('../models/Category').default;
+                const cat = await Category.findByPk(categoryId);
+                if (cat) {
+                    finalCategory = cat.slug;
+                    finalCategoryId = cat.id;
+                }
+            } else if (category && category !== product.category) {
+                finalCategoryId = null;
+            }
 
             const goldPriceService = require('../services/goldPriceService').default;
             const finalMilyem = milyem ?? product.milyem;
@@ -406,7 +420,8 @@ export class AdminController {
             await product.update({
                 title: title ?? product.title,
                 description: description ?? product.description,
-                category: category ?? product.category,
+                category: finalCategory,
+                categoryId: finalCategoryId,
                 gramWeight: finalGram,
                 milyem: finalMilyem,
                 effectiveMilyem: finalEffective,

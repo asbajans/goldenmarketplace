@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Card, Button, Modal, Form, Input, InputNumber, Switch, message, Tag, Space } from 'antd';
+import { Table, Card, Button, Modal, Form, Input, InputNumber, Switch, Select, message, Tag, Space } from 'antd';
 import { EditOutlined, SearchOutlined } from '@ant-design/icons';
 import { AdminAPI } from '../services/api';
 
 export const ProductsPage: React.FC = () => {
     const [products, setProducts] = useState<any[]>([]);
+    const [categories, setCategories] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchText, setSearchText] = useState('');
     const [pagination, setPagination] = useState({ current: 1, pageSize: 50, total: 0 });
@@ -31,12 +32,19 @@ export const ProductsPage: React.FC = () => {
 
     useEffect(() => {
         fetchProducts();
+        AdminAPI.getCategories().then(setCategories).catch(() => {});
     }, []);
 
     const handleEdit = (record: any) => {
         setEditingProduct(record);
+        const catId = record.categoryId ||
+            categories.find(c =>
+                c.name === record.category ||
+                c.slug === record.category
+            )?.id || null;
         form.setFieldsValue({
             title: record.title,
+            categoryId: catId,
             category: record.category,
             gramWeight: record.gramWeight,
             milyem: record.milyem,
@@ -157,8 +165,21 @@ export const ProductsPage: React.FC = () => {
                     </Form.Item>
 
                     <Space size="large" style={{ display: 'flex', marginBottom: 8 }}>
-                        <Form.Item name="category" label="Kategori" rules={[{ required: true }]}>
-                            <Input style={{ width: 200 }} />
+                        <Form.Item name="categoryId" label="Kategori" rules={[{ required: true }]}>
+                            <Select
+                                style={{ width: 200 }}
+                                placeholder="Kategori Seçin"
+                                showSearch
+                                optionFilterProp="label"
+                                onChange={(val: string) => {
+                                    const cat = categories.find(c => c.id === val);
+                                    if (cat) form.setFieldValue('category', cat.slug);
+                                }}
+                                options={categories.map((c: any) => ({
+                                    value: c.id,
+                                    label: c.name
+                                }))}
+                            />
                         </Form.Item>
                         <Form.Item name="quantity" label="Kalan Stok" rules={[{ required: true }]}>
                             <InputNumber min={0} style={{ width: 120 }} />
@@ -167,6 +188,9 @@ export const ProductsPage: React.FC = () => {
                             <Switch />
                         </Form.Item>
                     </Space>
+                    <Form.Item name="category" hidden>
+                        <Input />
+                    </Form.Item>
 
                     <Card size="small" title="Fiyat & Altın Ayarları" style={{ marginBottom: 16 }}>
                         <Space size="middle" wrap>

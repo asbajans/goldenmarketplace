@@ -14,26 +14,60 @@ const goldenFilter: WhereOptions = {
 // Fallback translations for category strings that aren't linked to the Category model.
 // Used when a product's categoryId is null and only the raw category string is available.
 const FALLBACK_CATEGORY_TRANSLATIONS: Record<string, Record<string, string>> = {
+  // Genel / General
   Genel: { en: 'General', tr: 'Genel', it: 'Generale', es: 'General', ar: 'عام' },
+  genel: { en: 'General', tr: 'Genel', it: 'Generale', es: 'General', ar: 'عام' },
   General: { en: 'General', tr: 'Genel', it: 'Generale', es: 'General', ar: 'عام' },
-  Bilezik: { en: 'Bracelets', tr: 'Bilezik', it: 'Bracciali', es: 'Pulseras', ar: 'أساور' },
-  Bracelets: { en: 'Bracelets', tr: 'Bilezik', it: 'Bracciali', es: 'Pulseras', ar: 'أساور' },
-  bracelet: { en: 'Bracelets', tr: 'Bilezik', it: 'Bracciali', es: 'Pulseras', ar: 'أساور' },
+  general: { en: 'General', tr: 'Genel', it: 'Generale', es: 'General', ar: 'عام' },
+  // Yüzük / Rings
   Yüzük: { en: 'Rings', tr: 'Yüzük', it: 'Anelli', es: 'Anillos', ar: 'خواتم' },
+  yüzük: { en: 'Rings', tr: 'Yüzük', it: 'Anelli', es: 'Anillos', ar: 'خواتم' },
+  yuzuk: { en: 'Rings', tr: 'Yüzük', it: 'Anelli', es: 'Anillos', ar: 'خواتم' },
   Rings: { en: 'Rings', tr: 'Yüzük', it: 'Anelli', es: 'Anillos', ar: 'خواتم' },
   rings: { en: 'Rings', tr: 'Yüzük', it: 'Anelli', es: 'Anillos', ar: 'خواتم' },
+  // Kolye / Necklaces
   Kolye: { en: 'Necklaces', tr: 'Kolye', it: 'Collane', es: 'Collares', ar: 'قلائد' },
+  kolye: { en: 'Necklaces', tr: 'Kolye', it: 'Collane', es: 'Collares', ar: 'قلائد' },
   Necklaces: { en: 'Necklaces', tr: 'Kolye', it: 'Collane', es: 'Collares', ar: 'قلائد' },
   necklaces: { en: 'Necklaces', tr: 'Kolye', it: 'Collane', es: 'Collares', ar: 'قلائد' },
+  necklace: { en: 'Necklaces', tr: 'Kolye', it: 'Collane', es: 'Collares', ar: 'قلائد' },
+  // Bilezik / Bracelets
+  Bilezik: { en: 'Bracelets', tr: 'Bilezik', it: 'Bracciali', es: 'Pulseras', ar: 'أساور' },
+  bilezik: { en: 'Bracelets', tr: 'Bilezik', it: 'Bracciali', es: 'Pulseras', ar: 'أساور' },
+  Bracelets: { en: 'Bracelets', tr: 'Bilezik', it: 'Bracciali', es: 'Pulseras', ar: 'أساور' },
+  bracelets: { en: 'Bracelets', tr: 'Bilezik', it: 'Bracciali', es: 'Pulseras', ar: 'أساور' },
+  bracelet: { en: 'Bracelets', tr: 'Bilezik', it: 'Bracciali', es: 'Pulseras', ar: 'أساور' },
+  // Bileklik / Bracelet (former English variant)
+  Bileklik: { en: 'Bracelet', tr: 'Bileklik', it: 'Bracciale', es: 'Pulsera', ar: 'سوار' },
+  bileklik: { en: 'Bracelet', tr: 'Bileklik', it: 'Bracciale', es: 'Pulsera', ar: 'سوار' },
+  Bracelet: { en: 'Bracelet', tr: 'Bileklik', it: 'Bracciale', es: 'Pulsera', ar: 'سوار' },
+  // Küpe / Earrings
   Küpe: { en: 'Earrings', tr: 'Küpe', it: 'Orecchini', es: 'Aretes', ar: 'أقراط' },
+  küpe: { en: 'Earrings', tr: 'Küpe', it: 'Orecchini', es: 'Aretes', ar: 'أقراط' },
+  kupe: { en: 'Earrings', tr: 'Küpe', it: 'Orecchini', es: 'Aretes', ar: 'أقراط' },
   Earrings: { en: 'Earrings', tr: 'Küpe', it: 'Orecchini', es: 'Aretes', ar: 'أقراط' },
   earrings: { en: 'Earrings', tr: 'Küpe', it: 'Orecchini', es: 'Aretes', ar: 'أقراط' },
+  earring: { en: 'Earrings', tr: 'Küpe', it: 'Orecchini', es: 'Aretes', ar: 'أقراط' },
+  // Kolye Ucu / Pendants
   'Kolye Ucu': { en: 'Pendants', tr: 'Kolye Ucu', it: 'Ciondoli', es: 'Colgantes', ar: 'دلايات' },
+  'kolye ucu': { en: 'Pendants', tr: 'Kolye Ucu', it: 'Ciondoli', es: 'Colgantes', ar: 'دلايات' },
+  'kolye-ucu': { en: 'Pendants', tr: 'Kolye Ucu', it: 'Ciondoli', es: 'Colgantes', ar: 'دلايات' },
   Pendants: { en: 'Pendants', tr: 'Kolye Ucu', it: 'Ciondoli', es: 'Colgantes', ar: 'دلايات' },
   pendants: { en: 'Pendants', tr: 'Kolye Ucu', it: 'Ciondoli', es: 'Colgantes', ar: 'دلايات' },
+  pendant: { en: 'Pendants', tr: 'Kolye Ucu', it: 'Ciondoli', es: 'Colgantes', ar: 'دلايات' },
+  // Takı Seti / Sets
   'Takı Seti': { en: 'Sets', tr: 'Takı Seti', it: 'Set', es: 'Juegos', ar: 'مجموعات' },
+  'takı seti': { en: 'Sets', tr: 'Takı Seti', it: 'Set', es: 'Juegos', ar: 'مجموعات' },
+  'taki seti': { en: 'Sets', tr: 'Takı Seti', it: 'Set', es: 'Juegos', ar: 'مجموعات' },
+  'taki-seti': { en: 'Sets', tr: 'Takı Seti', it: 'Set', es: 'Juegos', ar: 'مجموعات' },
   Sets: { en: 'Sets', tr: 'Takı Seti', it: 'Set', es: 'Juegos', ar: 'مجموعات' },
   sets: { en: 'Sets', tr: 'Takı Seti', it: 'Set', es: 'Juegos', ar: 'مجموعات' },
+  set: { en: 'Sets', tr: 'Takı Seti', it: 'Set', es: 'Juegos', ar: 'مجموعات' },
+  // Saat / Watch
+  Saat: { en: 'Watch', tr: 'Saat', it: 'Orologio', es: 'Reloj', ar: 'ساعة' },
+  saat: { en: 'Watch', tr: 'Saat', it: 'Orologio', es: 'Reloj', ar: 'ساعة' },
+  Watch: { en: 'Watch', tr: 'Saat', it: 'Orologio', es: 'Reloj', ar: 'ساعة' },
+  watch: { en: 'Watch', tr: 'Saat', it: 'Orologio', es: 'Reloj', ar: 'ساعة' },
 };
 
 function resolveCategoryName(rawCategory: string, categoryRef: any, lang: string): string {
@@ -41,7 +75,12 @@ function resolveCategoryName(rawCategory: string, categoryRef: any, lang: string
     const catTranslations = categoryRef.translations || {};
     return catTranslations[lang]?.name || categoryRef.name || rawCategory;
   }
-  return FALLBACK_CATEGORY_TRANSLATIONS[rawCategory]?.[lang] || rawCategory;
+  const result = FALLBACK_CATEGORY_TRANSLATIONS[rawCategory]?.[lang];
+  if (result) return result;
+  const lowered = FALLBACK_CATEGORY_TRANSLATIONS[rawCategory.toLowerCase()]?.[lang];
+  if (lowered) return lowered;
+  const titleCased = rawCategory.charAt(0).toUpperCase() + rawCategory.slice(1).toLowerCase();
+  return FALLBACK_CATEGORY_TRANSLATIONS[titleCased]?.[lang] || rawCategory;
 }
 
 function applyTranslation(product: any, lang: string): any {
@@ -85,27 +124,46 @@ export class MarketplaceController {
       const hideOutOfStock = req.query.hideOutOfStock === 'true';
       const lang = (req.query.lang as string) || 'en';
 
-      const where: WhereOptions = {
+      let where: WhereOptions = {
         isActive: true,
         ...goldenFilter
       };
       
       if (hideOutOfStock) where.quantity = { [Op.gt]: 0 };
       if (search) where.title = { [Op.iLike]: `%${search}%` };
+
+      const categoryVariants: Record<string, string[]> = {
+        rings: ['rings', 'yüzük', 'yuzuk', 'anelli', 'anelli', 'خواتم', 'khatim', 'anillos'],
+        necklaces: ['necklaces', 'kolye', 'collane', 'قلائد', 'qalayed', 'collares'],
+        bracelets: ['bracelets', 'bilezik', 'bileklik', 'bracelet', 'bracciali', 'أساور', 'asawer', 'pulseras'],
+        earrings: ['earrings', 'küpe', 'kupe', 'orecchini', 'أقراط', 'aqrat', 'aretes'],
+        pendants: ['pendants', 'kolye ucu', 'kolye-ucu', 'ciondoli', 'pendenti', 'دلايات', 'dulaya', 'colgantes'],
+        sets: ['sets', 'takı seti', 'taki seti', 'taki-seti', 'set', 'مجموعات', 'majmueat', 'juegos'],
+      };
+
       if (category) {
         const catBySlug = await Category.findOne({ where: { slug: category } });
         if (catBySlug) {
-          where.categoryId = catBySlug.id;
-        } else {
-          const categoryVariants: Record<string, string[]> = {
-            rings: ['rings', 'yüzük', 'yuzuk', 'anelli', 'anelli', 'خواتم', 'khatim', 'anillos'],
-            necklaces: ['necklaces', 'kolye', 'collane', 'قلائد', 'qalayed', 'collares'],
-            bracelets: ['bracelets', 'bilezik', 'bracciali', 'أساور', 'asawer', 'pulseras'],
-            earrings: ['earrings', 'küpe', 'kupe', 'orecchini', 'أقراط', 'aqrat', 'aretes'],
-            pendants: ['pendants', 'kolye ucu', 'kolye-ucu', 'ciondoli', 'pendenti', 'دلايات', 'dulaya', 'colgantes'],
-            sets: ['sets', 'takı seti', 'taki seti', 'taki-seti', 'set', 'مجموعات', 'majmueat', 'juegos'],
-          };
+          // Collect all search terms for the raw category field (legacy products)
+          const legacyTerms: string[] = [
+            catBySlug.name, catBySlug.slug,
+            catBySlug.name?.toLowerCase(), catBySlug.slug?.toLowerCase()
+          ].filter(Boolean);
 
+          // Look up matching variant group for additional terms
+          const catSlugLower = catBySlug.slug?.toLowerCase() || '';
+          for (const [, terms] of Object.entries(categoryVariants)) {
+            if (terms.some(t => t === catSlugLower || t.includes(catSlugLower) || catSlugLower.includes(t))) {
+              legacyTerms.push(...terms);
+              break;
+            }
+          }
+
+          where = { ...where, [Op.or as any]: [
+            { categoryId: catBySlug.id },
+            { category: { [Op.or]: [...new Set(legacyTerms)].map(t => ({ [Op.iLike]: `%${t}%` })) } }
+          ] };
+        } else {
           const catLower = category.toLowerCase().trim();
           let allTerms: string[] = [catLower, category];
 
@@ -359,13 +417,15 @@ export class MarketplaceController {
         });
       }
 
-      // Deduplicate by slug (prefer categoryId-resolved entries first)
-      const seen = new Set<string>();
-      const deduped = mapped.filter(c => {
-        if (seen.has(c.slug)) return false;
-        seen.add(c.slug);
-        return true;
-      });
+      // Deduplicate by slug, keeping the highest count
+      const slugMap = new Map<string, { name: string; count: number }>();
+      for (const c of mapped) {
+        const existing = slugMap.get(c.slug);
+        if (!existing || c.count > existing.count) {
+          slugMap.set(c.slug, { name: c.name, count: c.count });
+        }
+      }
+      const deduped = Array.from(slugMap.entries()).map(([slug, { name, count }]) => ({ name, slug, count }));
 
       return res.json({ data: deduped });
     } catch (error) {
