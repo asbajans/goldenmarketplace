@@ -21,3 +21,6 @@ export const getProductAIStatus = (id: string) =>
 
 export const bulkAITranslate = (productIds: string[], taskType = 'both') =>
   client.post('/ai/products/bulk-ai', { productIds, taskType }).then(res => res.data);
+
+export const generateDescriptionSync = (title: string, category: string, tags?: string[]) =>
+  client.post('/ai/generate-description', { title, category, tags }).then(res => res.data);

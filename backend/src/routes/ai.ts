@@ -14,6 +14,9 @@ router.post('/products/:id/translate', authMiddleware, AIController.translatePro
 router.post('/products/:id/generate', authMiddleware, AIController.generateContent);
 router.get('/products/:id/ai-status', authMiddleware, AIController.getProductAIStatus);
 
+// Synchronous AI (no queue, real-time)
+router.post('/generate-description', authMiddleware, AIController.generateDescriptionSync);
+
 // Seller AI task list
 router.get('/tasks', authMiddleware, AIController.listAITasks);
 

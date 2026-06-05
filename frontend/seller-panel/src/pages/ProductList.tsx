@@ -1,10 +1,12 @@
 
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Space, message, Modal, Tabs, Tag, Switch, Typography, Input, Checkbox, Row, Col } from 'antd';
-import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined, DollarOutlined, GoldOutlined } from '@ant-design/icons';
+import { Table, Button, Space, message, Modal, Tabs, Tag, Switch, Typography, Input, Checkbox, Row, Col, Tooltip } from 'antd';
+import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined, DollarOutlined, GoldOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { deleteProduct, getAutoSyncStatus, setAutoSyncStatus, triggerManualSync, Product } from '../api/product';
+import { bulkAITranslate } from '../api/ai';
 import client from '../api/client';
 import AddProduct from './AddProduct';
+import AITaskProgress from './AITaskProgress';
 
 const { Text } = Typography;
 
@@ -19,6 +21,9 @@ const ProductList: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedMarketplaces, setSelectedMarketplaces] = useState<string[]>([]);
     const [totalCount, setTotalCount] = useState(0);
+    const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+    const [translateLoading, setTranslateLoading] = useState(false);
+    const [aiProgressVisible, setAiProgressVisible] = useState(false);
 
     useEffect(() => {
         fetchProducts(searchTerm, selectedMarketplaces);
@@ -127,6 +132,30 @@ const ProductList: React.FC = () => {
         if (refresh) fetchProducts();
     };
 
+    const handleBulkTranslate = async () => {
+        if (selectedRowKeys.length === 0) {
+            message.warning('Lütfen çevrilecek ürünleri seçin.');
+            return;
+        }
+        setTranslateLoading(true);
+        try {
+            const ids = selectedRowKeys.map(k => String(k));
+            const res = await bulkAITranslate(ids, 'translate');
+            message.success(res.message || `${ids.length} ürün çeviri kuyruğuna alındı`);
+            setAiProgressVisible(true);
+            setSelectedRowKeys([]);
+        } catch (err: any) {
+            message.error(err?.response?.data?.error || 'Toplu çeviri başlatılamadı');
+        } finally {
+            setTranslateLoading(false);
+        }
+    };
+
+    const rowSelection = {
+        selectedRowKeys,
+        onChange: (newKeys: React.Key[]) => setSelectedRowKeys(newKeys),
+    };
+
     const columns = [
         { title: 'Resim', dataIndex: 'images', key: 'images', render: (imgs: string[]) => imgs && imgs.length > 0 ? <img src={imgs[0]} alt="product" style={{ width: 50 }} /> : 'Yok' },
         { 
@@ -199,7 +228,8 @@ const ProductList: React.FC = () => {
         columns: columns,
         rowKey: "id",
         loading: loading,
-        pagination: { pageSize: 15 }
+        pagination: { pageSize: 15 },
+        rowSelection
     });
 
     const tabItems = [
@@ -288,10 +318,22 @@ const ProductList: React.FC = () => {
                          <Button type="default" icon={<SyncOutlined spin={syncing} />} onClick={handleManualSync} loading={syncing}>
                              Fiyatları Senkronize Et
                          </Button>
-                         <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-                             Yeni Ürün Ekle
-                         </Button>
-                     </Space>
+                          <Tooltip title={selectedRowKeys.length === 0 ? 'Önce ürünleri seçin' : ''}>
+                              <Button
+                                  type="default"
+                                  icon={<ThunderboltOutlined />}
+                                  onClick={handleBulkTranslate}
+                                  loading={translateLoading}
+                                  disabled={selectedRowKeys.length === 0}
+                                  style={{ borderColor: '#722ed1', color: '#722ed1' }}
+                              >
+                                  AI ile Çevir ({selectedRowKeys.length})
+                              </Button>
+                          </Tooltip>
+                          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+                              Yeni Ürün Ekle
+                          </Button>
+                      </Space>
                  </Col>
              </Row>
 
@@ -299,7 +341,7 @@ const ProductList: React.FC = () => {
 
             <Modal
                 title={editingProduct ? "Ürün Düzenle" : "Yeni Ürün Ekle"}
-                visible={isModalVisible}
+                open={isModalVisible}
                 onCancel={() => handleModalClose(false)}
                 footer={null}
                 destroyOnClose
@@ -309,6 +351,16 @@ const ProductList: React.FC = () => {
                     onSuccess={() => handleModalClose(true)}
                 />
             </Modal>
+
+            <AITaskProgress
+                visible={aiProgressVisible}
+                onClose={() => setAiProgressVisible(false)}
+                onAllComplete={() => {
+                    message.success('Tüm AI işlemleri tamamlandı!');
+                    setAiProgressVisible(false);
+                    fetchProducts();
+                }}
+            />
         </div>
     );
 };

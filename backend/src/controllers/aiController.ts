@@ -174,6 +174,36 @@ export class AIController {
     }
   }
 
+  // ─── Synchronous Description Generation (no queue) ───
+
+  static async generateDescriptionSync(req: Request, res: Response) {
+    try {
+      const userId = (req as any).user.id;
+      const { title, category, tags } = req.body;
+
+      if (!title || !category) {
+        return res.status(400).json({ error: 'title and category are required' });
+      }
+
+      const access = await planAccessService.checkAIAccess(userId, 1);
+      if (!access.allowed) {
+        return res.status(403).json({ error: access.message, credits: access });
+      }
+
+      const tagsStr = Array.isArray(tags) ? tags.join(', ') : (tags || '');
+      const description = await aiService.generateProductDescription(title, category, 'tr', tagsStr);
+
+      if (!description || description === title) {
+        return res.status(500).json({ error: 'AI açıklama oluşturamadı' });
+      }
+
+      await planAccessService.deductCredits(userId, 1);
+      return res.json({ description });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
   // ─── Bulk AI ───
 
   static async bulkAITranslate(req: Request, res: Response) {

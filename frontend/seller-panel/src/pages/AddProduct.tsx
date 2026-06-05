@@ -13,7 +13,7 @@ import {
     ShopOutlined, CheckCircleOutlined, ThunderboltOutlined, MinusCircleOutlined
 } from '@ant-design/icons';
 import { createProduct, updateProduct } from '../api/product';
-import { translateProduct, generateProductContent } from '../api/ai';
+import { translateProduct, generateDescriptionSync, getProductAIStatus } from '../api/ai';
 import client from '../api/client';
 
 const { Option } = Select;
@@ -83,6 +83,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [fetchingEtsyProfiles, setFetchingEtsyProfiles] = useState(false);
     const [activeLanguage, setActiveLanguage] = useState('en');
     const [aiLoading, setAILoading] = useState<string | null>(null);
+    const [aiTaskStatus, setAiTaskStatus] = useState<{ status: string; taskType: string; progress: number } | null>(null);
     const [translations, setTranslations] = useState<Record<string, any>>({
         en: { title: '', description: '', keywords: '' },
         tr: { title: '', description: '', keywords: '' },
@@ -139,7 +140,40 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 });
             }, 100);
         }
+
+        if (initialValues?.id) {
+            fetchAIStatus(initialValues.id);
+        }
     }, []);
+
+    const fetchAIStatus = async (productId: string) => {
+        try {
+            const tasks = await getProductAIStatus(productId);
+            const latest = tasks?.[0];
+            if (latest && latest.status !== 'completed' && latest.status !== 'failed') {
+                setAiTaskStatus({ status: latest.status, taskType: latest.taskType, progress: latest.progress || 0 });
+                // poll until done
+                const poll = async () => {
+                    try {
+                        const updated = await getProductAIStatus(productId);
+                        const u = updated?.[0];
+                        if (!u) return;
+                        if (u.status === 'completed' || u.status === 'failed') {
+                            setAiTaskStatus({ status: u.status, taskType: u.taskType, progress: 100 });
+                            if (u.status === 'completed') {
+                                message.success('AI işlemi tamamlandı! Sayfa yenileniyor...');
+                                setTimeout(() => window.location.reload(), 1500);
+                            }
+                            return;
+                        }
+                        setAiTaskStatus({ status: u.status, taskType: u.taskType, progress: u.progress || 0 });
+                        setTimeout(poll, 3000);
+                    } catch { /* stop */ }
+                };
+                setTimeout(poll, 3000);
+            }
+        } catch { /* ignore */ }
+    };
 
     useEffect(() => {
         if (selectedMarketplaces.includes('etsy') && etsyShippingProfiles.length === 0) {
@@ -276,19 +310,27 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     };
 
     const handleAIGenerateContent = async () => {
-        if (!initialValues?.id) {
-            message.warning('Önce ürünü kaydedin, ardından AI ile açıklama oluşturabilirsiniz.');
+        const title = translations[activeLanguage]?.title || form.getFieldValue('title');
+        if (!title) {
+            message.warning('Önce ürün adını girin.');
             return;
         }
+        const categoryId = form.getFieldValue('categoryId');
+        const cat = categories.find(c => c.id === categoryId);
+        const categoryName = cat?.name || categoryId || 'Genel';
+
         setAILoading('content');
         try {
-            const res = await generateProductContent(initialValues.id);
-            message.success(res.message || 'AI içerik oluşturma kuyruğa alındı');
-            setTimeout(() => {
-                window.location.reload();
-            }, 2000);
+            const res = await generateDescriptionSync(title, categoryName, tags);
+            if (res.description) {
+                setTranslations(prev => ({
+                    ...prev,
+                    [activeLanguage]: { ...prev[activeLanguage], description: res.description }
+                }));
+                message.success('Açıklama oluşturuldu!');
+            }
         } catch (err: any) {
-            message.error(err?.response?.data?.error || 'AI içerik oluşturma başarısız');
+            message.error(err?.response?.data?.error || 'Açıklama oluşturulamadı');
         } finally {
             setAILoading(null);
         }
@@ -303,14 +345,35 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         try {
             const res = await translateProduct(initialValues.id);
             message.success(res.message || 'AI çeviri kuyruğa alındı');
-            setTimeout(() => {
-                window.location.reload();
-            }, 2000);
+            checkTranslationStatus(initialValues.id);
         } catch (err: any) {
             message.error(err?.response?.data?.error || 'AI çeviri başarısız');
         } finally {
             setAILoading(null);
         }
+    };
+
+    const checkTranslationStatus = (productId: string) => {
+        const poll = async () => {
+            try {
+                const tasks = await getProductAIStatus(productId);
+                const latestTask = tasks?.[0];
+                if (!latestTask) return;
+                if (latestTask.status === 'completed') {
+                    message.success('Çeviri tamamlandı! Sayfa yenileniyor...');
+                    setTimeout(() => window.location.reload(), 1500);
+                    return;
+                }
+                if (latestTask.status === 'failed') {
+                    message.error(latestTask.result?.error || 'Çeviri başarısız oldu.');
+                    return;
+                }
+                setTimeout(poll, 3000);
+            } catch {
+                // stop polling on error
+            }
+        };
+        setTimeout(poll, 2000);
     };
 
     const generateTags = (title: string, category: string) => {
@@ -913,7 +976,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                             icon={<ThunderboltOutlined />}
                             loading={aiLoading === 'content'}
                             onClick={() => handleAIGenerateContent()}
-                            disabled={isCloned || !initialValues?.id}
+                            disabled={isCloned}
                         >
                             AI ile Açıklama Oluştur
                         </Button>
@@ -926,6 +989,15 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                         >
                             AI ile Tüm Dillere Çevir
                         </Button>
+                        {aiTaskStatus && (
+                            <Tag color={aiTaskStatus.status === 'completed' ? 'green' : aiTaskStatus.status === 'failed' ? 'red' : 'processing'}>
+                                {aiTaskStatus.status === 'processing' || aiTaskStatus.status === 'pending'
+                                    ? `${aiTaskStatus.taskType === 'translate' ? 'Çeviri' : 'İçerik'} işleniyor... (%${aiTaskStatus.progress})`
+                                    : aiTaskStatus.status === 'completed'
+                                        ? 'İşlem tamamlandı'
+                                        : 'İşlem başarısız'}
+                            </Tag>
+                        )}
                     </Space>
                 </Form.Item>
             </Card>
