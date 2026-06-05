@@ -4,9 +4,10 @@ import { Op, Sequelize, WhereOptions } from 'sequelize';
 
 // Reusable golden marketplace filter as a raw SQL literal condition.
 // Using Op.and with a Sequelize.literal keeps it compatible with WhereOptions.
+// Backward compatible: includes products with NULL/empty marketplaces (legacy/seed products).
 const goldenFilter: WhereOptions = {
   [Op.and]: Sequelize.literal(
-    `CAST("marketplaces" AS text) ILIKE '%golden%'`
+    `("marketplaces" IS NULL OR "marketplaces" = '[]' OR CAST("marketplaces" AS text) ILIKE '%golden%')`
   )
 };
 
@@ -289,7 +290,7 @@ export class MarketplaceController {
           where: {
             isActive: true,
             [Op.and]: [
-              Sequelize.literal('"categoryId" IS NOT NULL AND CAST("marketplaces" AS text) ILIKE \'%golden%\'')
+              Sequelize.literal('"categoryId" IS NOT NULL AND ("marketplaces" IS NULL OR "marketplaces" = \'[]\' OR CAST("marketplaces" AS text) ILIKE \'%golden%\')')
             ]
           },
           attributes: [
@@ -305,7 +306,7 @@ export class MarketplaceController {
           where: {
             isActive: true,
             [Op.and]: [
-              Sequelize.literal('"categoryId" IS NULL AND CAST("marketplaces" AS text) ILIKE \'%golden%\'')
+              Sequelize.literal('"categoryId" IS NULL AND ("marketplaces" IS NULL OR "marketplaces" = \'[]\' OR CAST("marketplaces" AS text) ILIKE \'%golden%\')')
             ]
           },
           attributes: [
