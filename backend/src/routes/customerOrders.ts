@@ -66,4 +66,35 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
+router.post('/:id/cancel', async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const { id } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const order = await Order.findOne({
+      where: { id, customerId: userId }
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    if (order.status !== 'pending' && order.status !== 'confirmed') {
+      return res.status(400).json({ error: 'Order cannot be cancelled in its current status' });
+    }
+
+    order.status = 'cancelled';
+    await order.save();
+
+    return res.json({ success: true, order });
+  } catch (error: any) {
+    console.error('Customer order cancel error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;
