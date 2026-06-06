@@ -124,6 +124,12 @@ router.post('/add', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
+    // Apply discount if available
+    const discountRate = parseFloat(product?.discountRate) || 0;
+    if (discountRate > 0) {
+      unitPrice = parseFloat(product?.discountedPrice) || unitPrice;
+    }
+
     const cartWhere: any = { status: 'pending' };
     if (userId) {
       cartWhere.customerId = userId;
@@ -337,9 +343,10 @@ router.post('/checkout', async (req: Request, res: Response) => {
           sellerId = store?.userId || null;
         }
 
-        // Apply discount to USD price for Stripe
+        // Apply discount to both TRY (order) and USD (Stripe) prices
         const discountRate = parseFloat(product?.discountRate) || 0;
         if (discountRate > 0) {
+          unitPrice = parseFloat(product?.discountedPrice) || unitPrice;
           unitPriceUSD = Math.round(unitPriceUSD * (1 - discountRate / 100) * 100) / 100;
         }
 

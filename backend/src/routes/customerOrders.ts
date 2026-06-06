@@ -66,6 +66,60 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
+router.post('/:id/pay', async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const { id } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const order = await Order.findOne({
+      where: { id, customerId: userId, status: 'pending' },
+      include: [{ model: OrderItem, as: 'items' }]
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found or already paid' });
+    }
+
+    const stripeService = require('../services/stripeService').default;
+    const Product = require('../models/Product').default;
+    const ProductVariant = require('../models/ProductVariant').default;
+    const origin = req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:3000';
+    const successUrl = `${origin}/order/${order.id}?success=1`;
+    const cancelUrl = `${origin}/account/orders/${order.id}`;
+
+    const stripeItems = await Promise.all((order.items || []).map(async (item: any) => {
+      let usdPrice = 0;
+      if (item.variantId) {
+        const v = await ProductVariant.findByPk(item.variantId);
+        usdPrice = parseFloat(v?.priceUSD) || 0;
+      }
+      if (!usdPrice && item.productId) {
+        const p = await Product.findByPk(item.productId);
+        usdPrice = parseFloat(p?.priceUSD) || 0;
+        const discountRate = parseFloat(p?.discountRate) || 0;
+        if (discountRate > 0) usdPrice = Math.round(usdPrice * (1 - discountRate / 100) * 100) / 100;
+      }
+      return {
+        name: item.title,
+        price: usdPrice || parseFloat(item.unitPrice),
+        quantity: item.quantity,
+        currency: 'usd'
+      };
+    }));
+
+    const session = await stripeService.createDirectCheckout(stripeItems, successUrl, cancelUrl, undefined);
+
+    return res.json({ success: true, checkoutUrl: session.url });
+  } catch (error: any) {
+    console.error('Customer order pay error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 router.post('/:id/cancel', async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
