@@ -202,7 +202,7 @@ export class MarketplaceController {
 
       const { count, rows: products } = await Product.findAndCountAll({
         where,
-        attributes: ['id', 'title', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'description', 'discountRate'],
+        attributes: ['id', 'title', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'description', 'discountRate', 'discountedPrice'],
         include: [
           includeStore,
           { model: Category, as: 'categoryRef', attributes: ['id', 'name', 'translations', 'slug'] }
@@ -234,7 +234,7 @@ export class MarketplaceController {
 
       const product = await Product.findOne({
         where: { slug, isActive: true },
-        attributes: ['id', 'title', 'description', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'sku', 'quantity', 'gramWeight', 'marketplaces'],
+        attributes: ['id', 'title', 'description', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'sku', 'quantity', 'gramWeight', 'marketplaces', 'discountRate', 'discountedPrice'],
         include: [
           {
             model: Store,
@@ -314,7 +314,7 @@ export class MarketplaceController {
           isActive: true,
           ...goldenFilter
         },
-        attributes: ['id', 'title', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage'],
+        attributes: ['id', 'title', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'discountRate', 'discountedPrice'],
         include: [
           { model: Category, as: 'categoryRef', attributes: ['id', 'name', 'translations', 'slug'] }
         ],
