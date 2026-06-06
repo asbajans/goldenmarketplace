@@ -303,21 +303,26 @@ router.post('/checkout', async (req: Request, res: Response) => {
       let storeId: string | null = null;
       let sellerId: string | null = null;
 
+      const stripeItems: any[] = [];
+
       for (const ci of cartItems) {
         let product: any = null;
         let variant: any = null;
         let unitPrice = 0;
+        let unitPriceUSD = 0;
 
         if (ci.variantId) {
           variant = await ProductVariant.findByPk(ci.variantId);
           if (variant) {
             product = await Product.findByPk(variant.productId);
             unitPrice = parseFloat(variant.priceTRY) || 0;
+            unitPriceUSD = parseFloat(variant?.priceUSD) || 0;
           }
         }
         if (!product && ci.productId) {
           product = await Product.findByPk(ci.productId);
           unitPrice = parseFloat(product?.priceTRY) || 0;
+          unitPriceUSD = parseFloat(product?.priceUSD) || 0;
         }
 
         if (!product) {
@@ -332,6 +337,12 @@ router.post('/checkout', async (req: Request, res: Response) => {
           sellerId = store?.userId || null;
         }
 
+        // Apply discount to USD price for Stripe
+        const discountRate = parseFloat(product?.discountRate) || 0;
+        if (discountRate > 0) {
+          unitPriceUSD = Math.round(unitPriceUSD * (1 - discountRate / 100) * 100) / 100;
+        }
+
         const qty = ci.quantity || 1;
         const total = unitPrice * qty;
         orderTotal += total;
@@ -344,6 +355,13 @@ router.post('/checkout', async (req: Request, res: Response) => {
           quantity: qty,
           unitPrice,
           totalPrice: total
+        });
+
+        stripeItems.push({
+          name: product.title,
+          price: unitPriceUSD,
+          quantity: qty,
+          currency: 'usd'
         });
       }
 
@@ -382,11 +400,7 @@ router.post('/checkout', async (req: Request, res: Response) => {
         const successUrl = `${origin}/order/${newOrder.id}?success=1`;
         const cancelUrl = `${origin}/checkout`;
         
-        const stripeSession = await stripeService.createDirectCheckout(orderItems.map((i: any) => ({
-          name: i.title,
-          price: i.unitPrice,
-          quantity: i.quantity
-        })), successUrl, cancelUrl, undefined);
+        const stripeSession = await stripeService.createDirectCheckout(stripeItems, successUrl, cancelUrl, undefined);
         
         return res.json({
           success: true,
@@ -442,11 +456,22 @@ router.post('/checkout', async (req: Request, res: Response) => {
       const successUrl = `${origin}/order/${order.id}?success=1`;
       const cancelUrl = `${origin}/checkout`;
       
-      const stripeSession = await stripeService.createDirectCheckout(cart.items.map((i: any) => ({
-        name: i.title,
-        price: i.unitPrice,
-        quantity: i.quantity
-      })), successUrl, cancelUrl, undefined);
+      // Re-lookup products for USD prices (cart items store TRY)
+      const stripeItems2 = await Promise.all(cart.items.map(async (i: any) => {
+        let usdPrice = 0;
+        if (i.variantId) {
+          const v = await ProductVariant.findByPk(i.variantId);
+          usdPrice = parseFloat(v?.priceUSD) || 0;
+        }
+        if (!usdPrice && i.productId) {
+          const p = await Product.findByPk(i.productId);
+          usdPrice = parseFloat(p?.priceUSD) || 0;
+          const discountRate = parseFloat(p?.discountRate) || 0;
+          if (discountRate > 0) usdPrice = Math.round(usdPrice * (1 - discountRate / 100) * 100) / 100;
+        }
+        return { name: i.title, price: usdPrice, quantity: i.quantity, currency: 'usd' };
+      }));
+      const stripeSession = await stripeService.createDirectCheckout(stripeItems2, successUrl, cancelUrl, undefined);
       
       return res.json({
         success: true,

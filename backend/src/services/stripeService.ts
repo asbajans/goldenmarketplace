@@ -194,7 +194,7 @@ export class StripeService {
       }
 
       const price = await stripe.prices.create({
-        currency: product.currency || 'try',
+        currency: product.currency || 'usd',
         unit_amount: Math.round(product.price * 100),
         product_data: {
           name: product.name,
@@ -259,7 +259,7 @@ export class StripeService {
 
       const lineItems = await Promise.all(items.map(async (item) => {
         const price = await activeStripe.prices.create({
-          currency: item.currency || 'try',
+          currency: item.currency || 'usd',
           unit_amount: Math.round(item.price * 100),
           product_data: {
             name: item.name,
