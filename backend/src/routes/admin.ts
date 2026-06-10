@@ -48,6 +48,6 @@ router.post('/settings', SettingsController.updateSettings);
 
 // --- ORDERS ---
 import adminOrdersRouter from './adminOrders';
-router.use('/orders', adminOrdersRouter);
+router.use('/', adminOrdersRouter);
 
 export default router;

@@ -1,14 +1,10 @@
 import express, { Request, Response } from 'express';
-import { authMiddleware, adminMiddleware } from '../middleware/authMiddleware';
 import { Op } from 'sequelize';
 import Order, { OrderItem } from '../models/Order';
 import Store from '../models/Store';
 import User from '../models/User';
 
 const router = express.Router();
-
-router.use(authMiddleware);
-router.use(adminMiddleware);
 
 router.get('/orders', async (req: Request, res: Response) => {
   try {
