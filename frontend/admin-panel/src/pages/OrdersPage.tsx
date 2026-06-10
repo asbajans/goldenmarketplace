@@ -50,6 +50,11 @@ interface Order {
         storeName: string;
         storeSlug: string;
     };
+    seller?: {
+        firstName: string;
+        lastName: string;
+        email: string;
+    };
     customer?: {
         firstName: string;
         lastName: string;
@@ -96,7 +101,6 @@ const OrdersPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState('all');
     const [statusFilter, setStatusFilter] = useState<string>('');
     const [sourceFilter, setSourceFilter] = useState<string>('');
-    const [storeFilter, _setStoreFilter] = useState<string>('');
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [detailModalOpen, setDetailModalOpen] = useState(false);
     const [stats, setStats] = useState({
@@ -111,7 +115,7 @@ const OrdersPage: React.FC = () => {
     useEffect(() => {
         fetchOrders();
         fetchStats();
-    }, [page, pageSize, statusFilter, sourceFilter, storeFilter, activeTab]);
+    }, [page, pageSize, statusFilter, sourceFilter, activeTab]);
 
     const fetchOrders = async () => {
         setLoading(true);
@@ -119,7 +123,6 @@ const OrdersPage: React.FC = () => {
             const params: any = { page, limit: pageSize };
             if (statusFilter) params.status = statusFilter;
             if (sourceFilter) params.source = sourceFilter;
-            if (storeFilter) params.storeId = storeFilter;
             
             if (activeTab !== 'all') {
                 if (activeTab === 'golden') {
@@ -160,6 +163,12 @@ const OrdersPage: React.FC = () => {
             dataIndex: 'store',
             key: 'store',
             render: (store: any) => store?.storeName || '-'
+        },
+        {
+            title: 'Satıcı',
+            dataIndex: 'seller',
+            key: 'seller',
+            render: (seller: any) => seller ? `${seller.firstName} ${seller.lastName}` : '-'
         },
         {
             title: 'Müşteri',
@@ -364,6 +373,17 @@ const OrdersPage: React.FC = () => {
                                 <Text strong>{selectedOrder.store?.storeName}</Text>
                             </Col>
                             <Col span={12}>
+                                <Text type="secondary">Satıcı:</Text>
+                                <br />
+                                <Text>
+                                    {selectedOrder.seller?.firstName} {selectedOrder.seller?.lastName}
+                                    <br />
+                                    <Text type="secondary">{selectedOrder.seller?.email}</Text>
+                                </Text>
+                            </Col>
+                        </Row>
+                        <Row gutter={16} style={{ marginTop: 16 }}>
+                            <Col span={12}>
                                 <Text type="secondary">Müşteri:</Text>
                                 <br />
                                 <Text>
@@ -372,17 +392,13 @@ const OrdersPage: React.FC = () => {
                                     <Text type="secondary">{selectedOrder.customer?.email}</Text>
                                 </Text>
                             </Col>
-                        </Row>
-
-                        <Row gutter={16} style={{ marginTop: 16 }}>
                             <Col span={12}>
                                 <Text type="secondary">Durum:</Text>
                                 <br />
                                 <Tag color={statusColors[selectedOrder.status]}>
                                     {statusLabels[selectedOrder.status]}
                                 </Tag>
-                            </Col>
-                            <Col span={12}>
+                                <br /><br />
                                 <Text type="secondary">Kaynak:</Text>
                                 <br />
                                 <Tag>{sourceLabels[selectedOrder.source]}</Tag>

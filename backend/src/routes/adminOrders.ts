@@ -16,7 +16,14 @@ router.get('/orders', async (req: Request, res: Response) => {
 
     const where: any = {};
     if (status) where.status = status;
-    if (source) where.source = source;
+    if (source) {
+      const sourceStr = source as string;
+      if (sourceStr.startsWith('!')) {
+        where.source = { [Op.ne]: sourceStr.slice(1) };
+      } else {
+        where.source = sourceStr;
+      }
+    }
     if (storeId) where.storeId = storeId;
     
     if (startDate || endDate) {
@@ -30,7 +37,8 @@ router.get('/orders', async (req: Request, res: Response) => {
       include: [
         { model: OrderItem, as: 'items' },
         { model: Store, as: 'store', attributes: ['id', 'storeName', 'storeSlug'] },
-        { model: User, as: 'customer', attributes: ['id', 'email', 'firstName', 'lastName'] }
+        { model: User, as: 'customer', attributes: ['id', 'email', 'firstName', 'lastName'] },
+        { model: User, as: 'seller', attributes: ['id', 'email', 'firstName', 'lastName'] }
       ],
       order: [['createdAt', 'DESC']],
       limit: Number(limit),
@@ -57,7 +65,8 @@ router.get('/orders/:id', async (req: Request, res: Response) => {
       include: [
         { model: OrderItem, as: 'items' },
         { model: Store, as: 'store', attributes: ['id', 'storeName', 'storeSlug'] },
-        { model: User, as: 'customer', attributes: ['id', 'email', 'firstName', 'lastName'] }
+        { model: User, as: 'customer', attributes: ['id', 'email', 'firstName', 'lastName'] },
+        { model: User, as: 'seller', attributes: ['id', 'email', 'firstName', 'lastName'] }
       ]
     });
 
@@ -75,6 +84,11 @@ router.patch('/orders/:id/status', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
+
+    const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
 
     const order = await Order.findOne({ where: { id } });
     if (!order) {
