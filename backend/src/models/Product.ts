@@ -329,4 +329,20 @@ Product.afterDestroy(async (product) => {
   }
 });
 
+Product.afterUpdate(async (product) => {
+  try {
+    const prev = (product as any)._previousDataValues;
+    if (prev && prev.isActive !== product.isActive) {
+      const Store = require('./Store').default;
+      if (prev.isActive && !product.isActive) {
+        await Store.decrement('totalProducts', { by: 1, where: { id: product.storeId } });
+      } else if (!prev.isActive && product.isActive) {
+        await Store.increment('totalProducts', { by: 1, where: { id: product.storeId } });
+      }
+    }
+  } catch (err) {
+    console.error('[Product Hook] afterUpdate error:', err);
+  }
+});
+
 export default Product;

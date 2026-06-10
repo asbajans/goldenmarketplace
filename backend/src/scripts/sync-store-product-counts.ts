@@ -25,7 +25,9 @@ async function main() {
       UPDATE stores s
       SET "totalProducts" = (
         SELECT COUNT(*) FROM products p
-        WHERE p."storeId" = s.id AND p."isActive" = true
+        WHERE p."storeId" = s.id
+          AND p."isActive" = true
+          AND (p."marketplaces" IS NULL OR p."marketplaces"::text = '[]' OR p."marketplaces"::text ILIKE '%golden%')
       )
       WHERE s."isActive" = true;
     `);
@@ -38,7 +40,9 @@ async function main() {
       FROM stores s
       LEFT JOIN LATERAL (
         SELECT COUNT(*) as count FROM products p
-        WHERE p."storeId" = s.id AND p."isActive" = true
+        WHERE p."storeId" = s.id
+          AND p."isActive" = true
+          AND (p."marketplaces" IS NULL OR p."marketplaces"::text = '[]' OR p."marketplaces"::text ILIKE '%golden%')
       ) actual ON true
       WHERE s."isActive" = true
       ORDER BY s."storeName";

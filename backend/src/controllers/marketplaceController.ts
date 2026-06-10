@@ -274,10 +274,27 @@ export class MarketplaceController {
 
       const { count, rows: stores } = await Store.findAndCountAll({
         where,
-        attributes: ['id', 'storeName', 'storeSlug', 'description', 'logo', 'banner', 'rating', 'totalProducts', 'createdAt'],
+        attributes: {
+          include: [
+            [
+              Sequelize.literal(`(
+                SELECT COUNT(*) FROM products p
+                WHERE p."storeId" = "Store"."id"
+                  AND p."isActive" = true
+                  AND (p."marketplaces" IS NULL OR p."marketplaces"::text = '[]' OR p."marketplaces"::text ILIKE '%golden%')
+              )`),
+              'totalProducts'
+            ]
+          ]
+        },
         limit,
         offset,
-        order: [['totalProducts', 'DESC']]
+        order: [[Sequelize.literal(`(
+          SELECT COUNT(*) FROM products p
+          WHERE p."storeId" = "Store"."id"
+            AND p."isActive" = true
+            AND (p."marketplaces" IS NULL OR p."marketplaces"::text = '[]' OR p."marketplaces"::text ILIKE '%golden%')
+        )`), 'DESC']]
       });
 
       return res.json({
