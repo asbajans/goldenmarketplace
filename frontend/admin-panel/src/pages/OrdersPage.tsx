@@ -6,21 +6,11 @@ import {
 import { 
     EyeOutlined
 } from '@ant-design/icons';
-import axios from 'axios';
 import dayjs from 'dayjs';
+import { AdminAPI } from '../services/api';
 
 const { Text } = Typography;
 const { Option } = Select;
-
-const api = axios.create({
-    baseURL: '/api',
-    headers: { 'Content-Type': 'application/json' }
-});
-api.interceptors.request.use((cfg) => {
-    const token = localStorage.getItem('token');
-    if (token) cfg.headers.Authorization = `Bearer ${token}`;
-    return cfg;
-});
 
 interface OrderItem {
     id: string;
@@ -132,9 +122,9 @@ const OrdersPage: React.FC = () => {
                 }
             }
             
-            const res = await api.get('/admin/orders', { params });
-            setOrders(res.data.orders || []);
-            setTotal(res.data.total || 0);
+            const data = await AdminAPI.getOrders(params);
+            setOrders(data.orders || []);
+            setTotal(data.total || 0);
         } catch (error: any) {
             console.error('Error fetching orders:', error);
         } finally {
@@ -144,8 +134,8 @@ const OrdersPage: React.FC = () => {
 
     const fetchStats = async () => {
         try {
-            const res = await api.get('/admin/stats/orders');
-            setStats(res.data);
+            const data = await AdminAPI.getOrderStats();
+            setStats(data);
         } catch (error: any) {
             console.error('Error fetching stats:', error);
         }
