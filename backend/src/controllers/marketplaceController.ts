@@ -259,6 +259,40 @@ export class MarketplaceController {
   }
 
   /**
+   * GET /api/marketplace/products/by-id/:id
+   */
+  static async getProductById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const lang = (req.query.lang as string) || 'en';
+
+      const product = await Product.findOne({
+        where: { id, isActive: true },
+        attributes: ['id', 'title', 'description', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'sku', 'quantity', 'gramWeight', 'marketplaces', 'discountRate', 'discountedPrice'],
+        include: [
+          {
+            model: Store,
+            as: 'store',
+            attributes: ['id', 'storeName', 'storeSlug', 'logo', 'description', 'rating', 'totalProducts']
+          },
+          {
+            model: ProductVariant,
+            as: 'variants',
+            attributes: ['id', 'sku', 'attributes', 'priceTRY', 'priceUSD', 'quantity']
+          },
+          { model: Category, as: 'categoryRef', attributes: ['id', 'name', 'translations', 'slug'] }
+        ]
+      });
+
+      if (!product) return res.status(404).json({ error: 'Product not found' });
+      return res.json(applyTranslation(product, lang));
+    } catch (error: any) {
+      console.error('[Marketplace] getProductById error:', error);
+      return res.status(500).json({ error: 'Failed to fetch product by id', details: error?.message || String(error) });
+    }
+  }
+
+  /**
    * GET /api/marketplace/stores
    * Public store listing for B2C frontend.
    */
