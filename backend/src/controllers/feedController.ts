@@ -59,7 +59,6 @@ export class FeedController {
                 const discountRate = Number((product as any).discountRate) || 0;
                 const salePrice = discountRate > 0 ? originalPrice * (1 - discountRate / 100) : 0;
                 const priceTRY = salePrice > 0 ? salePrice : originalPrice;
-                const priceUSD = Number(product.priceUSD) || 0;
 
                 // Generate language-specific entries
                 for (const lang of LANGUAGES) {
