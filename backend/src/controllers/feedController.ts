@@ -38,7 +38,7 @@ export class FeedController {
 
             const products = await Product.findAll({
                 where: whereClause,
-                limit: 5000,
+                limit: 20000,
                 include: [{ model: Store, as: 'store', attributes: ['storeName', 'storeSlug'] }]
             });
 
@@ -93,25 +93,50 @@ export class FeedController {
     <g:sale_price>${salePrice.toFixed(2)} TRY</g:sale_price>`;
                     }
 
-                    // USD as alternate price (if available)
-                    if (priceUSD > 0) {
-                        xml += `
-    <g:unit_pricing_base_measure>${priceUSD.toFixed(2)} USD</g:unit_pricing_base_measure>`;
-                    }
-
+                    // Tax (Turkey KDV)
                     xml += `
-    <g:availability>${product.quantity > 0 ? 'in_stock' : (product.quantity === 0 ? 'out_of_stock' : 'in_stock')}</g:availability>
+    <g:tax>
+      <g:country>${targetCountry}</g:country>
+      <g:rate>20.0</g:rate>
+      <g:tax_ship>y</g:tax_ship>
+    </g:tax>`;
+
+                    // Shipping weight (grams -> kg for Google)
+                    const gramWeight = Number(product.gramWeight) || 0;
+                    const shippingWeightKg = gramWeight > 0 ? (gramWeight / 1000).toFixed(3) : '0.100';
+                    xml += `
+    <g:shipping_weight>${shippingWeightKg} kg</g:shipping_weight>`;
+
+                    // Shipping cost based on weight
+                    const shipCost = gramWeight > 0
+                        ? Math.max(49.90, Math.round(gramWeight * 0.5 * 100) / 100)
+                        : 49.90;
+                    xml += `
+    <g:shipping>
+      <g:country>${targetCountry}</g:country>
+      <g:service>Standard</g:service>
+      <g:price>${shipCost.toFixed(2)} TRY</g:price>
+    </g:shipping>`;
+
+                    // In-store pickup option
+                    xml += `
+    <g:shipping>
+      <g:country>${targetCountry}</g:country>
+      <g:service>Store Pickup</g:service>
+      <g:price>0.00 TRY</g:price>
+    </g:shipping>`;
+
+                    // Availability
+                    const qty = Number(product.quantity) || 0;
+                    const availability = qty > 0 ? 'in_stock' : 'out_of_stock';
+                    xml += `
+    <g:availability>${availability}</g:availability>
     <g:condition>new</g:condition>
     <g:brand><![CDATA[${langStore}]]></g:brand>
     <g:mpn>${product.sku || product.id}</g:mpn>
     <g:product_type><![CDATA[${product.category || 'Jewelry'}]]></g:product_type>
     <g:google_product_category>188</g:google_product_category>
-    <g:identifier_exists>FALSE</g:identifier_exists>
-    <g:shipping>
-      <g:country>${targetCountry}</g:country>
-      <g:service>Standard</g:service>
-      <g:price>0.00 TRY</g:price>
-    </g:shipping>`;
+    <g:identifier_exists>FALSE</g:identifier_exists>`;
 
                     if (merchantId) {
                         xml += `
