@@ -127,7 +127,7 @@ services:
 
   # MinIO Initialization (Creates default bucket and makes it public)
   minio-init:
-    image: minio/mc:latest
+    image: minio/mc:RELEASE.2024-08-10T21-44-35Z
     container_name: golden-minio-init
     depends_on:
       - minio
