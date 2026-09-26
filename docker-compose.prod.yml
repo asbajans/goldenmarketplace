@@ -143,7 +143,7 @@ services:
 
   # MinIO S3 Server
   minio:
-    image: quay.io/minio/minio:RELEASE.2024-08-10T21-44-35Z
+    image: ghcr.io/asbajans/rahatio/minio:latest
     container_name: golden-minio
     restart: always
     ports:
@@ -159,9 +159,9 @@ services:
     command: server /data --console-address ":9001"
 
   # MinIO Initialization (Creates default bucket and makes it public)
-  # Uses same quay.io image (includes mc) - single pull, no auth issues
+  # Uses ghcr.io/asbajans/rahatio/minio-mc (Portainer has registry auth for this namespace)
   minio-init:
-    image: quay.io/minio/minio:RELEASE.2024-08-10T21-44-35Z
+    image: ghcr.io/asbajans/rahatio/minio-mc:latest
     container_name: golden-minio-init
     depends_on:
       - minio
