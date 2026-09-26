@@ -126,9 +126,9 @@ services:
     command: server /data --console-address ":9001"
 
   # MinIO Initialization (Creates default bucket and makes it public)
-  # Uses ghcr.io/asbajans/rahatio/minio-mc (publicly accessible, no rate limits)
+  # Uses same quay.io image (includes mc) - single pull, no auth issues
   minio-init:
-    image: ghcr.io/asbajans/rahatio/minio-mc:latest
+    image: quay.io/minio/minio:RELEASE.2024-08-10T21-44-35Z
     container_name: golden-minio-init
     depends_on:
       - minio
