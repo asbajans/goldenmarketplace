@@ -6,6 +6,7 @@ const router = Router();
 
 // Global feeds (all products, admin-managed merchant settings)
 router.get('/google.xml', FeedController.googleShoppingFeed);
+router.get('/product_reviews.xml', FeedController.productRatingsFeed);
 router.get('/facebook.json', FeedController.facebookCatalogFeed);
 router.get('/instagram.json', FeedController.facebookCatalogFeed);
 

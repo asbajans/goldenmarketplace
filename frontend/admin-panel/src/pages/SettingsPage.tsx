@@ -14,10 +14,14 @@ export default function SettingsPage() {
     const [form] = Form.useForm();
     const [aiForm] = Form.useForm();
     const [goldForm] = Form.useForm();
+    const [feedForm] = Form.useForm();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [savingGold, setSavingGold] = useState(false);
     const [savingAI, setSavingAI] = useState(false);
+    const [savingFeed, setSavingFeed] = useState(false);
+    const [backfilling, setBackfilling] = useState(false);
+    const [feedResult, setFeedResult] = useState<string | null>(null);
     const [testingAI, setTestingAI] = useState(false);
     const [aiTestResult, setAITestResult] = useState<{ success: boolean; message: string } | null>(null);
     const [goldPrice, setGoldPrice] = useState<GoldPriceInfo | null>(null);
@@ -34,6 +38,14 @@ export default function SettingsPage() {
             setLoading(true);
             const data = await AdminAPI.getSettings();
             form.setFieldsValue(data);
+            feedForm.setFieldsValue({
+                feed_default_gender: data.feed_default_gender || 'unisex',
+                feed_default_age_group: data.feed_default_age_group || 'adult',
+                feed_default_color: data.feed_default_color || 'Gold',
+                merchant_center_id: data.merchant_center_id || '',
+                merchant_target_country: data.merchant_target_country || 'TR',
+                merchant_target_language: data.merchant_target_language || 'tr'
+            });
             // Pre-fill gold price field if already set
             if (data.gold_price_try_per_gram) {
                 goldForm.setFieldsValue({ pricePerGramTRY: parseFloat(data.gold_price_try_per_gram) });
@@ -42,6 +54,43 @@ export default function SettingsPage() {
             message.error('Ayarlar yüklenemedi.');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleSaveFeed = async (values: any) => {
+        try {
+            setSavingFeed(true);
+            setFeedResult(null);
+            const res = await AdminAPI.updateSettings(values);
+            const backfilled = (res as any)?.backfilledProducts;
+            const msg = backfilled
+                ? `Feed varsayılanları kaydedildi. Değeri boş ${backfilled} ürün güncellendi.`
+                : 'Feed varsayılanları kaydedildi!';
+            setFeedResult(msg);
+            message.success(msg);
+        } catch (error: any) {
+            message.error(error.response?.data?.error || 'Feed ayarları kaydedilemedi.');
+        } finally {
+            setSavingFeed(false);
+        }
+    };
+
+    const handleBackfill = async () => {
+        try {
+            setBackfilling(true);
+            const values = feedForm.getFieldsValue();
+            const res = await AdminAPI.backfillFeedAttributes({
+                gender: values.feed_default_gender,
+                ageGroup: values.feed_default_age_group,
+                color: values.feed_default_color
+            });
+            const msg = `Toplu doldurma tamamlandı: ${res.updated} ürün güncellendi (${res.scanned} eksik kayıt tarandı).`;
+            setFeedResult(msg);
+            message.success(msg);
+        } catch (error: any) {
+            message.error(error.response?.data?.error || 'Toplu doldurma başarısız.');
+        } finally {
+            setBackfilling(false);
         }
     };
 
@@ -227,6 +276,105 @@ export default function SettingsPage() {
                         onClose={() => setSyncResult(null)}
                     />
                 )}
+            </Card>
+
+            {/* Google Merchant Feed Defaults */}
+            <Card
+                title="Google Merchant Feed Varsayılanları (gender / age_group / color)"
+                bordered={false}
+                style={{ marginBottom: 24 }}
+            >
+                <Alert
+                    type="info"
+                    showIcon
+                    style={{ marginBottom: 20 }}
+                    message="Google'ın zorunlu kıldığı cinsiyet, yaş grubu ve renk alanları için varsayılan değerler. Üründe değer yoksa feed'e bu değerler yazılır; kaydetme sırasında değeri boş olan eski ürünler de otomatik doldurulur."
+                />
+                <Form
+                    form={feedForm}
+                    layout="vertical"
+                    onFinish={handleSaveFeed}
+                >
+                    <Row gutter={16}>
+                        <Col span={8}>
+                            <Form.Item
+                                name="feed_default_gender"
+                                label="Varsayılan Cinsiyet (gender)"
+                                rules={[{ required: true, message: 'Cinsiyet zorunludur' }]}
+                            >
+                                <Select>
+                                    <Select.Option value="female">Kadın (female)</Select.Option>
+                                    <Select.Option value="male">Erkek (male)</Select.Option>
+                                    <Select.Option value="unisex">Unisex (unisex)</Select.Option>
+                                </Select>
+                            </Form.Item>
+                        </Col>
+                        <Col span={8}>
+                            <Form.Item
+                                name="feed_default_age_group"
+                                label="Varsayılan Yaş Grubu (age_group)"
+                                rules={[{ required: true, message: 'Yaş grubu zorunludur' }]}
+                            >
+                                <Select>
+                                    <Select.Option value="newborn">Yenidoğan (newborn, 0-3 ay)</Select.Option>
+                                    <Select.Option value="infant">Bebek (infant, 3-12 ay)</Select.Option>
+                                    <Select.Option value="toddler">Yürümeye başlayan (toddler, 1-5 yaş)</Select.Option>
+                                    <Select.Option value="kids">Çocuk (kids, 5-13 yaş)</Select.Option>
+                                    <Select.Option value="adult">Yetişkin (adult, 13+)</Select.Option>
+                                </Select>
+                            </Form.Item>
+                        </Col>
+                        <Col span={8}>
+                            <Form.Item
+                                name="feed_default_color"
+                                label="Varsayılan Renk (color)"
+                                rules={[{ required: true, message: 'Renk zorunludur' }]}
+                                extra="Birden fazla renk eğik çizgi ile ayrılır: Gold / White"
+                            >
+                                <Input placeholder="örn: Gold" />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+
+                    <Divider orientation="left">Merchant Center</Divider>
+                    <Row gutter={16}>
+                        <Col span={8}>
+                            <Form.Item name="merchant_center_id" label="Merchant Center ID">
+                                <Input placeholder="örn: 123456789" />
+                            </Form.Item>
+                        </Col>
+                        <Col span={8}>
+                            <Form.Item name="merchant_target_country" label="Hedef Ülke">
+                                <Input placeholder="TR" maxLength={2} />
+                            </Form.Item>
+                        </Col>
+                        <Col span={8}>
+                            <Form.Item name="merchant_target_language" label="Hedef Dil">
+                                <Input placeholder="tr" maxLength={5} />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+
+                    <Space>
+                        <Button type="primary" htmlType="submit" loading={savingFeed}>
+                            Feed Varsayılanlarını Kaydet
+                        </Button>
+                        <Button onClick={handleBackfill} loading={backfilling}>
+                            Eksik Değerleri Toplu Doldur
+                        </Button>
+                    </Space>
+
+                    {feedResult && (
+                        <Alert
+                            type="success"
+                            message={feedResult}
+                            showIcon
+                            style={{ marginTop: 16 }}
+                            closable
+                            onClose={() => setFeedResult(null)}
+                        />
+                    )}
+                </Form>
             </Card>
 
             {/* AI Settings */}

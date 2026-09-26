@@ -7,6 +7,46 @@ import { GlobalSetting } from '../models/GlobalSetting';
 const SITE_URL = process.env.SITE_URL || 'https://goldencrafters.com';
 const LANGUAGES = ['en', 'tr', 'it', 'ar', 'es'];
 
+// Google Merchant zorunlu varyant alanları
+const FEED_GENDERS = ['male', 'female', 'unisex'];
+const FEED_AGE_GROUPS = ['newborn', 'infant', 'toddler', 'kids', 'adult'];
+const FEED_FALLBACK_GENDER = 'unisex';
+const FEED_FALLBACK_AGE_GROUP = 'adult';
+const FEED_FALLBACK_COLOR = 'Gold';
+
+function resolveFeedGender(raw: unknown, def: unknown): string {
+    const v = String(raw || '').trim().toLowerCase();
+    if (FEED_GENDERS.includes(v)) return v;
+    const d = String(def || '').trim().toLowerCase();
+    if (FEED_GENDERS.includes(d)) return d;
+    return FEED_FALLBACK_GENDER;
+}
+
+function resolveFeedAgeGroup(raw: unknown, def: unknown): string {
+    const v = String(raw || '').trim().toLowerCase();
+    if (FEED_AGE_GROUPS.includes(v)) return v;
+    const d = String(def || '').trim().toLowerCase();
+    if (FEED_AGE_GROUPS.includes(d)) return d;
+    return FEED_FALLBACK_AGE_GROUP;
+}
+
+function resolveFeedColor(raw: unknown, def: unknown): string {
+    const v = String(raw || '').trim();
+    if (v) return v;
+    const d = String(def || '').trim();
+    if (d) return d;
+    return FEED_FALLBACK_COLOR;
+}
+
+function escapeXml(input: unknown): string {
+    return String(input ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+}
+
 export class FeedController {
     /**
      * Google Shopping XML Feed
@@ -19,15 +59,29 @@ export class FeedController {
             let whereClause: any = { isActive: true };
             let storeName = 'Golden Crafters';
 
-            // Load global merchant settings
+            // Load global merchant settings (+ feed defaults for gender/age_group/color)
             const settings = await GlobalSetting.findAll({
-                where: { key: { [Op.in]: ['merchant_center_id', 'merchant_target_country', 'merchant_target_language'] } }
+                where: {
+                    key: {
+                        [Op.in]: [
+                            'merchant_center_id',
+                            'merchant_target_country',
+                            'merchant_target_language',
+                            'feed_default_gender',
+                            'feed_default_age_group',
+                            'feed_default_color'
+                        ]
+                    }
+                }
             });
             const settingsMap: Record<string, string> = {};
             for (const s of settings) settingsMap[s.key] = s.value;
 
             const merchantId = settingsMap.merchant_center_id || '';
             const targetCountry = (settingsMap.merchant_target_country || 'TR').toUpperCase();
+            const defaultGender = settingsMap.feed_default_gender || FEED_FALLBACK_GENDER;
+            const defaultAgeGroup = settingsMap.feed_default_age_group || FEED_FALLBACK_AGE_GROUP;
+            const defaultColor = settingsMap.feed_default_color || FEED_FALLBACK_COLOR;
 
             if (storeSlug) {
                 const store = await Store.findOne({ where: { storeSlug, isActive: true } });
@@ -128,6 +182,10 @@ export class FeedController {
                     // Availability
                     const qty = Number(product.quantity) || 0;
                     const availability = qty > 0 ? 'in_stock' : 'out_of_stock';
+                    // Google zorunlu alanları: ürün değeri yoksa admin varsayılanı kullanılır
+                    const feedGender = resolveFeedGender((product as any).gender, defaultGender);
+                    const feedAgeGroup = resolveFeedAgeGroup((product as any).ageGroup, defaultAgeGroup);
+                    const feedColor = resolveFeedColor((product as any).color, defaultColor);
                     xml += `
     <g:availability>${availability}</g:availability>
     <g:condition>new</g:condition>
@@ -135,6 +193,9 @@ export class FeedController {
     <g:mpn>${product.sku || product.id}</g:mpn>
     <g:product_type><![CDATA[${product.category || 'Jewelry'}]]></g:product_type>
     <g:google_product_category>188</g:google_product_category>
+    <g:gender>${feedGender}</g:gender>
+    <g:age_group>${feedAgeGroup}</g:age_group>
+    <g:color><![CDATA[${feedColor}]]></g:color>
     <g:identifier_exists>FALSE</g:identifier_exists>`;
 
                     if (merchantId) {
@@ -170,6 +231,11 @@ export class FeedController {
                 where: whereClause,
                 limit: 5000
             });
+            const feedDefaults = await GlobalSetting.findAll({
+                where: { key: { [Op.in]: ['feed_default_gender', 'feed_default_age_group', 'feed_default_color'] } }
+            });
+            const defaultsMap: Record<string, string> = {};
+            for (const s of feedDefaults) defaultsMap[s.key] = s.value;
 
             const catalog = products.map(product => ({
                 id: product.id,
@@ -186,13 +252,93 @@ export class FeedController {
                 additional_image_link: product.images?.slice(1).join(',') || undefined,
                 brand: 'Golden Crafters',
                 google_product_category: '188',
-                mpn: product.sku || product.id
+                mpn: product.sku || product.id,
+                gender: resolveFeedGender((product as any).gender, defaultsMap.feed_default_gender || FEED_FALLBACK_GENDER),
+                age_group: resolveFeedAgeGroup((product as any).ageGroup, defaultsMap.feed_default_age_group || FEED_FALLBACK_AGE_GROUP),
+                color: resolveFeedColor((product as any).color, defaultsMap.feed_default_color || FEED_FALLBACK_COLOR)
             }));
 
             return res.json({ data: catalog });
         } catch (error) {
             console.error('Facebook Feed Error:', error);
             return res.status(500).json({ error: 'Failed to generate feed' });
+        }
+    }
+
+    /**
+     * Google Product Ratings Feed (XML)
+     * Endpoint: GET /api/feed/product_reviews.xml
+     * Merchant Center → Product Ratings programına kaynak olarak eklenir.
+     * Sadece ONAYLI gerçek yorumları içerir (sahte değerlendirme yasaktır).
+     */
+    static async productRatingsFeed(_req: Request, res: Response) {
+        try {
+            const { default: ProductReview } = await import('../models/ProductReview');
+            const reviews = await ProductReview.findAll({
+                where: { isApproved: true },
+                order: [['createdAt', 'DESC']],
+                limit: 5000,
+                include: [{
+                    model: Product,
+                    as: 'product',
+                    attributes: ['id', 'title', 'slug', 'sku'],
+                    where: { isActive: true },
+                    required: true
+                }]
+            });
+
+            let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.google.com/shopping/reviews/schema/product/2.3/product_reviews.xsd">
+  <version>2.3</version>
+  <aggregator>
+    <name><![CDATA[Golden Crafters]]></name>
+  </aggregator>
+  <publisher>
+    <name><![CDATA[Golden Crafters]]></name>
+  </publisher>
+  <reviews>`;
+
+            for (const r of reviews as any[]) {
+                const p = r.product;
+                if (!p) continue;
+                const ts = new Date(r.createdAt).toISOString();
+                xml += `
+    <review>
+      <review_id>${r.id}</review_id>
+      <reviewer>
+        <name><![CDATA[${r.reviewerName || 'Verified Buyer'}]]></name>
+      </reviewer>
+      <review_timestamp>${ts}</review_timestamp>
+      <title><![CDATA[${r.title || p.title}]]></title>
+      <content><![CDATA[${String(r.comment || '').replace(/<[^>]*>/g, '').substring(0, 5000)}]]></content>
+      <review_url type="singleton">${SITE_URL}/p/${p.slug}</review_url>
+      <ratings>
+        <overall min="1" max="5">${r.rating}</overall>
+      </ratings>
+      <products>
+        <product>
+          <product_ids>
+            <mpns><mpn>${escapeXml(p.sku || p.id)}</mpn></mpns>
+            <skus><sku>${escapeXml(p.sku || p.id)}</sku></skus>
+          </product_ids>
+          <product_name><![CDATA[${p.title}]]></product_name>
+          <product_url>${SITE_URL}/p/${p.slug}</product_url>
+        </product>
+      </products>
+      <is_verified_order>${r.isVerifiedPurchase ? 'true' : 'false'}</is_verified_order>
+      <is_anonymous>${r.userId ? 'false' : 'true'}</is_anonymous>
+    </review>`;
+            }
+
+            xml += `
+  </reviews>
+</feed>`;
+
+            res.set('Content-Type', 'application/xml; charset=utf-8');
+            return res.send(xml);
+        } catch (error) {
+            console.error('Product Ratings Feed Error:', error);
+            return res.status(500).json({ error: 'Failed to generate ratings feed' });
         }
     }
 
@@ -208,6 +354,43 @@ export class FeedController {
 
             const imageUrl = product.images?.[0] || `${SITE_URL}/images/placeholder.jpg`;
 
+            // Schema.org JSON-LD (aggregateRating/review yalnızca gerçek onaylı yorum varsa)
+            let jsonLd: Record<string, unknown> | null = null;
+            try {
+                const { buildProductJsonLd } = await import('../utils/jsonLd');
+                const { default: ProductReview } = await import('../models/ProductReview');
+                const approved = await ProductReview.findAll({
+                    where: { productId: product.id, isApproved: true },
+                    order: [['createdAt', 'DESC']],
+                    limit: 10,
+                    attributes: ['reviewerName', 'rating', 'title', 'comment', 'createdAt']
+                });
+                const store = await Store.findByPk((product as any).storeId, { attributes: ['storeName'] }).catch(() => null);
+                jsonLd = buildProductJsonLd(
+                    {
+                        title: product.title,
+                        description: product.description,
+                        slug: product.slug,
+                        sku: product.sku,
+                        images: product.images,
+                        priceTRY: product.priceTRY,
+                        quantity: product.quantity,
+                        storeName: (store as any)?.storeName,
+                        ratingAverage: (product as any).ratingAverage,
+                        ratingCount: (product as any).ratingCount
+                    },
+                    approved.map((r: any) => ({
+                        reviewerName: r.reviewerName,
+                        rating: r.rating,
+                        title: r.title,
+                        comment: r.comment,
+                        createdAt: r.createdAt
+                    }))
+                );
+            } catch (e) {
+                console.error('Share Data jsonLd warning:', e);
+            }
+
             return res.json({
                 title: product.title,
                 description: product.description || `${product.title} - Golden Crafters`,
@@ -215,6 +398,9 @@ export class FeedController {
                 image: imageUrl,
                 price: product.priceTRY,
                 currency: 'TRY',
+                ratingAverage: Number((product as any).ratingAverage) || 0,
+                ratingCount: (product as any).ratingCount || 0,
+                jsonLd,
                 og: {
                     'og:title': product.title,
                     'og:description': product.description || `${product.title} - Golden Crafters`,

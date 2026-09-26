@@ -37,9 +37,10 @@ const TRACKING_FIELDS = [
       <div style={{ marginTop: 12, padding: '8px 12px', background: '#f5f5f5', borderRadius: 6, fontSize: 13 }}>
         <strong>Feed URL'leri:</strong><br />
         Google Shopping: <code>/api/feed/google.xml</code><br />
+        Product Ratings (yorumlar): <code>/api/feed/product_reviews.xml</code><br />
         Facebook Catalog: <code>/api/feed/facebook.json</code><br />
         Instagram: <code>/api/feed/instagram.json</code><br />
-        <small>Bu URL'leri Merchant Center / Commerce Manager'da ürün feed'i olarak ekleyin.</small>
+        <small>Bu URL'leri Merchant Center / Commerce Manager'da ürün feed'i olarak ekleyin. Ratings feed'i "Product Ratings" programına kaynak olarak eklenir.</small>
       </div>
     ),
   },

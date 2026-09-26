@@ -36,7 +36,14 @@ router.delete('/subscription-plans/:id', AdminController.deleteSubscriptionPlan)
 
 // --- ALL PRODUCTS (admin view) ---
 router.get('/products', AdminController.getAllProducts);
+router.post('/products/backfill-feed-attributes', AdminController.backfillFeedAttributes);
 router.put('/products/:id', AdminController.updateProductByAdmin);
+
+// --- PRODUCT REVIEWS (moderation) ---
+import { ReviewController } from '../controllers/reviewController';
+router.get('/reviews', ReviewController.adminList);
+router.put('/reviews/:id', ReviewController.adminUpdate);
+router.delete('/reviews/:id', ReviewController.adminDelete);
 
 // --- INTEGRATIONS ---
 router.get('/integrations', AdminController.getIntegrations);

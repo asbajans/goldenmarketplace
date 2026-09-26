@@ -10,7 +10,8 @@ import {
   AppstoreOutlined,
   InboxOutlined,
   WalletOutlined,
-  ApiOutlined
+  ApiOutlined,
+  StarOutlined
 } from '@ant-design/icons';
 import './App.css';
 
@@ -24,6 +25,7 @@ import IntegrationLogsPage from './pages/IntegrationLogsPage';
 import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import OrdersPage from './pages/OrdersPage';
+import ReviewsPage from './pages/ReviewsPage';
 import ContentManagementPage from './pages/ContentManagementPage';
 import PixelsTrackingPage from './pages/PixelsTrackingPage';
 import PaymentSettingsPage from './pages/PaymentSettingsPage';
@@ -124,6 +126,11 @@ function App() {
       label: 'Siparişler'
     },
     {
+      key: 'reviews',
+      icon: <StarOutlined />,
+      label: 'Yorumlar'
+    },
+    {
       key: 'payment',
       icon: <WalletOutlined />,
       label: 'Ödeme Yönetimi'
@@ -195,6 +202,9 @@ function App() {
 
       case 'orders':
         return <OrdersPage />;
+
+      case 'reviews':
+        return <ReviewsPage />;
 
       case 'payment':
         return <PaymentSettingsPage />;

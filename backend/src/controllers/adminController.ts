@@ -349,7 +349,8 @@ export class AdminController {
                     'effectiveMilyem', 'gramHas', 'priceTRY', 'priceUSD',
                     'b2bPrice', 'b2bDiscount', 'isB2BEnabled', 'quantity',
                     'images', 'isActive', 'profitMargin', 'storeId',
-                    'hasVariants', 'marketplaces', 'createdAt'
+                    'hasVariants', 'marketplaces', 'gender', 'ageGroup', 'color',
+                    'ratingAverage', 'ratingCount', 'createdAt'
                 ],
                 include: [{
                     model: Store,
@@ -389,8 +390,17 @@ export class AdminController {
             const {
                 title, description, category, categoryId, gramWeight, milyem, effectiveMilyem,
                 profitMargin, isB2BEnabled, b2bDiscount, quantity, isActive,
-                images, marketplaces
+                images, marketplaces, gender, ageGroup, color
             } = req.body;
+
+            const FEED_GENDERS = ['male', 'female', 'unisex'];
+            const FEED_AGE_GROUPS = ['newborn', 'infant', 'toddler', 'kids', 'adult'];
+            if (gender !== undefined && gender !== null && gender !== '' && !FEED_GENDERS.includes(String(gender).toLowerCase())) {
+                return res.status(400).json({ error: `Geçersiz gender. İzin verilenler: ${FEED_GENDERS.join(', ')}` });
+            }
+            if (ageGroup !== undefined && ageGroup !== null && ageGroup !== '' && !FEED_AGE_GROUPS.includes(String(ageGroup).toLowerCase())) {
+                return res.status(400).json({ error: `Geçersiz ageGroup. İzin verilenler: ${FEED_AGE_GROUPS.join(', ')}` });
+            }
 
             // If categoryId is provided, derive the raw category string from the Category record
             let finalCategory = category ?? product.category;
@@ -436,11 +446,68 @@ export class AdminController {
                 isActive: isActive ?? product.isActive,
                 images: images ?? product.images,
                 marketplaces: marketplaces ?? product.marketplaces,
+                gender: gender === undefined ? product.gender : (gender === '' || gender === null ? null : String(gender).toLowerCase()),
+                ageGroup: ageGroup === undefined ? product.ageGroup : (ageGroup === '' || ageGroup === null ? null : String(ageGroup).toLowerCase()),
+                color: color === undefined ? product.color : (color === '' || color === null ? null : String(color).trim()),
             });
             return res.json(product);
         } catch (error: any) {
             console.error('Admin Error [updateProductByAdmin]:', error);
             return res.status(400).json({ error: error.message || 'Failed to update product' });
+        }
+    }
+
+    /**
+     * POST /api/admin/products/backfill-feed-attributes
+     * Değeri boş olan tüm ürünlere feed varsayılanlarını yazar.
+     * Body ile override edilebilir: { gender, ageGroup, color }
+     * Verilmezse GlobalSetting'deki feed_default_* kullanılır.
+     */
+    static async backfillFeedAttributes(req: Request, res: Response): Promise<Response> {
+        try {
+            const { Op } = require('sequelize');
+            const { GlobalSetting } = require('../models/GlobalSetting');
+            const settings = await GlobalSetting.findAll({
+                where: { key: { [Op.in]: ['feed_default_gender', 'feed_default_age_group', 'feed_default_color'] } }
+            });
+            const map: Record<string, string> = {};
+            for (const s of settings) map[s.key] = s.value;
+
+            const gender = req.body?.gender !== undefined ? String(req.body.gender).toLowerCase() : String(map.feed_default_gender || 'unisex').toLowerCase();
+            const ageGroup = req.body?.ageGroup !== undefined ? String(req.body.ageGroup).toLowerCase() : String(map.feed_default_age_group || 'adult').toLowerCase();
+            const color = req.body?.color !== undefined ? String(req.body.color).trim() : String(map.feed_default_color || 'Gold').trim();
+
+            const FEED_GENDERS = ['male', 'female', 'unisex'];
+            const FEED_AGE_GROUPS = ['newborn', 'infant', 'toddler', 'kids', 'adult'];
+            if (!FEED_GENDERS.includes(gender)) return res.status(400).json({ error: `Geçersiz gender: ${gender}` });
+            if (!FEED_AGE_GROUPS.includes(ageGroup)) return res.status(400).json({ error: `Geçersiz ageGroup: ${ageGroup}` });
+            if (!color) return res.status(400).json({ error: 'Geçersiz color: boş olamaz' });
+
+            const candidates = await Product.findAll({
+                where: {
+                    [Op.or]: [
+                        { gender: { [Op.or]: [null, ''] } },
+                        { ageGroup: { [Op.or]: [null, ''] } },
+                        { color: { [Op.or]: [null, ''] } }
+                    ]
+                },
+                attributes: ['id', 'gender', 'ageGroup', 'color']
+            });
+            let updated = 0;
+            for (const p of candidates) {
+                const patch: any = {};
+                if (!p.gender) patch.gender = gender;
+                if (!p.ageGroup) patch.ageGroup = ageGroup;
+                if (!p.color) patch.color = color;
+                if (Object.keys(patch).length > 0) {
+                    await p.update(patch);
+                    updated++;
+                }
+            }
+            return res.json({ success: true, updated, scanned: candidates.length, applied: { gender, ageGroup, color } });
+        } catch (error: any) {
+            console.error('Admin Error [backfillFeedAttributes]:', error);
+            return res.status(500).json({ error: error.message || 'Backfill failed' });
         }
     }
 

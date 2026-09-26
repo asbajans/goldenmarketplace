@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     Form, Input, Button, InputNumber, message, Upload, TreeSelect,
-    Select, Checkbox, Space, Card, Tag, Typography, Statistic, Row, Col, Divider, Spin, Tooltip, Tabs
+    Select, Checkbox, Space, Card, Tag, Typography, Statistic, Row, Col, Divider, Spin, Tooltip, Tabs, Alert
 } from 'antd';
 import type { UploadFile, UploadChangeParam } from 'antd/es/upload';
 import type { RcFile } from 'antd/es/upload/interface';
@@ -601,6 +601,43 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                     </Space>
                     {tags.length === 0 && <Text type="secondary" style={{ fontSize: '0.85em' }}>İsim ve kategori girildikçe oluşur.</Text>}
                 </Form.Item>
+            </Card>
+
+            {/* GOOGLE MERCHANT */}
+            <Card title="Google Merchant (gender / age_group / color)" style={{ marginBottom: 16 }}>
+                <Alert
+                    type="info"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                    message="Boş bırakırsanız admin panelindeki varsayılan değerler kullanılır. Google feed'e İngilizce değerler yazılır."
+                />
+                <Row gutter={16}>
+                    <Col span={8}>
+                        <Form.Item name="gender" label="Cinsiyet">
+                            <Select placeholder="Varsayılanı kullan" allowClear disabled={isCloned}>
+                                <Option value="female">Kadın (female)</Option>
+                                <Option value="male">Erkek (male)</Option>
+                                <Option value="unisex">Unisex (unisex)</Option>
+                            </Select>
+                        </Form.Item>
+                    </Col>
+                    <Col span={8}>
+                        <Form.Item name="ageGroup" label="Yaş Grubu">
+                            <Select placeholder="Varsayılanı kullan" allowClear disabled={isCloned}>
+                                <Option value="newborn">Yenidoğan (newborn)</Option>
+                                <Option value="infant">Bebek (infant)</Option>
+                                <Option value="toddler">Toddler (1-5 yaş)</Option>
+                                <Option value="kids">Çocuk (kids)</Option>
+                                <Option value="adult">Yetişkin (adult)</Option>
+                            </Select>
+                        </Form.Item>
+                    </Col>
+                    <Col span={8}>
+                        <Form.Item name="color" label="Renk">
+                            <Input placeholder="örn: Gold (boşsa varsayılan)" disabled={isCloned} />
+                        </Form.Item>
+                    </Col>
+                </Row>
             </Card>
 
             {/* ALTIN FİYATLANDIRMA */}

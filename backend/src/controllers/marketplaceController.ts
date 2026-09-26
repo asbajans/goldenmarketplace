@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
-import { Product, Store, ProductVariant, Category } from '../models';
+import { Product, Store, ProductVariant, Category, ProductReview } from '../models';
 import { Op, Sequelize, WhereOptions } from 'sequelize';
+import { buildProductJsonLd } from '../utils/jsonLd';
 
 // Reusable golden marketplace filter as a raw SQL literal condition.
 // Using Op.and with a Sequelize.literal keeps it compatible with WhereOptions.
@@ -102,6 +103,45 @@ function applyTranslation(product: any, lang: string): any {
     _lang: lang,
     _defaultLang: defaultLang,
   };
+}
+
+/**
+ * Attach schema.org Product JSON-LD (with genuine aggregateRating/review)
+ * to a translated product detail payload.
+ */
+async function buildDetailJsonLd(product: any, data: any) {
+  try {
+    const approved = await ProductReview.findAll({
+      where: { productId: product.id, isApproved: true },
+      order: [['createdAt', 'DESC']],
+      limit: 10,
+      attributes: ['reviewerName', 'rating', 'title', 'comment', 'createdAt']
+    });
+    return buildProductJsonLd(
+      {
+        title: data.title,
+        description: data.description,
+        slug: product.slug,
+        sku: product.sku,
+        images: product.images,
+        priceTRY: product.priceTRY,
+        quantity: product.quantity,
+        storeName: data.store?.storeName,
+        ratingAverage: product.ratingAverage,
+        ratingCount: product.ratingCount
+      },
+      approved.map(r => ({
+        reviewerName: r.reviewerName,
+        rating: r.rating,
+        title: r.title,
+        comment: r.comment,
+        createdAt: r.createdAt
+      }))
+    );
+  } catch (err) {
+    console.error('[Marketplace] jsonLd build warning:', err);
+    return null;
+  }
 }
 
 export class MarketplaceController {
@@ -234,7 +274,7 @@ export class MarketplaceController {
 
       const product = await Product.findOne({
         where: { slug, isActive: true },
-        attributes: ['id', 'title', 'description', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'sku', 'quantity', 'gramWeight', 'marketplaces', 'discountRate', 'discountedPrice'],
+        attributes: ['id', 'title', 'description', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'sku', 'quantity', 'gramWeight', 'marketplaces', 'discountRate', 'discountedPrice', 'ratingAverage', 'ratingCount'],
         include: [
           {
             model: Store,
@@ -251,7 +291,9 @@ export class MarketplaceController {
       });
 
       if (!product) return res.status(404).json({ error: 'Product not found' });
-      return res.json(applyTranslation(product, lang));
+      const data = applyTranslation(product, lang);
+      data.jsonLd = await buildDetailJsonLd(product, data);
+      return res.json(data);
     } catch (error: any) {
       console.error('[Marketplace] getProductBySlug error:', error);
       return res.status(500).json({ error: 'Failed to fetch product details', details: error?.message || String(error) });
@@ -268,7 +310,7 @@ export class MarketplaceController {
 
       const product = await Product.findOne({
         where: { id, isActive: true },
-        attributes: ['id', 'title', 'description', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'sku', 'quantity', 'gramWeight', 'marketplaces', 'discountRate', 'discountedPrice'],
+        attributes: ['id', 'title', 'description', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'sku', 'quantity', 'gramWeight', 'marketplaces', 'discountRate', 'discountedPrice', 'ratingAverage', 'ratingCount'],
         include: [
           {
             model: Store,
@@ -285,7 +327,9 @@ export class MarketplaceController {
       });
 
       if (!product) return res.status(404).json({ error: 'Product not found' });
-      return res.json(applyTranslation(product, lang));
+      const data = applyTranslation(product, lang);
+      data.jsonLd = await buildDetailJsonLd(product, data);
+      return res.json(data);
     } catch (error: any) {
       console.error('[Marketplace] getProductById error:', error);
       return res.status(500).json({ error: 'Failed to fetch product by id', details: error?.message || String(error) });

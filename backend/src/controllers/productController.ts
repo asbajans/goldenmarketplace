@@ -10,6 +10,25 @@ import goldPriceService from '../services/goldPriceService';
 import { s3Service } from '../services/s3Service';
 import { productSyncQueue } from '../jobs/productSyncJob';
 
+const FEED_GENDERS = ['male', 'female', 'unisex'];
+const FEED_AGE_GROUPS = ['newborn', 'infant', 'toddler', 'kids', 'adult'];
+
+function normalizeFeedAttr(value: unknown, allowed: string[]): string | null {
+  if (value === undefined || value === null) return null;
+  const v = String(value).trim().toLowerCase();
+  if (!v) return null;
+  if (!allowed.includes(v)) {
+    throw new Error(`Geçersiz değer: "${value}". İzin verilenler: ${allowed.join(', ')}`);
+  }
+  return v;
+}
+
+function normalizeColor(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  const v = String(value).trim();
+  return v || null;
+}
+
 export class ProductController {
   /**
    * Get all products
@@ -96,8 +115,20 @@ export class ProductController {
         images, videoUrl, marketplaces, marketplaceConfig, gramWeight, milyem, effectiveMilyem, profitMargin, priceMultiplier,
         isB2BEnabled, b2bDiscount, discountRate,
         hasVariants, variantAttributes, variants,
-        translations, defaultLanguage = 'en'
+        translations, defaultLanguage = 'en',
+        gender, ageGroup, color
       } = req.body;
+
+      let feedGender: string | null = null;
+      let feedAgeGroup: string | null = null;
+      let feedColor: string | null = null;
+      try {
+        feedGender = normalizeFeedAttr(gender, FEED_GENDERS);
+        feedAgeGroup = normalizeFeedAttr(ageGroup, FEED_AGE_GROUPS);
+        feedColor = normalizeColor(color);
+      } catch (feedErr: any) {
+        return res.status(400).json({ error: { message: feedErr.message, status: 400 } });
+      }
 
       // Validate required gold fields
       if (!gramWeight || gramWeight <= 0) {
@@ -190,6 +221,9 @@ export class ProductController {
         videoUrl,
         marketplaces: (Array.isArray(marketplaces) && marketplaces.length > 0) ? marketplaces : ['golden'],
         marketplaceConfig: marketplaceConfig || {},
+        gender: feedGender,
+        ageGroup: feedAgeGroup,
+        color: feedColor,
         hasVariants: !!hasVariants,
         variantAttributes: variantAttributes || [],
         tags,
@@ -266,8 +300,16 @@ export class ProductController {
         title, description, category, categoryId, quantity,
         images, videoUrl, marketplaces, marketplaceConfig, gramWeight, milyem, effectiveMilyem, profitMargin, priceMultiplier,
         isB2BEnabled, b2bDiscount, discountRate,
-        hasVariants, variantAttributes, variants
+        hasVariants, variantAttributes, variants,
+        gender, ageGroup, color
       } = req.body;
+
+      try {
+        if (gender !== undefined) normalizeFeedAttr(gender === '' ? null : gender, FEED_GENDERS);
+        if (ageGroup !== undefined) normalizeFeedAttr(ageGroup === '' ? null : ageGroup, FEED_AGE_GROUPS);
+      } catch (feedErr: any) {
+        return res.status(400).json({ error: { message: feedErr.message, status: 400 } });
+      }
 
       const user = (req as any).user;
       const product = await Product.findByPk(id);
@@ -367,6 +409,9 @@ export class ProductController {
         videoUrl: isCloned ? product.videoUrl : (videoUrl !== undefined ? videoUrl : product.videoUrl),
         marketplaces: marketplaces || product.marketplaces,
         marketplaceConfig: marketplaceConfig !== undefined ? marketplaceConfig : product.marketplaceConfig,
+        gender: gender === undefined ? product.gender : (gender === '' || gender === null ? null : String(gender).trim().toLowerCase()),
+        ageGroup: ageGroup === undefined ? product.ageGroup : (ageGroup === '' || ageGroup === null ? null : String(ageGroup).trim().toLowerCase()),
+        color: color === undefined ? product.color : (color === '' || color === null ? null : String(color).trim()),
         hasVariants: finalHasVariants,
         variantAttributes: finalVariantAttributes,
         tags: isCloned ? product.tags : tags

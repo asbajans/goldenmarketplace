@@ -94,6 +94,15 @@ export const AdminAPI = {
     // Settings
     getSettings: () => api.get('/settings').then((res) => res.data),
     updateSettings: (data: any) => api.post('/settings', data).then((res) => res.data),
+    backfillFeedAttributes: (data?: { gender?: string; ageGroup?: string; color?: string }) =>
+        api.post('/products/backfill-feed-attributes', data || {}).then((res) => res.data),
+
+    // Product reviews (moderation)
+    getReviews: (params?: { page?: number; limit?: number; approved?: boolean }) =>
+        api.get('/reviews', { params }).then((res) => res.data),
+    updateReview: (id: string, data: { isApproved?: boolean; isVerifiedPurchase?: boolean }) =>
+        api.put(`/reviews/${id}`, data).then((res) => res.data),
+    deleteReview: (id: string) => api.delete(`/reviews/${id}`).then((res) => res.data),
 
     // Settings – single key helpers (used by ContentManagementPage)
     getSetting: (key: string) =>

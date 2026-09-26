@@ -79,6 +79,14 @@ async function syncAndSeedSettings() {
       // Stripe
       { key: 'stripe_publishable_key', value: '', description: 'Stripe Publishable Key', isPublic: true },
       { key: 'stripe_secret_key', value: '', description: 'Stripe Secret Key', isPublic: false },
+      // Google Merchant Center
+      { key: 'merchant_center_id', value: '', description: 'Google Merchant Center ID', isPublic: true },
+      { key: 'merchant_target_country', value: 'TR', description: 'Google feed target country (e.g. TR)', isPublic: true },
+      { key: 'merchant_target_language', value: 'tr', description: 'Google feed target language (e.g. tr)', isPublic: true },
+      // Google Merchant feed defaults (missing gender/age_group/color fallback)
+      { key: 'feed_default_gender', value: 'unisex', description: 'Google feed default gender: male | female | unisex', isPublic: true },
+      { key: 'feed_default_age_group', value: 'adult', description: 'Google feed default age_group: newborn | infant | toddler | kids | adult', isPublic: true },
+      { key: 'feed_default_color', value: 'Gold', description: 'Google feed default color (e.g. Gold)', isPublic: true },
     ];
 
     for (const setting of settingsToSeed) {
@@ -182,6 +190,7 @@ app.use('/api/cart', require('./routes/cart').default || require('./routes/cart'
 app.use('/api/wishlist', require('./routes/wishlist').default || require('./routes/wishlist'));
 app.use('/api/addresses', require('./routes/addresses').default || require('./routes/addresses'));
 app.use('/api/feeds', require('./routes/externalFeeds').default || require('./routes/externalFeeds'));
+app.use('/api/reviews', require('./routes/reviews').default || require('./routes/reviews'));
 app.use('/api/ai', require('./routes/ai').default || require('./routes/ai'));
 app.use('/api/image-proxy', require('./routes/imageProxy').default || require('./routes/imageProxy'));
 

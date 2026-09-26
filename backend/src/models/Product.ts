@@ -34,6 +34,11 @@ interface ProductAttributes {
   videos?: string[];
   videoUrl?: string;
   marketplaces?: string[];
+  gender?: string | null;
+  ageGroup?: string | null;
+  color?: string | null;
+  ratingAverage?: number;
+  ratingCount?: number;
   hasVariants: boolean;
   variantAttributes?: any;
   marketplaceConfig?: any;
@@ -75,6 +80,11 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public videos?: string[];
   public videoUrl?: string;
   public marketplaces?: string[];
+  public gender?: string | null;
+  public ageGroup?: string | null;
+  public color?: string | null;
+  public ratingAverage!: number;
+  public ratingCount!: number;
   public hasVariants!: boolean;
   public variantAttributes?: any;
   public marketplaceConfig?: any;
@@ -238,6 +248,33 @@ Product.init(
       type: DataTypes.JSON,
       allowNull: true,
       defaultValue: []
+    },
+    gender: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      comment: 'Google Merchant gender: male | female | unisex. NULL = feed_default_gender kullanılır.'
+    },
+    ageGroup: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      comment: 'Google Merchant age_group: newborn | infant | toddler | kids | adult. NULL = feed_default_age_group kullanılır.'
+    },
+    color: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      comment: 'Google Merchant color (örn: Gold). Birden fazla renk "/" ile ayrılır. NULL = feed_default_color kullanılır.'
+    },
+    ratingAverage: {
+      type: DataTypes.DECIMAL(3, 2),
+      allowNull: false,
+      defaultValue: 0,
+      comment: 'Average of approved review ratings (0 = no reviews yet)'
+    },
+    ratingCount: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+      comment: 'Number of approved reviews'
     },
     hasVariants: {
       type: DataTypes.BOOLEAN,

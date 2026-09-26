@@ -10,8 +10,26 @@ const PUBLIC_PREFIXES = [
     'homepage_',
     'about_',
     'blog_',
-    'footer_'
+    'footer_',
+    'feed_',
+    'merchant_'
 ];
+
+// Google Merchant feed defaults (GlobalSetting keys)
+export const FEED_DEFAULT_KEYS = {
+    gender: 'feed_default_gender',
+    ageGroup: 'feed_default_age_group',
+    color: 'feed_default_color'
+} as const;
+
+export const FEED_GENDERS = ['male', 'female', 'unisex'] as const;
+export const FEED_AGE_GROUPS = ['newborn', 'infant', 'toddler', 'kids', 'adult'] as const;
+
+export const FEED_FALLBACKS = {
+    gender: 'unisex',
+    ageGroup: 'adult',
+    color: 'Gold'
+};
 
 function isPublicKey(key: string): boolean {
     return PUBLIC_PREFIXES.some(prefix => key.startsWith(prefix));
@@ -72,6 +90,42 @@ export class SettingsController {
                         });
                     }
                 }
+            }
+
+            // Feed varsayılanı değiştiyse, değeri boş olan eski ürünlere yansıt
+            // (NULL alanlar fiziksel olarak da doldurulur; feed ayrıca fallback uygular)
+            try {
+                const { FEED_DEFAULT_KEYS: KEYS } = { FEED_DEFAULT_KEYS };
+                const backfillMap: Record<string, string> = {};
+                if (typeof settingsToUpdate[KEYS.gender] === 'string') backfillMap.gender = String(settingsToUpdate[KEYS.gender]).trim().toLowerCase();
+                if (typeof settingsToUpdate[KEYS.ageGroup] === 'string') backfillMap.ageGroup = String(settingsToUpdate[KEYS.ageGroup]).trim().toLowerCase();
+                if (typeof settingsToUpdate[KEYS.color] === 'string') backfillMap.color = String(settingsToUpdate[KEYS.color]).trim();
+                const validGender = FEED_GENDERS.includes(backfillMap.gender as any) ? backfillMap.gender : undefined;
+                const validAge = FEED_AGE_GROUPS.includes(backfillMap.ageGroup as any) ? backfillMap.ageGroup : undefined;
+                const validColor = backfillMap.color ? backfillMap.color : undefined;
+                if (validGender || validAge || validColor) {
+                    const { default: Product } = require('../models/Product');
+                    const { Op } = require('sequelize');
+                    const orConds: any[] = [];
+                    if (validGender) orConds.push({ gender: { [Op.or]: [null, ''] } });
+                    if (validAge) orConds.push({ ageGroup: { [Op.or]: [null, ''] } });
+                    if (validColor) orConds.push({ color: { [Op.or]: [null, ''] } });
+                    const candidates = await Product.findAll({ where: { [Op.or]: orConds }, attributes: ['id', 'gender', 'ageGroup', 'color'] });
+                    let touched = 0;
+                    for (const p of candidates) {
+                        const patch: any = {};
+                        if (validGender && !p.gender) patch.gender = validGender;
+                        if (validAge && !p.ageGroup) patch.ageGroup = validAge;
+                        if (validColor && !p.color) patch.color = validColor;
+                        if (Object.keys(patch).length > 0) {
+                            await p.update(patch);
+                            touched++;
+                        }
+                    }
+                    return res.json({ success: true, message: 'Settings updated successfully', backfilledProducts: touched });
+                }
+            } catch (backfillErr) {
+                console.error('Feed defaults backfill warning:', backfillErr);
             }
 
             return res.json({ success: true, message: 'Settings updated successfully' });

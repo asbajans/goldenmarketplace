@@ -53,7 +53,10 @@ export const ProductsPage: React.FC = () => {
             isB2BEnabled: record.isB2BEnabled,
             b2bDiscount: record.b2bDiscount,
             isActive: record.isActive,
-            quantity: record.quantity
+            quantity: record.quantity,
+            gender: record.gender || undefined,
+            ageGroup: record.ageGroup || undefined,
+            color: record.color || undefined
         });
         setIsEditModalVisible(true);
     };
@@ -97,6 +100,16 @@ export const ProductsPage: React.FC = () => {
             )
         },
         { title: 'Fiyat (TL)', dataIndex: 'priceTRY', key: 'priceTRY', render: (val: number) => <span style={{ fontWeight: 600 }}>{val ? val.toLocaleString('tr-TR') : '0'} ₺</span> },
+        {
+            title: 'Puan',
+            key: 'rating',
+            width: 110,
+            render: (_: any, record: any) => (
+                Number(record.ratingCount) > 0 ? (
+                    <span>★ {Number(record.ratingAverage).toFixed(1)} <span style={{ color: '#888' }}>({record.ratingCount})</span></span>
+                ) : <span style={{ color: '#bbb' }}>—</span>
+            )
+        },
         { 
             title: 'B2B', 
             key: 'b2b', 
@@ -205,6 +218,30 @@ export const ProductsPage: React.FC = () => {
                             </Form.Item>
                             <Form.Item name="profitMargin" label="Kâr Marjı (%)">
                                 <InputNumber min={0} max={500} />
+                            </Form.Item>
+                        </Space>
+                    </Card>
+
+                    <Card size="small" title="Google Merchant (gender / age_group / color)" style={{ marginBottom: 16 }}>
+                        <Space size="middle" wrap>
+                            <Form.Item name="gender" label="Cinsiyet">
+                                <Select style={{ width: 180 }} placeholder="Varsayılan kullanılır" allowClear>
+                                    <Select.Option value="female">Kadın (female)</Select.Option>
+                                    <Select.Option value="male">Erkek (male)</Select.Option>
+                                    <Select.Option value="unisex">Unisex (unisex)</Select.Option>
+                                </Select>
+                            </Form.Item>
+                            <Form.Item name="ageGroup" label="Yaş Grubu">
+                                <Select style={{ width: 220 }} placeholder="Varsayılan kullanılır" allowClear>
+                                    <Select.Option value="newborn">Yenidoğan (newborn)</Select.Option>
+                                    <Select.Option value="infant">Bebek (infant)</Select.Option>
+                                    <Select.Option value="toddler">Toddler (1-5 yaş)</Select.Option>
+                                    <Select.Option value="kids">Çocuk (kids)</Select.Option>
+                                    <Select.Option value="adult">Yetişkin (adult)</Select.Option>
+                                </Select>
+                            </Form.Item>
+                            <Form.Item name="color" label="Renk">
+                                <Input style={{ width: 200 }} placeholder="örn: Gold (boşsa varsayılan)" />
                             </Form.Item>
                         </Space>
                     </Card>
