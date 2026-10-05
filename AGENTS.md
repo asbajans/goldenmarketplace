@@ -228,7 +228,7 @@ Admin panel (`ProductsPage.tsx`) artık kategori için plain `<Input>` yerine **
 - OpenRouter: `https://openrouter.ai/api/v1/chat/completions`
 - Gemini: `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`
 
-**Default model:** `gpt-4o-mini`. Ayarlar `GlobalSetting`'te: `ai_provider`, `ai_api_key`, `ai_model`.
+**Default model:** `gpt-4o-mini`. Ayarlar `GlobalSetting`'te: `ai_provider`, `ai_api_key`, `ai_model`, `ai_image_model` (blog kapağı için, aynı key; örn. `gpt-image-1` / OpenRouter'da `google/gemini-2.5-flash-image`).
 
 ### AI Özellikleri
 | Özellik | Controller Metodu | Açıklama |
@@ -302,6 +302,7 @@ Bing/Yandex/Naver/Seznam index'ine anlık URL bildirimi (`indexnow.org`). Google
 - Checkout akışında backend `/cart/add` çağrısı tekrarlanmamalı — her çağrı miktarı artırır (1x→2x→3x Stripe tutarı). Market proxy'sindeki `/cart/add` döngüsü bu yüzden kaldırıldı.
 - USD fiyatı olmayan üründe TRY tutar asla USD diye gönderilmez — `buildStripeLineItems` güncel `usd_try_rate` ile çevirir.
 - `paymentMethod` her checkout'ta `assertPaymentMethodAllowed()` ile doğrulanır: kapalı yöntem → 400. Admin toggle'ları (`payment_*`, `credit_card_provider`) public endpoint'ten okunur; `updateSettings` bunların `isPublic`'ini asla gizliye düşürmez.
+- **İndirim tek doğruluk kaynağı:** `discountRate` + canlı `priceTRY`'dir. `discountedPrice` her fiyat güncellemesinde (`updateProductPricesInternal`, `syncStorePrices`, admin edit) yeniden hesaplanır; sepette/checkout'ta asla stale değer okunmaz. Variant'ların kendi indirimi yoktur, parent `discountRate`'i miras alır (Stripe dahil).
 
 ---
 
