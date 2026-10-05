@@ -177,17 +177,31 @@ export class MarketplaceController {
       const andConds: any[] = [goldenFilter];
 
       if (search) {
-        const like = `%${search}%`;
+        // Accent-insensitive match: 'yuzuk' finds 'yüzük'. Both the column
+        // and the term are folded to ASCII (translate() needs no extension,
+        // unlike unaccent). Uppercase variants are mapped explicitly so the
+        // result never depends on the DB collation's case folding.
+        const fold = (s: string) => s.replace(/İ/g, 'i').toLowerCase()
+          .replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ı/g, 'i')
+          .replace(/ö/g, 'o').replace(/ş/g, 's').replace(/ü/g, 'u');
+        const like = `%${fold(search)}%`;
+        const folded = (col: string) => Sequelize.where(
+          Sequelize.fn('translate', Sequelize.col(col), 'çÇğĞıIiİöÖşŞüÜ', 'ccggiiiioossuu'),
+          { [Op.iLike]: like }
+        );
         // NOTE: columns MUST be qualified with Product.* — the joined
         // Store/Category tables also have description/translations columns
         // and an unqualified reference is a 500 (ambiguous column).
         andConds.push({
           [Op.or]: [
-            { title: { [Op.iLike]: like } },
-            { sku: { [Op.iLike]: like } },
-            Sequelize.where(Sequelize.col('Product.description'), { [Op.iLike]: like }),
+            folded('Product.title'),
+            folded('Product.sku'),
+            folded('Product.description'),
             // translations JSONB carries all 5 languages' titles/descriptions
-            Sequelize.where(Sequelize.cast(Sequelize.col('Product.translations'), 'text'), { [Op.iLike]: like })
+            Sequelize.where(
+              Sequelize.fn('translate', Sequelize.cast(Sequelize.col('Product.translations'), 'text'), 'çÇğĞıIiİöÖşŞüÜ', 'ccggiiiioossuu'),
+              { [Op.iLike]: like }
+            )
           ]
         });
       }
