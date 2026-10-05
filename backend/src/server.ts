@@ -107,6 +107,23 @@ async function syncAndSeedSettings() {
       }
     }
     logger.info('[DB] GlobalSettings synchronized successfully.');
+
+    // Hardening: secret keys must never be public, no matter what past code
+    // versions saved (e.g. updateAISettings used to expose ai_api_key).
+    // Values are untouched — only the visibility flag is repaired.
+    const SECRET_KEYS = [
+      'ai_api_key',
+      'stripe_secret_key',
+      'iyzico_api_key', 'iyzico_secret_key',
+      'paytr_merchant_id', 'paytr_merchant_key', 'paytr_merchant_salt'
+    ];
+    for (const key of SECRET_KEYS) {
+      const row = await GlobalSetting.findOne({ where: { key } });
+      if (row && (row as any).isPublic) {
+        await row.update({ isPublic: false });
+        logger.info(`[DB] Made secret setting private: ${key}`);
+      }
+    }
   } catch (error) {
     logger.error('[DB] Failed to synchronize GlobalSettings:', error);
   }

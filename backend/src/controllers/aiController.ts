@@ -27,11 +27,15 @@ export class AIController {
   static async updateAISettings(req: Request, res: Response) {
     try {
       const allowed = ['ai_provider', 'ai_api_key', 'ai_model', 'ai_credit_packs', 'ai_translation_cost', 'ai_content_cost'];
+      // ai_api_key is a SECRET — it must never be served on public endpoints.
+      const PRIVATE_KEYS = new Set(['ai_api_key']);
       for (const key of allowed) {
         if (req.body[key] !== undefined) {
-          await GlobalSetting.upsert({ key, value: String(req.body[key]), isPublic: true, description: `AI setting: ${key}` } as any);
+          await GlobalSetting.upsert({ key, value: String(req.body[key]), isPublic: !PRIVATE_KEYS.has(key), description: `AI setting: ${key}` } as any);
         }
       }
+      // Repair: if a previous save exposed the secret, make it private again.
+      await GlobalSetting.update({ isPublic: false }, { where: { key: 'ai_api_key' } }).catch(() => undefined);
       return res.json({ message: 'AI settings updated' });
     } catch (error) {
       return res.status(500).json({ error: 'Failed to update AI settings' });
