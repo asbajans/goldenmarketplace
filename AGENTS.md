@@ -257,6 +257,7 @@ Admin panel (`ProductsPage.tsx`) artık kategori için plain `<Input>` yerine **
 | Route | Auth | Açıklama |
 |-------|------|----------|
 | `/api/ai/admin/settings` | admin | AI provider yapılandırması |
+| `/api/ai/admin/blog/generate` | admin | Blog yazısı üret (body: `topic?`, `productId?`, `tone?` → 5 dilde `translations` + benzersiz `slug` önerisi) |
 | `/api/ai/products/:id/translate` | seller | Tek ürün çeviri |
 | `/api/ai/products/:id/generate` | seller | Tek ürün içerik üretimi |
 | `/api/ai/products/:id/ai-status` | seller | AI task geçmişi (son 10) |
@@ -266,6 +267,41 @@ Admin panel (`ProductsPage.tsx`) artık kategori için plain `<Input>` yerine **
 
 ### ProductAITask Modeli
 - `product_ai_tasks` tablosu: taskType (translate/generate_content/both), status (pending/processing/completed/failed), progress (0-100), creditsConsumed, result (JSONB)
+
+### AI Blog Yazımı (Admin → Blog)
+- Admin panel (ContentManagementPage → "AI ile Yazdır"): konu + opsiyonel ürün + üslup seçilir
+- Backend `AIController.generateBlogPost`: İngilizce taslak (JSON: title/excerpt/content, düz metin paragraf) → tr/it/es/ar çevirileri → mevcut `blog_posts` slug'larına göre benzersiz slug önerisi
+- Sonuç edit modalında açılır, admin inceleyip kaydeder (`blog_posts` JSON setting). Kaydetme `updateSettings` üzerinden geçince IndexNow'a otomatik gönderilir.
+
+---
+
+## IndexNow (Anında Indexleme)
+
+Bing/Yandex/Naver/Seznam index'ine anlık URL bildirimi (`indexnow.org`). Google desteklemez; ama Bing-verili yapay zeka cevapları (Copilot vb.) için görünürlük sağlar.
+
+### Altyapı
+- **Service:** `services/indexNowService.ts` — `submitUrls()` (max 10k/istek, throw etmez), `productUrls()` / `blogPostUrls()` / `categoryUrls()` (5 locale: en,tr,it,ar,es), `submitUrlsAsync()` (fire-and-forget)
+- **Config:** `GlobalSetting` → `indexnow_key` (private), `indexnow_enabled` (public). Seed `server.ts`'tedir.
+- **Doğrulama dosyası:** Market frontend'de `public/<key>.txt` (içeriği = anahtarın kendisi). Anahtar değişirse dosyayı da güncelleyin.
+- **Admin route'ları** (`/api/admin/indexnow/*`): `GET status`, `POST submit { urls[] }`
+
+### Otomatik Tetikleyiciler (hepsi non-blocking, hata yutmalı)
+- `productController` create/update → ürün sayfası (5 dil)
+- `settingsController.updateSettings` içinde `blog_posts` değişirse → aktif yazıların URL'leri (5 dil)
+
+---
+
+## Checkout & Ödeme Tutar Kuralları (KRİTİK)
+
+`POST /api/cart/checkout` üç modda çalışır (`routes/cart.ts`):
+- **MODE 0 (retry):** Body'de `orderId` varsa aynı bekleyen sipariş yeniden kullanılır, sadece yeni Stripe oturumu açılır. Tutar retry'ler arası ASLA büyümez. Frontend her "Tekrar Öde"de `orderId` göndermelidir.
+- **MODE 1:** `cartItems[]` ile sıfırdan sipariş kurulur. Stripe satırları `checkoutService.buildStripeLineItems()` ile DB'deki üründen türetilir (tek doğruluk kaynağı).
+- **MODE 2 (legacy):** DB'deki pending sepet kullanılır.
+
+**Yasaklar:**
+- Checkout akışında backend `/cart/add` çağrısı tekrarlanmamalı — her çağrı miktarı artırır (1x→2x→3x Stripe tutarı). Market proxy'sindeki `/cart/add` döngüsü bu yüzden kaldırıldı.
+- USD fiyatı olmayan üründe TRY tutar asla USD diye gönderilmez — `buildStripeLineItems` güncel `usd_try_rate` ile çevirir.
+- `paymentMethod` her checkout'ta `assertPaymentMethodAllowed()` ile doğrulanır: kapalı yöntem → 400. Admin toggle'ları (`payment_*`, `credit_card_provider`) public endpoint'ten okunur; `updateSettings` bunların `isPublic`'ini asla gizliye düşürmez.
 
 ---
 
