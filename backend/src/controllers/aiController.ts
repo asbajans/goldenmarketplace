@@ -14,7 +14,7 @@ export class AIController {
   static async getAISettings(_req: Request, res: Response) {
     try {
       const settings = await GlobalSetting.findAll({
-        where: { key: ['ai_provider', 'ai_api_key', 'ai_model', 'ai_credit_packs', 'ai_translation_cost', 'ai_content_cost'] }
+        where: { key: ['ai_provider', 'ai_api_key', 'ai_model', 'ai_image_model', 'ai_credit_packs', 'ai_translation_cost', 'ai_content_cost'] }
       });
       const result: any = {};
       for (const s of settings) result[s.key] = s.value;
@@ -26,7 +26,7 @@ export class AIController {
 
   static async updateAISettings(req: Request, res: Response) {
     try {
-      const allowed = ['ai_provider', 'ai_api_key', 'ai_model', 'ai_credit_packs', 'ai_translation_cost', 'ai_content_cost'];
+      const allowed = ['ai_provider', 'ai_api_key', 'ai_model', 'ai_image_model', 'ai_credit_packs', 'ai_translation_cost', 'ai_content_cost'];
       // ai_api_key is a SECRET — it must never be served on public endpoints.
       const PRIVATE_KEYS = new Set(['ai_api_key']);
       for (const key of allowed) {
@@ -347,18 +347,42 @@ export class AIController {
       }
 
       let context = '';
+      let productUrl = '';
+      let productImageUrl = '';
       if (productId) {
         const product: any = await Product.findByPk(productId);
         if (!product) {
           return res.status(404).json({ error: 'Product not found' });
         }
-        context = `Feature this product naturally inside the article (one section about it, plus a closing call-to-action):\n- Name: ${product.title}\n- Category: ${product.category || ''}\n- Price: ${product.priceTRY || ''} TRY\n- Description: ${(product.description || '').slice(0, 800)}`;
+        // Prices: ALWAYS the discounted sale price, in TRY and in USD.
+        const priceTRY = parseFloat(product.priceTRY) || 0;
+        const discountRate = parseFloat(product.discountRate) || 0;
+        const saleTRY = discountRate > 0
+          ? Math.round(priceTRY * (1 - discountRate / 100) * 100) / 100
+          : priceTRY;
+        let saleUSD = parseFloat(product.priceUSD) || 0;
+        if (discountRate > 0) saleUSD = Math.round(saleUSD * (1 - discountRate / 100) * 100) / 100;
+        if (!saleUSD) {
+          try {
+            const goldPriceService = require('../services/goldPriceService').default;
+            const gold = await goldPriceService.getCurrentGoldPrice();
+            if (gold?.usdTryRate > 0) saleUSD = Math.round((saleTRY / gold.usdTryRate) * 100) / 100;
+          } catch { /* USD optional */ }
+        }
+        const priceLine = discountRate > 0
+          ? `Sale price: ${saleTRY} TRY (approx $${saleUSD} USD) — ${discountRate}% OFF the regular ${priceTRY} TRY`
+          : `Price: ${saleTRY} TRY (approx $${saleUSD} USD)`;
+        productUrl = `https://goldencrafters.com/en/p/${product.slug || product.id}`;
+        const images: any[] = Array.isArray(product.images) ? product.images : [];
+        productImageUrl = images[0] || '';
+        context = `Feature this product naturally inside the article (one section about it, plus mention its price in BOTH Turkish lira and US dollars exactly as given):\n- Name: ${product.title}\n- Category: ${product.category || ''}\n- ${priceLine}\n- Description: ${(product.description || '').slice(0, 800)}`;
       }
 
       // 1) Draft in English, strict JSON (plain-text paragraphs, no HTML/markdown)
       const draftRes = await aiService.generateContent(
         `You are an expert jewelry journalist writing for Golden Crafters, a fine gold jewelry marketplace.
 Write in English with a ${tone} tone. Audience: jewelry shoppers and gold enthusiasts.
+Whenever a product price is given, quote it in both TRY and USD exactly as provided.
 Return ONLY a JSON object (no code fences, no extra text) with exactly these keys:
 { "title": "catchy SEO title, max 70 chars", "excerpt": "1-2 sentence teaser, max 200 chars", "content": "full article, 300-500 words, plain text paragraphs separated by blank lines, no HTML, no markdown" }`,
         `Article topic: ${topic || 'gold jewelry'}\n${context}`
@@ -392,7 +416,46 @@ Return ONLY a JSON object (no code fences, no extra text) with exactly these key
         translations[lang] = { title: tTitle, excerpt: tExcerpt, content: tContent };
       }));
 
-      // 3) Suggest a slug unique among existing blog posts
+      // 3) Featured-product CTA appended AFTER translation (static templates,
+      // so the product URL can never be mangled by the translator).
+      if (productId && productUrl) {
+        const CTA: Record<string, string> = {
+          en: 'Featured in this article',
+          tr: 'Bu yazıda öne çıkan ürün',
+          it: 'In evidenza in questo articolo',
+          es: 'Destacado en este artículo',
+          ar: 'منتج مميز في هذه المقالة'
+        };
+        const VIEW: Record<string, string> = {
+          en: 'View product', tr: 'Ürünü incele', it: 'Vedi il prodotto',
+          es: 'Ver el producto', ar: 'عرض المنتج'
+        };
+        for (const lang of Object.keys(translations)) {
+          const t = translations[lang];
+          t.content = `${t.content}\n\n${CTA[lang] || CTA.en}: ${productUrl}\n${VIEW[lang] || VIEW.en}: ${productUrl}`;
+        }
+      }
+
+      // 4) AI cover image (uploaded to object storage). Failure never blocks
+      // the article — imageUrl is simply left empty.
+      let imageUrl = '';
+      let imageError = '';
+      try {
+        const imgPrompt = topic
+          ? `${topic}, elegant gold jewelry theme`
+          : `elegant gold jewelry showcase`;
+        const img = await aiService.generateImage(imgPrompt);
+        if (img.success && img.dataUrl) {
+          const { s3Service } = require('../services/s3Service');
+          imageUrl = await s3Service.uploadBase64Image(img.dataUrl, 'blog');
+        } else if (img.error) {
+          imageError = img.error;
+        }
+      } catch (imgErr: any) {
+        imageError = imgErr?.message || 'Image upload failed';
+      }
+
+      // 5) Suggest a slug unique among existing blog posts
       const slugBase = draft.title.toLowerCase().normalize('NFKD')
         .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'blog-post';
       let slug = slugBase;
@@ -407,7 +470,7 @@ Return ONLY a JSON object (no code fences, no extra text) with exactly these key
         while (existingSlugs.has(slug)) slug = `${slugBase}-${n++}`;
       } catch { /* slug stays as-is */ }
 
-      return res.json({ slug, translations });
+      return res.json({ slug, translations, imageUrl, imageError, productUrl, productImageUrl });
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
     }

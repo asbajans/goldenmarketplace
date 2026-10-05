@@ -165,12 +165,29 @@ export class MarketplaceController {
       const lang = (req.query.lang as string) || 'en';
 
       let where: WhereOptions = {
-        isActive: true,
-        ...goldenFilter
+        isActive: true
       };
-      
+
       if (hideOutOfStock) where.quantity = { [Op.gt]: 0 };
-      if (search) where.title = { [Op.iLike]: `%${search}%` };
+
+      // AND-ed filter groups. NOTE: search and category both need Op.or —
+      // they are kept as separate Op.and members so one can never overwrite
+      // the other (same-key collision on Op.or). goldenFilter rides along as
+      // the first member (it is itself an Op.and literal).
+      const andConds: any[] = [goldenFilter];
+
+      if (search) {
+        const like = `%${search}%`;
+        andConds.push({
+          [Op.or]: [
+            { title: { [Op.iLike]: like } },
+            { sku: { [Op.iLike]: like } },
+            { description: { [Op.iLike]: like } },
+            // translations JSONB carries all 5 languages' titles/descriptions
+            Sequelize.where(Sequelize.cast(Sequelize.col('translations'), 'text'), { [Op.iLike]: like })
+          ]
+        });
+      }
 
       const categoryVariants: Record<string, string[]> = {
         rings: ['rings', 'yüzük', 'yuzuk', 'anelli', 'anelli', 'خواتم', 'khatim', 'anillos'],
@@ -199,10 +216,10 @@ export class MarketplaceController {
             }
           }
 
-          where = { ...where, [Op.or as any]: [
+          andConds.push({ [Op.or as any]: [
             { categoryId: catBySlug.id },
             { category: { [Op.or]: [...new Set(legacyTerms)].map(t => ({ [Op.iLike]: `%${t}%` })) } }
-          ] };
+          ] });
         } else {
           const catLower = category.toLowerCase().trim();
           let allTerms: string[] = [catLower, category];
@@ -214,15 +231,22 @@ export class MarketplaceController {
             }
           }
 
-          where.category = {
-            [Op.or]: allTerms.map(term => ({ [Op.iLike]: `%${term}%` }))
-          };
+          andConds.push({
+            category: {
+              [Op.or]: allTerms.map(term => ({ [Op.iLike]: `%${term}%` }))
+            }
+          });
         }
       }
       if (minPrice !== null || maxPrice !== null) {
-        where.priceTRY = {};
-        if (minPrice !== null) (where.priceTRY as any)[Op.gte] = minPrice;
-        if (maxPrice !== null) (where.priceTRY as any)[Op.lte] = maxPrice;
+        const priceCond: any = {};
+        if (minPrice !== null) priceCond[Op.gte] = minPrice;
+        if (maxPrice !== null) priceCond[Op.lte] = maxPrice;
+        andConds.push({ priceTRY: priceCond });
+      }
+
+      if (andConds.length > 0) {
+        where = { ...where, [Op.and]: andConds };
       }
 
       let order: any[] = [['createdAt', 'DESC']];

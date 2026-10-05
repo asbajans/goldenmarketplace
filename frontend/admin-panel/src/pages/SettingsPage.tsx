@@ -395,7 +395,7 @@ export default function SettingsPage() {
                     onFinish={handleSaveAI}
                 >
                     <Row gutter={16}>
-                        <Col span={8}>
+                        <Col span={6}>
                             <Form.Item name="ai_provider" label="AI Sağlayıcı" rules={[{ required: true }]}>
                                 <Select>
                                     <Select.Option value="openai">OpenAI</Select.Option>
@@ -404,14 +404,23 @@ export default function SettingsPage() {
                                 </Select>
                             </Form.Item>
                         </Col>
-                        <Col span={8}>
+                        <Col span={6}>
                             <Form.Item name="ai_api_key" label="API Anahtarı">
                                 <Input.Password placeholder="sk-..." />
                             </Form.Item>
                         </Col>
-                        <Col span={8}>
+                        <Col span={6}>
                             <Form.Item name="ai_model" label="Model">
                                 <Input placeholder="gpt-4o-mini" />
+                            </Form.Item>
+                        </Col>
+                        <Col span={6}>
+                            <Form.Item
+                                name="ai_image_model"
+                                label="Görsel Modeli"
+                                tooltip="Blog kapak görselleri için. Aynı API anahtarı kullanılır. Örn: gpt-image-1 (OpenAI) veya google/gemini-2.5-flash-image (OpenRouter). Boşsa görsel üretilmez."
+                            >
+                                <Input placeholder="gpt-image-1" />
                             </Form.Item>
                         </Col>
                     </Row>

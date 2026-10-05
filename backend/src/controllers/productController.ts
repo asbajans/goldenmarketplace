@@ -629,10 +629,11 @@ export class ProductController {
                   Number(product.priceMultiplier || 1)
               );
               const gramHas = Math.round(Number(product.gramWeight) * (usedMilyem / 1000) * 10000) / 10000;
-             const b2bPrice = product.isB2BEnabled ? Math.round(priceTRY * (1 - (product.b2bDiscount || 0) / 100) * 100) / 100 : 0;
-             const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
-             await product.update({ priceTRY, b2bPrice, priceUSD, gramHas });
-             updatedCount++;
+              const b2bPrice = product.isB2BEnabled ? Math.round(priceTRY * (1 - (product.b2bDiscount || 0) / 100) * 100) / 100 : 0;
+              const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
+              const discountedPrice = goldPriceService.discountedPrice(priceTRY, Number(product.discountRate) || 0);
+              await product.update({ priceTRY, b2bPrice, priceUSD, gramHas, discountedPrice });
+              updatedCount++;
           }
 
           // Sync Variants for non-clones
@@ -661,20 +662,22 @@ export class ProductController {
 
           const clones = products.filter(p => !!p.originalProductId);
           // Load parents for clones
-          for (const clone of clones) {
-             const parent = await Product.findByPk(clone.originalProductId);
-             if (parent && parent.b2bPrice > 0) {
-                const priceTRY = Math.round(parent.b2bPrice * (1 + (clone.profitMargin || 0) / 100) * 100) / 100;
-                const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
-                await clone.update({ priceTRY, priceUSD });
-                updatedCount++;
-             } else if (parent && parent.priceTRY > 0) {
-                const priceTRY = Math.round(parent.priceTRY * (1 + (clone.profitMargin || 0) / 100) * 100) / 100;
-                const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
-                await clone.update({ priceTRY, priceUSD });
-                updatedCount++;
-             }
-          }
+           for (const clone of clones) {
+              const parent = await Product.findByPk(clone.originalProductId);
+              if (parent && parent.b2bPrice > 0) {
+                 const priceTRY = Math.round(parent.b2bPrice * (1 + (clone.profitMargin || 0) / 100) * 100) / 100;
+                 const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
+                 const discountedPrice = goldPriceService.discountedPrice(priceTRY, Number((clone as any).discountRate) || 0);
+                 await clone.update({ priceTRY, priceUSD, discountedPrice });
+                 updatedCount++;
+              } else if (parent && parent.priceTRY > 0) {
+                 const priceTRY = Math.round(parent.priceTRY * (1 + (clone.profitMargin || 0) / 100) * 100) / 100;
+                 const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
+                 const discountedPrice = goldPriceService.discountedPrice(priceTRY, Number((clone as any).discountRate) || 0);
+                 await clone.update({ priceTRY, priceUSD, discountedPrice });
+                 updatedCount++;
+              }
+           }
           
           // Sync Variants for clones
           const cloneVariantIds = clones.map(p => p.id);

@@ -201,6 +201,85 @@ Do NOT wrap the JSON in markdown code blocks. Return ONLY raw JSON.`,
        return { title: productTitle, description: description.substring(0, 150) };
      }
   }
+
+  /**
+   * Generate a cover image with AI. Uses the SAME api key as text, but a
+   * dedicated model from the `ai_image_model` setting (Admin → AI Ayarları).
+   * Supports openai (images API), openrouter (chat + image modality) and
+   * gemini (image preview models). Returns a data-URL (or raw base64) that
+   * can be passed straight to s3Service.uploadBase64Image.
+   */
+  async generateImage(prompt: string): Promise<{ success: boolean; dataUrl: string; error?: string }> {
+    const rows = await GlobalSetting.findAll({
+      where: { key: ['ai_provider', 'ai_api_key', 'ai_image_model'] }
+    });
+    const map: Record<string, string> = {};
+    for (const s of rows) map[s.key] = s.value;
+    const provider = map.ai_provider || 'openai';
+    const apiKey = map.ai_api_key || '';
+    const imageModel = (map.ai_image_model || '').trim();
+
+    if (!apiKey) return { success: false, dataUrl: '', error: 'AI API Key not configured.' };
+    if (!imageModel) return { success: false, dataUrl: '', error: 'AI image model not configured (Admin → AI Ayarları → Görsel Modeli).' };
+
+    const styledPrompt = `Luxurious fine gold jewelry photography for an e-commerce blog cover, photorealistic, elegant warm lighting, no text, no watermark. Subject: ${prompt}`;
+    try {
+      if (provider === 'openai') {
+        const res = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+          body: JSON.stringify({ model: imageModel, prompt: styledPrompt, size: '1024x1024', response_format: 'b64_json' })
+        });
+        if (!res.ok) throw new Error(`Images API error: ${res.status} ${(await res.text()).slice(0, 200)}`);
+        const data: any = await res.json();
+        const b64 = data?.data?.[0]?.b64_json;
+        if (!b64) throw new Error('Image API returned no image');
+        return { success: true, dataUrl: `data:image/png;base64,${b64}` };
+      }
+      if (provider === 'openrouter') {
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+            'HTTP-Referer': 'https://goldencrafters.com',
+            'X-Title': 'Golden Crafters Blog'
+          },
+          body: JSON.stringify({
+            model: imageModel,
+            messages: [{ role: 'user', content: styledPrompt }],
+            modalities: ['image', 'text']
+          })
+        });
+        if (!res.ok) throw new Error(`OpenRouter error: ${res.status} ${(await res.text()).slice(0, 200)}`);
+        const data: any = await res.json();
+        const parts: any[] = data?.choices?.[0]?.message?.images || [];
+        const url = parts.map((p: any) => p?.image_url?.url || p?.url || '').find((u: string) => u.startsWith('data:image'));
+        if (!url) throw new Error('Model returned no image (does it support image output?)');
+        return { success: true, dataUrl: url };
+      }
+      if (provider === 'gemini') {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${imageModel}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: styledPrompt }] }],
+            generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
+          })
+        });
+        if (!res.ok) throw new Error(`Gemini error: ${res.status} ${(await res.text()).slice(0, 200)}`);
+        const data: any = await res.json();
+        const parts: any[] = data?.candidates?.[0]?.content?.parts || [];
+        const inline = parts.find((p: any) => p?.inlineData?.data);
+        if (!inline) throw new Error('Model returned no image');
+        return { success: true, dataUrl: `data:${inline.inlineData.mimeType || 'image/png'};base64,${inline.inlineData.data}` };
+      }
+      return { success: false, dataUrl: '', error: 'Unknown provider' };
+    } catch (error: any) {
+      console.error('[AIService] Image generation failed:', error?.message || error);
+      return { success: false, dataUrl: '', error: error?.message || 'Image generation failed' };
+    }
+  }
 }
 
 export default new AIService();

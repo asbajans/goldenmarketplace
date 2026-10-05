@@ -128,10 +128,13 @@ router.post('/add', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    // Apply discount if available
+    // Apply the live discount (computed from current priceTRY × discountRate,
+    // never the stored discountedPrice which goes stale when gold moves).
+    // Variants inherit the parent product's discount rate.
     const discountRate = parseFloat(product?.discountRate) || 0;
     if (discountRate > 0) {
-      unitPrice = parseFloat(product?.discountedPrice) || unitPrice;
+      const goldPriceService = require('../services/goldPriceService').default;
+      unitPrice = goldPriceService.discountedPrice(unitPrice, discountRate);
     }
 
     const cartWhere: any = { status: 'pending' };
@@ -414,11 +417,14 @@ router.post('/checkout', async (req: Request, res: Response) => {
           sellerId = store?.userId || null;
         }
 
-        // Apply discount to the TRY order price (Stripe USD price is derived
-        // centrally in buildStripeLineItems so both stay consistent)
+        // Apply discount to the TRY order price from LIVE values (priceTRY ×
+        // discountRate — the stored discountedPrice goes stale when gold
+        // moves). Stripe USD price is derived centrally in
+        // buildStripeLineItems so both stay consistent.
         const discountRate = parseFloat(product?.discountRate) || 0;
         if (discountRate > 0) {
-          unitPrice = parseFloat(product?.discountedPrice) || unitPrice;
+          const goldPriceService = require('../services/goldPriceService').default;
+          unitPrice = goldPriceService.discountedPrice(unitPrice, discountRate);
         }
 
         const qty = ci.quantity || 1;

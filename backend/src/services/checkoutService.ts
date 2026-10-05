@@ -107,9 +107,13 @@ export interface StripeLineItem {
 
 /**
  * Build Stripe (USD) line items from order items (TRY).
- * Re-reads the live Product/Variant so gold-price moves are reflected,
- * applies the product discount, and converts TRY->USD when no USD price
- * exists instead of sending TRY numbers as USD.
+ * Pricing is ALWAYS derived from live product data (gold moves constantly):
+ *  - base USD = Variant.priceUSD or Product.priceUSD
+ *  - sale discount = parent Product.discountRate — variants have no own
+ *    discount, so they inherit it (previously variants were charged FULL
+ *    price on Stripe while the site showed the discounted price)
+ *  - when a product has no USD price, the live DISCOUNTED TRY amount is
+ *    converted with the current usd_try_rate — TRY is never sent as USD.
  */
 export async function buildStripeLineItems(
   items: Array<{ title: string; quantity: number; unitPrice: number | string; productId?: string; variantId?: string }>
@@ -118,33 +122,49 @@ export async function buildStripeLineItems(
   const ProductVariant = require('../models/ProductVariant').default;
   const usdTryRate = await getUsdTryRate();
 
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+
   const lineItems: StripeLineItem[] = [];
   for (const item of items) {
     let usdPrice = 0;
-    if ((item as any).variantId) {
-      const v: any = await ProductVariant.findByPk((item as any).variantId);
+    let tryPrice = 0;
+    let discountRate = 0;
+
+    const variantId = (item as any).variantId;
+    if (variantId) {
+      const v: any = await ProductVariant.findByPk(variantId);
       usdPrice = parseFloat(v?.priceUSD) || 0;
-    }
-    if (!usdPrice && item.productId) {
-      const p: any = await Product.findByPk(item.productId);
-      usdPrice = parseFloat(p?.priceUSD) || 0;
-      const discountRate = parseFloat(p?.discountRate) || 0;
-      if (discountRate > 0) {
-        usdPrice = Math.round(usdPrice * (1 - discountRate / 100) * 100) / 100;
+      tryPrice = parseFloat(v?.priceTRY) || 0;
+      // Variants inherit the parent product's discount.
+      const parentId = v?.productId || (item as any).productId;
+      if (parentId) {
+        const p: any = await Product.findByPk(parentId);
+        discountRate = parseFloat(p?.discountRate) || 0;
+        if (!usdPrice) usdPrice = parseFloat(p?.priceUSD) || 0;
+        if (!tryPrice) tryPrice = parseFloat(p?.priceTRY) || 0;
       }
+    } else if ((item as any).productId) {
+      const p: any = await Product.findByPk((item as any).productId);
+      usdPrice = parseFloat(p?.priceUSD) || 0;
+      tryPrice = parseFloat(p?.priceTRY) || 0;
+      discountRate = parseFloat(p?.discountRate) || 0;
     }
+
     if (!usdPrice) {
-      // No USD price on the product (legacy record): convert the stored TRY
-      // unit price with the live rate instead of charging TRY-as-USD.
-      const tryPrice = parseFloat(item.unitPrice as any) || 0;
-      usdPrice = Math.round((tryPrice / usdTryRate) * 100) / 100;
+      // No USD price on record: convert the live DISCOUNTED TRY amount.
+      const storedTry = parseFloat(item.unitPrice as any) || 0;
+      const baseTry = tryPrice > 0 ? tryPrice : storedTry;
+      const discTry = discountRate > 0 ? baseTry * (1 - discountRate / 100) : baseTry;
+      usdPrice = round2(discTry / usdTryRate);
+    } else if (discountRate > 0) {
+      usdPrice = round2(usdPrice * (1 - discountRate / 100));
     }
+
     const qty = Number((item as any).quantity) || 1;
     lineItems.push({ name: item.title, price: usdPrice, quantity: qty, currency: 'usd' });
   }
 
-  const stripeTotalUSD =
-    Math.round(lineItems.reduce((s, li) => s + li.price * li.quantity, 0) * 100) / 100;
+  const stripeTotalUSD = round2(lineItems.reduce((s, li) => s + li.price * li.quantity, 0));
   return { lineItems, stripeTotalUSD };
 }
 

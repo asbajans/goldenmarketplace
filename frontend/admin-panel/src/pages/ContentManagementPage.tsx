@@ -102,6 +102,9 @@ export default function ContentManagementPage() {
   const [aiTone, setAiTone] = useState('warm, expert and trustworthy');
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiProducts, setAiProducts] = useState<any[]>([]);
+  // Cover suggestions from the last AI generation (AI image vs product photo)
+  const [aiCoverOptions, setAiCoverOptions] = useState<{ ai: string; product: string } | null>(null);
+  const [aiImageNote, setAiImageNote] = useState('');
 
   const openAIBlogModal = async () => {
     setAiBlogModal(true);
@@ -130,11 +133,13 @@ export default function ContentManagementPage() {
       setEditingBlog(null);
       setBlogForm({
         slug: result.slug || '',
-        imageUrl: '',
+        imageUrl: result.imageUrl || result.productImageUrl || '',
         isActive: true,
         order: blogPosts.length + 1,
         translations: result.translations,
       });
+      setAiCoverOptions({ ai: result.imageUrl || '', product: result.productImageUrl || '' });
+      setAiImageNote(result.imageError || '');
       setBlogLang('en');
       setAiBlogModal(false);
       setBlogModal(true);
@@ -415,6 +420,8 @@ export default function ContentManagementPage() {
 
     setBlogPosts(updated);
     setBlogModal(false);
+    setAiCoverOptions(null);
+    setAiImageNote('');
     saveBlogPosts(updated);
   };
 
@@ -674,7 +681,7 @@ export default function ContentManagementPage() {
         title={editingBlog ? 'Blog Yazısı Düzenle' : 'Yeni Blog Yazısı'}
         open={blogModal}
         onOk={saveBlog}
-        onCancel={() => setBlogModal(false)}
+        onCancel={() => { setBlogModal(false); setAiCoverOptions(null); setAiImageNote(''); }}
         width={800}
       >
         <div style={{ marginBottom: 16 }}>
@@ -685,6 +692,44 @@ export default function ContentManagementPage() {
           <label>Kapak Görseli URL</label>
           <Input value={blogForm.imageUrl} onChange={e => setBlogForm({ ...blogForm, imageUrl: e.target.value })} />
         </div>
+        {aiCoverOptions && (aiCoverOptions.ai || aiCoverOptions.product) && (
+          <div style={{ marginBottom: 16 }}>
+            <label>AI Kapak Önerileri (seçmek için tıklayın)</label>
+            <Space align="start">
+              {aiCoverOptions.ai && (
+                <div style={{ textAlign: 'center' }}>
+                  <img
+                    src={aiCoverOptions.ai}
+                    alt="AI kapağı"
+                    onClick={() => setBlogForm({ ...blogForm, imageUrl: aiCoverOptions.ai })}
+                    style={{
+                      width: 140, borderRadius: 8, cursor: 'pointer',
+                      border: blogForm.imageUrl === aiCoverOptions.ai ? '3px solid #722ed1' : '1px solid #ddd',
+                    }}
+                  />
+                  <div style={{ fontSize: 12, color: '#666' }}>AI Görseli</div>
+                </div>
+              )}
+              {aiCoverOptions.product && (
+                <div style={{ textAlign: 'center' }}>
+                  <img
+                    src={aiCoverOptions.product}
+                    alt="Ürün fotoğrafı"
+                    onClick={() => setBlogForm({ ...blogForm, imageUrl: aiCoverOptions.product })}
+                    style={{
+                      width: 140, borderRadius: 8, cursor: 'pointer',
+                      border: blogForm.imageUrl === aiCoverOptions.product ? '3px solid #722ed1' : '1px solid #ddd',
+                    }}
+                  />
+                  <div style={{ fontSize: 12, color: '#666' }}>Ürün Fotoğrafı</div>
+                </div>
+              )}
+            </Space>
+          </div>
+        )}
+        {aiImageNote && (
+          <Alert type="warning" showIcon message={aiImageNote} style={{ marginBottom: 16 }} />
+        )}
         <div style={{ marginBottom: 16 }}>
           <label>Aktif mi?</label>
           <Switch checked={blogForm.isActive} onChange={checked => setBlogForm({ ...blogForm, isActive: checked })} />
