@@ -418,9 +418,9 @@ export default function SettingsPage() {
                             <Form.Item
                                 name="ai_image_model"
                                 label="Görsel Modeli"
-                                tooltip="Blog kapak görselleri için. Aynı API anahtarı kullanılır. Örn: gpt-image-1 (OpenAI) veya google/gemini-2.5-flash-image (OpenRouter). Boşsa görsel üretilmez."
+                                tooltip="Blog kapak görselleri için. Aynı API anahtarı kullanılır. OpenRouter: google/gemini-2.5-flash-image veya recraft/recraft-v4.1-flash · OpenAI: gpt-image-1. Boşsa görsel üretilmez."
                             >
-                                <Input placeholder="gpt-image-1" />
+                                <Input placeholder="google/gemini-2.5-flash-image" />
                             </Form.Item>
                         </Col>
                     </Row>

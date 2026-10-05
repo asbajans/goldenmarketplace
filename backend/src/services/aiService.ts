@@ -237,7 +237,10 @@ Do NOT wrap the JSON in markdown code blocks. Return ONLY raw JSON.`,
         return { success: true, dataUrl: `data:image/png;base64,${b64}` };
       }
       if (provider === 'openrouter') {
-        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        // Dedicated Images API (NOT chat completions: pure image models like
+        // recraft/* have no endpoint serving chat+image modalities).
+        // Docs: https://openrouter.ai/docs/features/multimodal/image-generation
+        const res = await fetch('https://openrouter.ai/api/v1/images/generations', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -245,18 +248,32 @@ Do NOT wrap the JSON in markdown code blocks. Return ONLY raw JSON.`,
             'HTTP-Referer': 'https://goldencrafters.com',
             'X-Title': 'Golden Crafters Blog'
           },
-          body: JSON.stringify({
-            model: imageModel,
-            messages: [{ role: 'user', content: styledPrompt }],
-            modalities: ['image', 'text']
-          })
+          body: JSON.stringify({ model: imageModel, prompt: styledPrompt })
         });
-        if (!res.ok) throw new Error(`OpenRouter error: ${res.status} ${(await res.text()).slice(0, 200)}`);
+        if (!res.ok) {
+          const errText = (await res.text()).slice(0, 300);
+          throw new Error(
+            `OpenRouter Images API error ${res.status}: ${errText} ` +
+            `(Görsel Modeli resim üreten bir model olmalı — örn. google/gemini-2.5-flash-image)`
+          );
+        }
         const data: any = await res.json();
-        const parts: any[] = data?.choices?.[0]?.message?.images || [];
-        const url = parts.map((p: any) => p?.image_url?.url || p?.url || '').find((u: string) => u.startsWith('data:image'));
-        if (!url) throw new Error('Model returned no image (does it support image output?)');
-        return { success: true, dataUrl: url };
+        const item = data?.data?.[0];
+        if (item?.b64_json) {
+          return { success: true, dataUrl: `data:image/png;base64,${item.b64_json}` };
+        }
+        if (typeof item?.url === 'string' && item.url.startsWith('data:image')) {
+          return { success: true, dataUrl: item.url };
+        }
+        if (typeof item?.url === 'string' && /^https?:\/\//.test(item.url)) {
+          // Remote URL (may expire) — download now so we can host it on S3.
+          const imgRes = await fetch(item.url);
+          if (!imgRes.ok) throw new Error(`Could not download generated image (${imgRes.status})`);
+          const buf = Buffer.from(await imgRes.arrayBuffer());
+          const mime = imgRes.headers.get('content-type') || 'image/png';
+          return { success: true, dataUrl: `data:${mime};base64,${buf.toString('base64')}` };
+        }
+        throw new Error('Images API returned no image data');
       }
       if (provider === 'gemini') {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${imageModel}:generateContent?key=${apiKey}`, {
