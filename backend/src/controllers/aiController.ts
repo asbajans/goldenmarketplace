@@ -403,11 +403,15 @@ Return ONLY a JSON object (no code fences, no extra text) with exactly these key
       }
 
       // 2) Translate to every site language (fields translated in parallel)
+      // AND generate the cover image concurrently — the request must finish
+      // well under reverse-proxy timeouts, so nothing independent waits.
       const LANG_NAMES: Record<string, string> = { tr: 'Turkish', it: 'Italian', es: 'Spanish', ar: 'Arabic' };
       const translations: Record<string, { title: string; excerpt: string; content: string }> = {
         en: { title: draft.title, excerpt: draft.excerpt || '', content: draft.content }
       };
-      await Promise.all(Object.entries(LANG_NAMES).map(async ([lang, name]) => {
+      let imageUrl = '';
+      let imageError = '';
+      const translateAll = Promise.all(Object.entries(LANG_NAMES).map(async ([lang, name]) => {
         const [tTitle, tExcerpt, tContent] = await Promise.all([
           aiService.translateText(draft.title, name),
           draft.excerpt ? aiService.translateText(draft.excerpt, name) : Promise.resolve(''),
@@ -415,6 +419,23 @@ Return ONLY a JSON object (no code fences, no extra text) with exactly these key
         ]);
         translations[lang] = { title: tTitle, excerpt: tExcerpt, content: tContent };
       }));
+      const generateCover = (async () => {
+        try {
+          const imgPrompt = topic
+            ? `${topic}, elegant gold jewelry theme`
+            : `elegant gold jewelry showcase`;
+          const img = await aiService.generateImage(imgPrompt);
+          if (img.success && img.dataUrl) {
+            const { s3Service } = require('../services/s3Service');
+            imageUrl = await s3Service.uploadBase64Image(img.dataUrl, 'blog');
+          } else if (img.error) {
+            imageError = img.error;
+          }
+        } catch (imgErr: any) {
+          imageError = imgErr?.message || 'Image upload failed';
+        }
+      })();
+      await Promise.all([translateAll, generateCover]);
 
       // 3) Featured-product CTA appended AFTER translation (static templates,
       // so the product URL can never be mangled by the translator).
@@ -436,26 +457,7 @@ Return ONLY a JSON object (no code fences, no extra text) with exactly these key
         }
       }
 
-      // 4) AI cover image (uploaded to object storage). Failure never blocks
-      // the article — imageUrl is simply left empty.
-      let imageUrl = '';
-      let imageError = '';
-      try {
-        const imgPrompt = topic
-          ? `${topic}, elegant gold jewelry theme`
-          : `elegant gold jewelry showcase`;
-        const img = await aiService.generateImage(imgPrompt);
-        if (img.success && img.dataUrl) {
-          const { s3Service } = require('../services/s3Service');
-          imageUrl = await s3Service.uploadBase64Image(img.dataUrl, 'blog');
-        } else if (img.error) {
-          imageError = img.error;
-        }
-      } catch (imgErr: any) {
-        imageError = imgErr?.message || 'Image upload failed';
-      }
-
-      // 5) Suggest a slug unique among existing blog posts
+      // 4) Suggest a slug unique among existing blog posts
       const slugBase = draft.title.toLowerCase().normalize('NFKD')
         .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'blog-post';
       let slug = slugBase;

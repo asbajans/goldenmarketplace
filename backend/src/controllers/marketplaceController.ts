@@ -178,13 +178,16 @@ export class MarketplaceController {
 
       if (search) {
         const like = `%${search}%`;
+        // NOTE: columns MUST be qualified with Product.* — the joined
+        // Store/Category tables also have description/translations columns
+        // and an unqualified reference is a 500 (ambiguous column).
         andConds.push({
           [Op.or]: [
             { title: { [Op.iLike]: like } },
             { sku: { [Op.iLike]: like } },
-            { description: { [Op.iLike]: like } },
+            Sequelize.where(Sequelize.col('Product.description'), { [Op.iLike]: like }),
             // translations JSONB carries all 5 languages' titles/descriptions
-            Sequelize.where(Sequelize.cast(Sequelize.col('translations'), 'text'), { [Op.iLike]: like })
+            Sequelize.where(Sequelize.cast(Sequelize.col('Product.translations'), 'text'), { [Op.iLike]: like })
           ]
         });
       }
