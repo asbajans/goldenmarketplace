@@ -84,39 +84,25 @@ router.post('/:id/pay', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Order not found or already paid' });
     }
 
+    // Same rule as checkout: never open a Stripe session for a disabled method.
+    const { assertPaymentMethodAllowed, buildStripeLineItems } = require('../services/checkoutService');
+    await assertPaymentMethodAllowed('stripe');
+
     const stripeService = require('../services/stripeService').default;
-    const Product = require('../models/Product').default;
-    const ProductVariant = require('../models/ProductVariant').default;
     const origin = req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:3000';
     const successUrl = `${origin}/order/${order.id}?success=1`;
     const cancelUrl = `${origin}/account/orders/${order.id}`;
 
-    const stripeItems = await Promise.all((order.items || []).map(async (item: any) => {
-      let usdPrice = 0;
-      if (item.variantId) {
-        const v = await ProductVariant.findByPk(item.variantId);
-        usdPrice = parseFloat(v?.priceUSD) || 0;
-      }
-      if (!usdPrice && item.productId) {
-        const p = await Product.findByPk(item.productId);
-        usdPrice = parseFloat(p?.priceUSD) || 0;
-        const discountRate = parseFloat(p?.discountRate) || 0;
-        if (discountRate > 0) usdPrice = Math.round(usdPrice * (1 - discountRate / 100) * 100) / 100;
-      }
-      return {
-        name: item.title,
-        price: usdPrice || parseFloat(item.unitPrice),
-        quantity: item.quantity,
-        currency: 'usd'
-      };
-    }));
+    // Reuses the SAME persisted order items on every retry, so the amount is
+    // stable no matter how often the customer presses "pay".
+    const { lineItems, stripeTotalUSD } = await buildStripeLineItems((order as any).items || []);
 
-    const session = await stripeService.createDirectCheckout(stripeItems, successUrl, cancelUrl, undefined);
+    const session = await stripeService.createDirectCheckout(lineItems, successUrl, cancelUrl, undefined);
 
-    return res.json({ success: true, checkoutUrl: session.url });
+    return res.json({ success: true, checkoutUrl: session.url, stripeTotal: stripeTotalUSD, stripeCurrency: 'usd' });
   } catch (error: any) {
     console.error('Customer order pay error:', error);
-    return res.status(500).json({ error: error.message });
+    return res.status(error.status || 500).json({ error: error.message });
   }
 });
 

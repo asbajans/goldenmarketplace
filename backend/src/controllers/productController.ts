@@ -268,6 +268,14 @@ export class ProductController {
         console.warn('[ProductController] Could not enqueue sync job (Redis down?):', queueErr);
       }
 
+      // IndexNow: submit the new product page for instant indexing (non-blocking)
+      try {
+        const { submitUrlsAsync, productUrls } = require('../services/indexNowService');
+        submitUrlsAsync(productUrls((product as any).slug || product.id));
+      } catch (indexErr) {
+        console.warn('[ProductController] IndexNow submit warning:', indexErr);
+      }
+
       return res.status(201).json({
         message: 'Product created successfully',
         product
@@ -458,6 +466,14 @@ export class ProductController {
         });
       } catch (queueErr) {
         console.warn('[ProductController] Could not enqueue sync job (Redis down?):', queueErr);
+      }
+
+      // IndexNow: re-submit the updated product page for instant re-crawling
+      try {
+        const { submitUrlsAsync, productUrls } = require('../services/indexNowService');
+        submitUrlsAsync(productUrls((product as any).slug || product.id));
+      } catch (indexErr) {
+        console.warn('[ProductController] IndexNow submit warning:', indexErr);
       }
 
       return res.status(200).json({

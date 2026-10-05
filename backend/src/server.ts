@@ -87,12 +87,23 @@ async function syncAndSeedSettings() {
       { key: 'feed_default_gender', value: 'unisex', description: 'Google feed default gender: male | female | unisex', isPublic: true },
       { key: 'feed_default_age_group', value: 'adult', description: 'Google feed default age_group: newborn | infant | toddler | kids | adult', isPublic: true },
       { key: 'feed_default_color', value: 'Gold', description: 'Google feed default color (e.g. Gold)', isPublic: true },
+      // IndexNow instant indexing (Bing/Yandex/Naver). Key file is served at
+      // https://goldencrafters.com/<key>.txt by the market frontend.
+      { key: 'indexnow_key', value: '8cb77afabdfa071e61761f7e15abf567', description: 'IndexNow verification key', isPublic: false },
+      { key: 'indexnow_enabled', value: 'true', description: 'Submit changed URLs to IndexNow automatically', isPublic: true },
     ];
 
     for (const setting of settingsToSeed) {
       const exists = await GlobalSetting.findOne({ where: { key: setting.key } });
       if (!exists) {
         await GlobalSetting.create(setting);
+      } else if (exists.isPublic !== setting.isPublic) {
+        // Repair visibility flags corrupted by older updateSettings versions
+        // (they flipped payment_*/bank_*/stripe_* keys to private on every
+        // admin save, hiding them from the storefront and admin panel).
+        // Values are never touched here — only the isPublic flag.
+        await exists.update({ isPublic: setting.isPublic });
+        logger.info(`[DB] Fixed isPublic flag for setting: ${setting.key}`);
       }
     }
     logger.info('[DB] GlobalSettings synchronized successfully.');

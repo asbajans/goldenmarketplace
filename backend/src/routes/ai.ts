@@ -9,6 +9,9 @@ router.get('/admin/settings', authMiddleware, adminMiddleware, AIController.getA
 router.put('/admin/settings', authMiddleware, adminMiddleware, AIController.updateAISettings);
 router.post('/admin/settings/test', authMiddleware, adminMiddleware, AIController.testAIConnection);
 
+// Admin AI blog generation (topic or product -> all site languages)
+router.post('/admin/blog/generate', authMiddleware, adminMiddleware, AIController.generateBlogPost);
+
 // Seller AI operations (per product)
 router.post('/products/:id/translate', authMiddleware, AIController.translateProduct);
 router.post('/products/:id/generate', authMiddleware, AIController.generateContent);

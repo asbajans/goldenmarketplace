@@ -53,6 +53,11 @@ router.get('/integration-logs', AdminController.getIntegrationLogs);
 router.get('/settings', SettingsController.getSettings);
 router.post('/settings', SettingsController.updateSettings);
 
+// --- INDEXNOW (instant search indexing) ---
+import { IndexNowController } from '../controllers/indexNowController';
+router.get('/indexnow/status', IndexNowController.getStatus);
+router.post('/indexnow/submit', IndexNowController.submit);
+
 // --- ORDERS ---
 import adminOrdersRouter from './adminOrders';
 router.use('/', adminOrdersRouter);

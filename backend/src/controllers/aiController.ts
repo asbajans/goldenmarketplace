@@ -331,4 +331,81 @@ export class AIController {
       return res.status(500).json({ error: error.message });
     }
   }
+
+  // ─── Admin Blog Generation (all site languages) ───
+
+  static async generateBlogPost(req: Request, res: Response) {
+    try {
+      const { topic, productId, tone = 'warm, expert and trustworthy' } = req.body;
+
+      if (!topic && !productId) {
+        return res.status(400).json({ error: 'topic or productId is required' });
+      }
+
+      let context = '';
+      if (productId) {
+        const product: any = await Product.findByPk(productId);
+        if (!product) {
+          return res.status(404).json({ error: 'Product not found' });
+        }
+        context = `Feature this product naturally inside the article (one section about it, plus a closing call-to-action):\n- Name: ${product.title}\n- Category: ${product.category || ''}\n- Price: ${product.priceTRY || ''} TRY\n- Description: ${(product.description || '').slice(0, 800)}`;
+      }
+
+      // 1) Draft in English, strict JSON (plain-text paragraphs, no HTML/markdown)
+      const draftRes = await aiService.generateContent(
+        `You are an expert jewelry journalist writing for Golden Crafters, a fine gold jewelry marketplace.
+Write in English with a ${tone} tone. Audience: jewelry shoppers and gold enthusiasts.
+Return ONLY a JSON object (no code fences, no extra text) with exactly these keys:
+{ "title": "catchy SEO title, max 70 chars", "excerpt": "1-2 sentence teaser, max 200 chars", "content": "full article, 300-500 words, plain text paragraphs separated by blank lines, no HTML, no markdown" }`,
+        `Article topic: ${topic || 'gold jewelry'}\n${context}`
+      );
+      if (!draftRes.success || !draftRes.content) {
+        return res.status(500).json({ error: draftRes.error || 'AI could not generate the article' });
+      }
+
+      let draft: { title: string; excerpt: string; content: string };
+      try {
+        const cleaned = draftRes.content.replace(/```json|```/g, '').trim();
+        draft = JSON.parse(cleaned);
+      } catch {
+        return res.status(500).json({ error: 'AI returned an unparseable article, please try again' });
+      }
+      if (!draft.title || !draft.content) {
+        return res.status(500).json({ error: 'AI returned an incomplete article, please try again' });
+      }
+
+      // 2) Translate to every site language (fields translated in parallel)
+      const LANG_NAMES: Record<string, string> = { tr: 'Turkish', it: 'Italian', es: 'Spanish', ar: 'Arabic' };
+      const translations: Record<string, { title: string; excerpt: string; content: string }> = {
+        en: { title: draft.title, excerpt: draft.excerpt || '', content: draft.content }
+      };
+      await Promise.all(Object.entries(LANG_NAMES).map(async ([lang, name]) => {
+        const [tTitle, tExcerpt, tContent] = await Promise.all([
+          aiService.translateText(draft.title, name),
+          draft.excerpt ? aiService.translateText(draft.excerpt, name) : Promise.resolve(''),
+          aiService.translateText(draft.content, name)
+        ]);
+        translations[lang] = { title: tTitle, excerpt: tExcerpt, content: tContent };
+      }));
+
+      // 3) Suggest a slug unique among existing blog posts
+      const slugBase = draft.title.toLowerCase().normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'blog-post';
+      let slug = slugBase;
+      try {
+        const row = await GlobalSetting.findOne({ where: { key: 'blog_posts' } });
+        const existingSlugs = new Set<string>();
+        if (row?.value) {
+          const posts = JSON.parse(row.value);
+          if (Array.isArray(posts)) for (const p of posts) if (p?.slug) existingSlugs.add(p.slug);
+        }
+        let n = 2;
+        while (existingSlugs.has(slug)) slug = `${slugBase}-${n++}`;
+      } catch { /* slug stays as-is */ }
+
+      return res.json({ slug, translations });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
 }

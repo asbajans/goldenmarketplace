@@ -91,9 +91,13 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // Add item to cart
+// Body: { productId?, variantId?, quantity = 1, replace = false }
+// `replace: true` sets the absolute quantity instead of incrementing —
+// storefronts should use it when (re-)syncing the cart on page mount so a
+// repeated call can never inflate the quantity (and the Stripe amount).
 router.post('/add', async (req: Request, res: Response) => {
   try {
-    const { productId, variantId, quantity = 1 } = req.body;
+    const { productId, variantId, quantity = 1, replace = false } = req.body;
     const userId = extractUser(req)?.id;
     const cartId = getCartId(req);
 
@@ -157,7 +161,11 @@ router.post('/add', async (req: Request, res: Response) => {
     } as any);
 
     if (existingItem) {
-      existingItem.quantity = parseInt(existingItem.quantity, 10) + quantity;
+      if (replace) {
+        existingItem.quantity = quantity;
+      } else {
+        existingItem.quantity = parseInt(existingItem.quantity, 10) + quantity;
+      }
       existingItem.totalPrice = parseFloat(existingItem.unitPrice) * existingItem.quantity;
       await existingItem.save();
     } else {
@@ -281,7 +289,9 @@ router.delete('/clear', async (req: Request, res: Response) => {
 });
 
 // Checkout
-// Supports two modes:
+// Supports three modes:
+//   0. orderId in body (idempotent retry) - reuses a pending order, only
+//      refreshes the Stripe session so the amount never grows on retry
 //   1. cartItems[] in body (frontend local cart) - creates order from scratch
 //   2. DB pending cart (legacy session/token cart)
 router.post('/checkout', async (req: Request, res: Response) => {
@@ -289,7 +299,12 @@ router.post('/checkout', async (req: Request, res: Response) => {
     const user = extractUser(req);
     const userId = user?.id;
     const cartId = getCartId(req);
-    const { name, phone, address, city, country, notes, cartItems, paymentMethod } = req.body;
+    const { name, phone, address, city, country, notes, cartItems, paymentMethod, orderId } = req.body;
+
+    // Enforce admin payment toggles BEFORE any order writes, so the
+    // storefront can never charge with a method that is OFF in admin panel.
+    const { assertPaymentMethodAllowed, buildStripeLineItems } = require('../services/checkoutService');
+    await assertPaymentMethodAllowed(paymentMethod);
 
     let finalNotes = notes || '';
     if (paymentMethod === 'bankTransfer') {
@@ -302,6 +317,67 @@ router.post('/checkout', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Shipping address required (name, address, city)' });
     }
 
+    // ── MODE 0: Retry of an existing pending order (idempotent) ─────────────
+    // The frontend must pass the orderId returned by the first checkout call
+    // when the customer goes back and presses "pay" again. The SAME order and
+    // SAME items are reused — only a fresh Stripe session is created — so the
+    // charged amount can never grow between retries.
+    if (orderId) {
+      const orderScope: any = { id: orderId, status: 'pending' };
+      if (userId) {
+        orderScope.customerId = userId;
+      }
+
+      const existing = await Order.findOne({
+        where: orderScope,
+        include: [{ model: OrderItem, as: 'items' }]
+      });
+
+      if (!existing) {
+        return res.status(404).json({ error: 'Pending order not found. Please start a new checkout.' });
+      }
+      if (!existing.items?.length) {
+        return res.status(400).json({ error: 'Cart is empty' });
+      }
+
+      const retryTotal = existing.items.reduce((sum: number, item: any) => sum + (parseFloat(item.totalPrice) || 0), 0);
+
+      await existing.update({
+        status: paymentMethod === 'stripe' ? 'pending' : 'confirmed',
+        subtotal: retryTotal,
+        totalAmount: retryTotal,
+        shippingAddress: { name, address, city, country: country || 'Turkey', phone },
+        customerNote: finalNotes
+      } as any);
+
+      if (paymentMethod === 'stripe') {
+        const stripeService = require('../services/stripeService').default;
+        const origin = req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:3000';
+        const successUrl = `${origin}/order/${existing.id}?success=1`;
+        const cancelUrl = `${origin}/checkout`;
+
+        const { lineItems, stripeTotalUSD } = await buildStripeLineItems(existing.items);
+        const stripeSession = await stripeService.createDirectCheckout(lineItems, successUrl, cancelUrl, undefined);
+
+        return res.json({
+          success: true,
+          orderId: existing.id,
+          orderNumber: existing.orderNumber,
+          total: retryTotal,
+          stripeTotal: stripeTotalUSD,
+          stripeCurrency: 'usd',
+          checkoutUrl: stripeSession.url
+        });
+      }
+
+      return res.json({
+        success: true,
+        orderId: existing.id,
+        orderNumber: existing.orderNumber,
+        total: retryTotal
+      });
+    }
+
     // ── MODE 1: Frontend sends cartItems directly (local cart) ──────────────
     if (Array.isArray(cartItems) && cartItems.length > 0) {
       const orderItems: any[] = [];
@@ -309,26 +385,21 @@ router.post('/checkout', async (req: Request, res: Response) => {
       let storeId: string | null = null;
       let sellerId: string | null = null;
 
-      const stripeItems: any[] = [];
-
       for (const ci of cartItems) {
         let product: any = null;
         let variant: any = null;
         let unitPrice = 0;
-        let unitPriceUSD = 0;
 
         if (ci.variantId) {
           variant = await ProductVariant.findByPk(ci.variantId);
           if (variant) {
             product = await Product.findByPk(variant.productId);
             unitPrice = parseFloat(variant.priceTRY) || 0;
-            unitPriceUSD = parseFloat(variant?.priceUSD) || 0;
           }
         }
         if (!product && ci.productId) {
           product = await Product.findByPk(ci.productId);
           unitPrice = parseFloat(product?.priceTRY) || 0;
-          unitPriceUSD = parseFloat(product?.priceUSD) || 0;
         }
 
         if (!product) {
@@ -343,11 +414,11 @@ router.post('/checkout', async (req: Request, res: Response) => {
           sellerId = store?.userId || null;
         }
 
-        // Apply discount to both TRY (order) and USD (Stripe) prices
+        // Apply discount to the TRY order price (Stripe USD price is derived
+        // centrally in buildStripeLineItems so both stay consistent)
         const discountRate = parseFloat(product?.discountRate) || 0;
         if (discountRate > 0) {
           unitPrice = parseFloat(product?.discountedPrice) || unitPrice;
-          unitPriceUSD = Math.round(unitPriceUSD * (1 - discountRate / 100) * 100) / 100;
         }
 
         const qty = ci.quantity || 1;
@@ -362,13 +433,6 @@ router.post('/checkout', async (req: Request, res: Response) => {
           quantity: qty,
           unitPrice,
           totalPrice: total
-        });
-
-        stripeItems.push({
-          name: product.title,
-          price: unitPriceUSD,
-          quantity: qty,
-          currency: 'usd'
         });
       }
 
@@ -406,14 +470,19 @@ router.post('/checkout', async (req: Request, res: Response) => {
         // but it's safer to just point to the root or the referer path
         const successUrl = `${origin}/order/${newOrder.id}?success=1`;
         const cancelUrl = `${origin}/checkout`;
-        
-        const stripeSession = await stripeService.createDirectCheckout(stripeItems, successUrl, cancelUrl, undefined);
-        
+
+        // Build USD line items from the just-created order items (single
+        // source of truth) so Stripe always matches the order total.
+        const { lineItems, stripeTotalUSD } = await buildStripeLineItems(orderItems);
+        const stripeSession = await stripeService.createDirectCheckout(lineItems, successUrl, cancelUrl, undefined);
+
         return res.json({
           success: true,
           orderId: newOrder.id,
           orderNumber: newOrder.orderNumber,
           total: orderTotal,
+          stripeTotal: stripeTotalUSD,
+          stripeCurrency: 'usd',
           checkoutUrl: stripeSession.url
         });
       }
@@ -462,29 +531,20 @@ router.post('/checkout', async (req: Request, res: Response) => {
       const origin = req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:3000';
       const successUrl = `${origin}/order/${order.id}?success=1`;
       const cancelUrl = `${origin}/checkout`;
-      
-      // Re-lookup products for USD prices (cart items store TRY)
-      const stripeItems2 = await Promise.all(cart.items.map(async (i: any) => {
-        let usdPrice = 0;
-        if (i.variantId) {
-          const v = await ProductVariant.findByPk(i.variantId);
-          usdPrice = parseFloat(v?.priceUSD) || 0;
-        }
-        if (!usdPrice && i.productId) {
-          const p = await Product.findByPk(i.productId);
-          usdPrice = parseFloat(p?.priceUSD) || 0;
-          const discountRate = parseFloat(p?.discountRate) || 0;
-          if (discountRate > 0) usdPrice = Math.round(usdPrice * (1 - discountRate / 100) * 100) / 100;
-        }
-        return { name: i.title, price: usdPrice, quantity: i.quantity, currency: 'usd' };
-      }));
-      const stripeSession = await stripeService.createDirectCheckout(stripeItems2, successUrl, cancelUrl, undefined);
-      
+
+      // Single source of truth: derive USD line items from the persisted
+      // cart items (TRY) via the shared builder (handles discounts + TRY->USD
+      // conversion) instead of ad-hoc inline logic.
+      const { lineItems, stripeTotalUSD } = await buildStripeLineItems(cart.items);
+      const stripeSession = await stripeService.createDirectCheckout(lineItems, successUrl, cancelUrl, undefined);
+
       return res.json({
         success: true,
         orderId: order.id,
         orderNumber: order.orderNumber,
         total: orderTotal2,
+        stripeTotal: stripeTotalUSD,
+        stripeCurrency: 'usd',
         checkoutUrl: stripeSession.url
       });
     }
@@ -497,7 +557,7 @@ router.post('/checkout', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Checkout error:', error);
-    return res.status(500).json({ error: error.message });
+    return res.status(error.status || 500).json({ error: error.message });
   }
 });
 

@@ -12,7 +12,14 @@ const PUBLIC_PREFIXES = [
     'blog_',
     'footer_',
     'feed_',
-    'merchant_'
+    'merchant_',
+    // Payment method visibility flags (values are safe to expose; secrets stay private)
+    'payment_',
+    'credit_card_',
+    'bank_',
+    'stripe_publishable_key',
+    // NOTE: 'stripe_secret_key', 'iyzico_*' and 'paytr_*' are intentionally
+    // NOT public — they must never leak to the storefront.
 ];
 
 // Google Merchant feed defaults (GlobalSetting keys)
@@ -41,8 +48,10 @@ export class SettingsController {
      */
     static async getSettings(req: Request, res: Response) {
         try {
+            // NOTE: JWT payload carries `userType` (see utils/jwt.ts), older
+            // clients may send `role`. Accept both so admins always see all keys.
             // @ts-ignore
-            const userRole = req.user?.role;
+            const userRole = (req as any).user?.role ?? (req as any).user?.userType;
             const isAdmin = userRole === 'admin';
 
             const settings = await GlobalSetting.findAll({
@@ -78,18 +87,43 @@ export class SettingsController {
             for (const [key, value] of Object.entries(settingsToUpdate)) {
                 if (typeof value === 'string') {
                     const existing = await GlobalSetting.findOne({ where: { key } });
-                    const isPublic = isPublicKey(key);
 
                     if (existing) {
-                        await existing.update({ value, isPublic });
+                        // Preserve the existing visibility flag. Recomputing it
+                        // here used to flip payment keys (payment_*, bank_*,
+                        // stripe_*, ...) to private on every admin save, which
+                        // hid them from the storefront AND the admin panel.
+                        // Only ever upgrade to public for known-public keys —
+                        // never downgrade (keeps secrets private).
+                        const isPublic = existing.isPublic || isPublicKey(key);
+                        await existing.update({ value, ...(isPublic !== existing.isPublic ? { isPublic } : {}) });
                     } else {
                         await GlobalSetting.create({
                             key,
                             value,
-                            isPublic
+                            isPublic: isPublicKey(key)
                         });
                     }
                 }
+            }
+
+            // Blog posts changed -> submit article URLs to IndexNow instantly
+            // (fire-and-forget; never blocks the admin save).
+            try {
+                if (typeof settingsToUpdate['blog_posts'] === 'string') {
+                    const posts = JSON.parse(settingsToUpdate['blog_posts']);
+                    if (Array.isArray(posts)) {
+                        const ids = posts
+                            .filter((p: any) => p && p.isActive !== false && p.id !== undefined)
+                            .map((p: any) => p.id);
+                        if (ids.length > 0) {
+                            const { submitUrlsAsync, blogPostUrls } = require('../services/indexNowService');
+                            submitUrlsAsync(ids.flatMap((id: any) => blogPostUrls(id)));
+                        }
+                    }
+                }
+            } catch (indexErr) {
+                console.error('IndexNow blog submit warning:', indexErr);
             }
 
             // Feed varsayılanı değiştiyse, değeri boş olan eski ürünlere yansıt

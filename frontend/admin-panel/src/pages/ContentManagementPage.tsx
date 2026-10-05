@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
-import { Card, Tabs, Input, Button, message, Row, Col, List, Switch, Modal, Table, Tag } from 'antd';
-import { SaveOutlined, PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
+import { Card, Tabs, Input, Button, message, Row, Col, List, Switch, Modal, Table, Tag, Select, Alert, Space } from 'antd';
+import { SaveOutlined, PlusOutlined, DeleteOutlined, EditOutlined, RobotOutlined } from '@ant-design/icons';
 import { AdminAPI } from '../services/api';
 
 const { TextArea } = Input;
@@ -94,6 +94,57 @@ export default function ContentManagementPage() {
   const [editingBlog, setEditingBlog] = useState<any>(null);
   const [blogLang, setBlogLang] = useState('en');
   const [blogForm, setBlogForm] = useState({ slug: '', imageUrl: '', isActive: true, order: 0, translations: { ...initialTranslations } });
+
+  // AI blog generation state
+  const [aiBlogModal, setAiBlogModal] = useState(false);
+  const [aiTopic, setAiTopic] = useState('');
+  const [aiProductId, setAiProductId] = useState<string | undefined>(undefined);
+  const [aiTone, setAiTone] = useState('warm, expert and trustworthy');
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiProducts, setAiProducts] = useState<any[]>([]);
+
+  const openAIBlogModal = async () => {
+    setAiBlogModal(true);
+    if (aiProducts.length === 0) {
+      try {
+        const products = await AdminAPI.getAllProducts({ limit: 200 });
+        setAiProducts(products.data || products || []);
+      } catch {
+        /* product list optional — topic-only generation still works */
+      }
+    }
+  };
+
+  const handleAIGenerateBlog = async () => {
+    if (!aiTopic.trim() && !aiProductId) {
+      message.error('Bir konu yazın veya tanıtılacak ürünü seçin.');
+      return;
+    }
+    setAiGenerating(true);
+    try {
+      const result = await AdminAPI.generateBlogPost({
+        topic: aiTopic.trim() || undefined,
+        productId: aiProductId,
+        tone: aiTone,
+      });
+      setEditingBlog(null);
+      setBlogForm({
+        slug: result.slug || '',
+        imageUrl: '',
+        isActive: true,
+        order: blogPosts.length + 1,
+        translations: result.translations,
+      });
+      setBlogLang('en');
+      setAiBlogModal(false);
+      setBlogModal(true);
+      message.success('AI taslağı hazır (5 dil) — inceleyip kaydedin.');
+    } catch (err: any) {
+      message.error(err?.response?.data?.error || 'AI üretimi başarısız.');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
 
   useEffect(() => {
     loadPageContents();
@@ -518,7 +569,14 @@ export default function ContentManagementPage() {
       children: (
         <Card
           title="Blog Yazıları"
-          extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => openBlogModal()}>Yeni Yazı</Button>}
+          extra={
+            <Space>
+              <Button icon={<RobotOutlined />} onClick={openAIBlogModal} style={{ borderColor: '#722ed1', color: '#722ed1' }}>
+                AI ile Yazdır
+              </Button>
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => openBlogModal()}>Yeni Yazı</Button>
+            </Space>
+          }
         >
           <Table
             dataSource={blogPosts}
@@ -649,6 +707,58 @@ export default function ContentManagementPage() {
         <div style={{ marginBottom: 16 }}>
           <label>İçerik</label>
           <TextArea rows={8} value={blogForm.translations[blogLang]?.content || ''} onChange={e => updateBlogTranslation('content', e.target.value)} />
+        </div>
+      </Modal>
+
+      <Modal
+        title="✨ AI ile Blog Yazdır"
+        open={aiBlogModal}
+        onCancel={() => setAiBlogModal(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setAiBlogModal(false)}>Vazgeç</Button>,
+          <Button key="generate" type="primary" loading={aiGenerating} icon={<RobotOutlined />} onClick={handleAIGenerateBlog} style={{ backgroundColor: '#722ed1', borderColor: '#722ed1' }}>
+            {aiGenerating ? 'Yazılıyor...' : '5 Dilde Üret'}
+          </Button>,
+        ]}
+        width={640}
+      >
+        <Alert
+          type="info"
+          showIcon
+          message="AI önce İngilizce taslak yazar, sonra Türkçe, İtalyanca, İspanyolca ve Arapça'ya çevirir. Sonuç düzenleme ekranında açılır — kaydetmeden önce inceleyin."
+          style={{ marginBottom: 16 }}
+        />
+        <div style={{ marginBottom: 16 }}>
+          <label>Konu *</label>
+          <Input
+            placeholder="örn: 2026'da altın takı trendleri, karat seçimi rehberi, hediye önerileri..."
+            value={aiTopic}
+            onChange={e => setAiTopic(e.target.value)}
+          />
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          <label>Tanıtılacak Ürün (opsiyonel)</label>
+          <Select
+            showSearch
+            allowClear
+            placeholder="Ürün seçin — yazıda doğal şekilde tanıtılır"
+            value={aiProductId}
+            onChange={setAiProductId}
+            filterOption={(input, option) =>
+              String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+            options={aiProducts.map((p: any) => ({ label: p.title || p.slug || p.id, value: p.id }))}
+            style={{ width: '100%' }}
+          />
+        </div>
+        <div style={{ marginBottom: 8 }}>
+          <label>Üslup</label>
+          <Select value={aiTone} onChange={setAiTone} style={{ width: '100%' }}>
+            <Select.Option value="warm, expert and trustworthy">Sıcak, uzman ve güvenilir</Select.Option>
+            <Select.Option value="luxurious and elegant">Lüks ve zarif</Select.Option>
+            <Select.Option value="friendly and casual">Samimi ve gündelik</Select.Option>
+            <Select.Option value="educational and detailed">Eğitici ve detaylı</Select.Option>
+          </Select>
         </div>
       </Modal>
     </div>

@@ -143,6 +143,15 @@ export const AdminAPI = {
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
         }).then((res) => res.data);
     },
+    // AI Blog generation (admin: topic/product -> all site languages)
+    // Long timeout: draft + 4 translations take a while.
+    generateBlogPost: (data: { topic?: string; productId?: string; tone?: string }) => {
+        const token = localStorage.getItem('token');
+        return axios.post(`${API_URL}/ai/admin/blog/generate`, data, {
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            timeout: 180000,
+        }).then((res) => res.data);
+    },
     testAIConnection: (data?: any) => {
         const token = localStorage.getItem('token');
         return axios.post(`${API_URL}/ai/admin/settings/test`, data || {}, {
