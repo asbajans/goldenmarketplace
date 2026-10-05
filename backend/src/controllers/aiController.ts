@@ -349,6 +349,8 @@ export class AIController {
       let context = '';
       let productUrl = '';
       let productImageUrl = '';
+      // Per-locale product page URL builder (assigned when a product is used).
+      let productUrlFor = (_lang: string) => productUrl;
       if (productId) {
         const product: any = await Product.findByPk(productId);
         if (!product) {
@@ -372,7 +374,9 @@ export class AIController {
         const priceLine = discountRate > 0
           ? `Sale price: ${saleTRY} TRY (approx $${saleUSD} USD) — ${discountRate}% OFF the regular ${priceTRY} TRY`
           : `Price: ${saleTRY} TRY (approx $${saleUSD} USD)`;
-        productUrl = `https://goldencrafters.com/en/p/${product.slug || product.id}`;
+        const slugPart = encodeURIComponent(String(product.slug || product.id));
+        productUrlFor = (lang: string) => `https://www.goldencrafters.com/${lang}/p/${slugPart}`;
+        productUrl = productUrlFor('en');
         const images: any[] = Array.isArray(product.images) ? product.images : [];
         productImageUrl = images[0] || '';
         context = `Feature this product naturally inside the article (one section about it, plus mention its price in BOTH Turkish lira and US dollars exactly as given):\n- Name: ${product.title}\n- Category: ${product.category || ''}\n- ${priceLine}\n- Description: ${(product.description || '').slice(0, 800)}`;
@@ -453,7 +457,8 @@ Return ONLY a JSON object (no code fences, no extra text) with exactly these key
         };
         for (const lang of Object.keys(translations)) {
           const t = translations[lang];
-          t.content = `${t.content}\n\n${CTA[lang] || CTA.en}: ${productUrl}\n${VIEW[lang] || VIEW.en}: ${productUrl}`;
+          const url = productUrlFor(lang);
+          t.content = `${t.content}\n\n${CTA[lang] || CTA.en}: ${url}\n${VIEW[lang] || VIEW.en}: ${url}`;
         }
       }
 
