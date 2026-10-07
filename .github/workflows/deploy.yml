@@ -92,6 +92,29 @@ jobs:
           WORKING_DIRECTORY: frontend/marketplace
           PRODUCTION: true
 
+  # Deploy to Portainer (git stack "golldencrftrs" — stack type untouched,
+  # webhook just triggers Portainer-side git pull + redeploy)
+  deploy-portainer:
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Trigger Portainer stack webhook
+        env:
+          PORTAINER_WEBHOOK: ${{ secrets.PORTAINER_WEBHOOK_GOLDEN }}
+        run: |
+          if [ -z "$PORTAINER_WEBHOOK" ]; then
+            echo "::warning::PORTAINER_WEBHOOK_GOLDEN secret is not set, skipping Portainer deploy."
+            exit 0
+          fi
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" -m 120 -X POST "$PORTAINER_WEBHOOK")
+          echo "Portainer webhook HTTP: $HTTP"
+          if [ "$HTTP" != "204" ] && [ "$HTTP" != "200" ]; then
+            echo "::error::Portainer webhook failed with HTTP $HTTP"
+            exit 1
+          fi
+
   # Deploy to Railway
   deploy-railway:
     needs: test-and-build

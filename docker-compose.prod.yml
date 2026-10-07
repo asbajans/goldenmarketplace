@@ -61,6 +61,9 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRE: 7d
 
+      # Google OAuth (Sign in with Google — verified in authController.googleAuth)
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+
       # Stripe (opsiyonel)
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
