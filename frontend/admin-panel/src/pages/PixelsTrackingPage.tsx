@@ -23,6 +23,8 @@ const TRACKING_FIELDS = [
     fields: [
       { key: 'google_gtm_id', label: 'Google Tag Manager ID', placeholder: 'GTM-XXXXXXX' },
       { key: 'google_analytics_id', label: 'Google Analytics GA4 ID', placeholder: 'G-XXXXXXXXXX' },
+      { key: 'google_ads_id', label: 'Google Ads Dönüşüm ID', placeholder: 'AW-18476524454' },
+      { key: 'google_ads_conversion_label', label: 'Ads Satın Alma Etiket (label)', placeholder: 'h13_CP_rhpMdEKbHpepE' },
     ],
   },
   {

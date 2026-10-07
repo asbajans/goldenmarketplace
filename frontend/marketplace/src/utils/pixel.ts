@@ -3,11 +3,13 @@
  * Provides tracking functions for e-commerce events
  */
 
-// Declare global fbq & ttq functions
+// Declare global fbq & ttq & gtag functions
 declare global {
     interface Window {
         fbq: (...args: any[]) => void;
         ttq: any;
+        gtag: (...args: any[]) => void;
+        dataLayer: any[];
     }
 }
 
@@ -159,4 +161,62 @@ export function trackSearch(searchQuery: string) {
             search_string: searchQuery
         });
     }
+}
+
+// ============================================================
+// Google Ads Purchase Conversion (AW-...)
+// IDs come from backend public settings:
+//   google_ads_id (e.g. AW-18476524454)
+//   google_ads_conversion_label (e.g. h13_CP_rhpMdEKbHpepE)
+// Fire ONLY on the order success page (/order/:id?success=1) after the
+// order status is verified as paid — never site-wide.
+// ============================================================
+
+/** Load gtag.js once and configure the Google Ads ID */
+export function initGoogleAds(adsId: string) {
+    if (!adsId || adsId === 'AW-XXXXXXXXXX') {
+        console.log('[Google Ads] No Ads ID configured, skipping initialization');
+        return;
+    }
+    if (document.querySelector(`script[src*="googletagmanager.com/gtag/js?id=${adsId}"]`)) {
+        return; // already loaded
+    }
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = window.gtag || function (...args: any[]) {
+        window.dataLayer.push(args);
+    };
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${adsId}`;
+    document.head.appendChild(script);
+    window.gtag('js', new Date());
+}
+
+/**
+ * Fire the "Satın alma işlemi" conversion exactly once per order.
+ * Reload-guard: sessionStorage key per orderId.
+ */
+export function trackGoogleAdsPurchase(params: {
+    adsId: string;
+    label: string;
+    orderId: string;
+    value: number;
+    currency?: string;
+}) {
+    const { adsId, label, orderId, value } = params;
+    const currency = params.currency || 'TRY';
+    if (!adsId || !label || !orderId || typeof window.gtag !== 'function') {
+        return;
+    }
+    const guardKey = `google_ads_converted_${orderId}`;
+    if (sessionStorage.getItem(guardKey)) {
+        return; // already reported for this order (e.g. page refresh)
+    }
+    window.gtag('event', 'conversion', {
+        'send_to': `${adsId}/${label}`,
+        'value': value,
+        'currency': currency,
+        'transaction_id': orderId,
+    });
+    sessionStorage.setItem(guardKey, '1');
 }

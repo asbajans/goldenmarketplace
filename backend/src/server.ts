@@ -84,6 +84,10 @@ async function syncAndSeedSettings() {
       { key: 'merchant_center_id', value: '', description: 'Google Merchant Center ID', isPublic: true },
       { key: 'merchant_target_country', value: 'TR', description: 'Google feed target country (e.g. TR)', isPublic: true },
       { key: 'merchant_target_language', value: 'tr', description: 'Google feed target language (e.g. tr)', isPublic: true },
+      // Google Ads purchase conversion (storefront fires it on /order/:id?success=1
+      // with value + currency + transaction_id; values set via Admin panel).
+      { key: 'google_ads_id', value: '', description: 'Google Ads conversion ID (e.g. AW-12345678901)', isPublic: true },
+      { key: 'google_ads_conversion_label', value: '', description: 'Google Ads purchase conversion label', isPublic: true },
       // Google Merchant feed defaults (missing gender/age_group/color fallback)
       { key: 'feed_default_gender', value: 'unisex', description: 'Google feed default gender: male | female | unisex', isPublic: true },
       { key: 'feed_default_age_group', value: 'adult', description: 'Google feed default age_group: newborn | infant | toddler | kids | adult', isPublic: true },
