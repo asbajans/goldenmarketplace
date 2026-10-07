@@ -256,17 +256,61 @@ export class AuthController {
   }
 
   /**
-   * Google OAuth signup/login
+   * Google OAuth signup/login.
+   * Body: { googleToken } — a Google ID token (JWT) issued for our web client.
+   * The token is verified against Google (audience must equal our
+   * GOOGLE_CLIENT_ID) and only the verified email/name are trusted.
    */
   static async googleAuth(req: Request, res: Response) {
     try {
-      const { googleToken, email, firstName, lastName } = req.body;
+      const { googleToken } = req.body;
 
-      if (!googleToken && !email) {
+      if (!googleToken) {
         return res.status(400).json({
-          error: { message: 'Google token or email is required', status: 400 }
+          error: { message: 'Google token is required', status: 400 }
         });
       }
+
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      if (!clientId) {
+        return res.status(500).json({
+          error: { message: 'Google login is not configured', status: 500 }
+        });
+      }
+
+      let payload: any;
+      try {
+        const verifyRes = await fetch(
+          `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(googleToken)}`
+        );
+        if (!verifyRes.ok) {
+          return res.status(401).json({
+            error: { message: 'Invalid Google token', status: 401 }
+          });
+        }
+        payload = await verifyRes.json();
+      } catch {
+        return res.status(502).json({
+          error: { message: 'Could not verify Google token', status: 502 }
+        });
+      }
+
+      if (payload.aud !== clientId) {
+        return res.status(401).json({
+          error: { message: 'Google token was not issued for this app', status: 401 }
+        });
+      }
+
+      const emailVerified = payload.email_verified === true || payload.email_verified === 'true';
+      if (!payload.email || !emailVerified) {
+        return res.status(401).json({
+          error: { message: 'Google email is not verified', status: 401 }
+        });
+      }
+
+      const email = String(payload.email).toLowerCase();
+      const firstName = payload.given_name || email.split('@')[0];
+      const lastName = payload.family_name || '';
 
       let user = await User.findOne({ where: { email } });
       
