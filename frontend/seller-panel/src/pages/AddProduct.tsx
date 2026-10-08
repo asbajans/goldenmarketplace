@@ -87,6 +87,7 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         en: { title: '', description: '', keywords: '' },
         tr: { title: '', description: '', keywords: '' },
         it: { title: '', description: '', keywords: '' },
+        es: { title: '', description: '', keywords: '' },
         ar: { title: '', description: '', keywords: '' }
     });
     const isCloned = !!initialValues?.originalStoreName;
@@ -124,7 +125,14 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                     tr: { ...prev.tr, title: initialValues?.title || '', description: initialValues?.description || '' }
                 }));
             } else {
-                setTranslations(initialValues.translations);
+                // Eski ürünlerde bazı diller eksik olabilir; varsayılanlarla birleştir.
+                setTranslations(prev => {
+                    const merged: Record<string, any> = { ...prev };
+                    for (const lang of Object.keys(initialValues.translations)) {
+                        merged[lang] = { ...(merged[lang] || { title: '', description: '', keywords: '' }), ...initialValues.translations[lang] };
+                    }
+                    return merged;
+                });
             }
             
             if (initialValues?.defaultLanguage) {
@@ -287,7 +295,8 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
 
         setAILoading('content');
         try {
-            const res = await generateDescriptionSync(title, categoryName, tags);
+            // Aktif dil sekmesinin dilinde üret (backend eskiden hep Türkçe üretiyordu).
+            const res = await generateDescriptionSync(title, categoryName, tags, activeLanguage);
             if (res.description) {
                 setTranslations(prev => ({
                     ...prev,
@@ -319,9 +328,10 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                 setTranslations(prev => {
                     const updated = { ...prev };
                     for (const lang of Object.keys(res.translations)) {
-                        if (updated[lang]) {
-                            updated[lang] = { ...updated[lang], description: res.translations[lang] };
-                        }
+                        // Yeni ürünlerde bazı diller (örn. es) state'te yoktu ve
+                        // `if (updated[lang])` guard'ı yüzünden düşüyordu.
+                        const existing = updated[lang] || { title: '', description: '', keywords: '' };
+                        updated[lang] = { ...existing, description: res.translations[lang] };
                     }
                     return updated;
                 });
@@ -965,13 +975,14 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                             }));
                         }}
                     />
-                    <Space style={{ marginTop: 8 }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
                         <Button
                             size="small"
                             icon={<ThunderboltOutlined />}
                             loading={aiLoading === 'content'}
                             onClick={() => handleAIGenerateContent()}
                             disabled={isCloned}
+                            style={{ whiteSpace: 'normal', height: 'auto', minHeight: 24, textAlign: 'left' }}
                         >
                             AI ile Açıklama Oluştur ({LANGUAGES.find(l => l.key === activeLanguage)?.label || activeLanguage})
                         </Button>
@@ -981,10 +992,11 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                             loading={aiLoading === 'all'}
                             onClick={() => handleAIGenerateAllDescriptions()}
                             disabled={isCloned}
+                            style={{ whiteSpace: 'normal', height: 'auto', minHeight: 24, textAlign: 'left' }}
                         >
                             AI ile Tüm Dillere Açıklama Oluştur
                         </Button>
-                    </Space>
+                    </div>
                 </Form.Item>
             </Card>
 

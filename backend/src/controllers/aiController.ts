@@ -148,34 +148,48 @@ export class AIController {
 
   static async getCreditPrices(_req: Request, res: Response) {
     try {
-      const pack = await GlobalSetting.findOne({ where: { key: 'ai_credit_packs' } });
-      const packs = pack ? JSON.parse(pack.value) : [];
+      const { getCreditPacks } = require('../services/paymentService');
+      const packs = await getCreditPacks();
       return res.json({ packs });
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
     }
   }
 
-  static async purchaseCredits(req: Request, res: Response) {
+  /**
+   * Kredi checkout: fiyat adminin tanımladığı paketten gelir (istemci
+   * tutarı güvenilmez). Stripe → ödeme URL'i, havale → bekleyen talep.
+   * Kredi, ödeme doğrulanınca (webhook/verify veya admin onayı) bakiyeye
+   * eklenir — öncesinde ASLA.
+   */
+  static async checkoutCredits(req: Request, res: Response) {
     try {
       const userId = (req as any).user.id;
-      const { credits, amount } = req.body;
+      const { credits, provider = 'bank' } = req.body;
 
-      if (!credits || !amount) {
-        return res.status(400).json({ error: 'credits and amount are required' });
+      if (!credits) {
+        return res.status(400).json({ error: 'credits gerekli' });
+      }
+      if (!['stripe', 'bank'].includes(provider)) {
+        return res.status(400).json({ error: 'provider stripe|bank olmalı' });
       }
 
-      // Mock purchase (same pattern as subscription mock)
-      const stripe = process.env.STRIPE_SECRET_KEY;
-      if (!stripe || String(credits).startsWith('mock')) {
-        await planAccessService.addPurchasedCredits(userId, Number(credits));
-        return res.json({ success: true, message: `${credits} credits added to your account`, credits });
-      }
-
-      // Real Stripe checkout would go here
-      return res.json({ success: true, message: `${credits} credits purchased`, credits });
+      const { createCreditCheckout } = require('../services/paymentService');
+      const { payment, url, bank } = await createCreditCheckout(userId, Number(credits), provider);
+      return res.json({
+        paymentId: payment.id,
+        status: payment.status,
+        amount: payment.amount,
+        currency: payment.currency,
+        credits: payment.credits,
+        url,
+        bank: bank || undefined,
+        message: url
+          ? 'Ödeme sayfasına yönlendiriliyorsunuz'
+          : 'Talebiniz alındı. Havale/EFT sonrası admin onayıyla kredileriniz yüklenecek.'
+      });
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      return res.status(400).json({ error: error.message });
     }
   }
 
@@ -184,7 +198,7 @@ export class AIController {
   static async generateDescriptionSync(req: Request, res: Response) {
     try {
       const userId = (req as any).user.id;
-      const { title, category, tags } = req.body;
+      const { title, category, tags, language } = req.body;
 
       if (!title || !category) {
         return res.status(400).json({ error: 'title and category are required' });
@@ -195,8 +209,10 @@ export class AIController {
         return res.status(403).json({ error: access.message, credits: access });
       }
 
+      // Modal hangi dil sekmesindeyse o dilde üret (eski davranış: hep Türkçe).
+      const targetLanguage = AIController.resolveLanguageName(language) || 'Turkish';
       const tagsStr = Array.isArray(tags) ? tags.join(', ') : (tags || '');
-      const description = await aiService.generateProductDescription(title, category, 'tr', tagsStr);
+      const description = await aiService.generateProductDescription(title, category, targetLanguage, tagsStr);
 
       if (!description || description === title) {
         return res.status(500).json({ error: 'AI açıklama oluşturamadı' });
@@ -237,6 +253,25 @@ export class AIController {
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
     }
+  }
+
+  /**
+   * Dil kodu ("en") veya dil adı ("English") → AI prompt'unda kullanılacak
+   * İngilizce dil adı. Bilinmeyen değerde null döner (çağıran varsayılanı seçer).
+   */
+  private static resolveLanguageName(input: unknown): string | null {
+    if (input === undefined || input === null) return null;
+    const v = String(input).trim();
+    if (!v) return null;
+    const byCode: Record<string, string> = {
+      en: 'English', tr: 'Turkish', it: 'Italian', es: 'Spanish', ar: 'Arabic',
+      de: 'German', fr: 'French', pt: 'Portuguese', ru: 'Russian', zh: 'Chinese'
+    };
+    const lower = v.toLowerCase();
+    if (byCode[lower]) return byCode[lower];
+    const names = Object.values(byCode).map(n => n.toLowerCase());
+    if (names.includes(lower)) return v;
+    return null;
   }
 
   // ─── Cleanup Descriptions ───

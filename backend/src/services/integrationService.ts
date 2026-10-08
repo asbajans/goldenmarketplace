@@ -5,7 +5,7 @@ import HepsiburadaClient from '../integrations/hepsiburada/hepsiburadaClient';
 import N11Client from '../integrations/n11/n11Client';
 import PazaramaClient from '../integrations/pazarama/pazaramaClient';
 import User from '../models/User';
-import SubscriptionPlan from '../models/SubscriptionPlan';
+import planAccessService from './planAccessService';
 
 class IntegrationService {
     /**
@@ -21,13 +21,8 @@ class IntegrationService {
         const user = await User.findByPk(userId);
         if (!user) throw new Error('Kullanıcı bulunamadı');
 
-        let integrationLimit = 1; // Default for free/no plan
-        if (user.subscriptionPlan) {
-            const plan = await SubscriptionPlan.findOne({ where: { name: user.subscriptionPlan } });
-            if (plan && plan.integrationLimit !== undefined) {
-                integrationLimit = plan.integrationLimit;
-            }
-        }
+        // Paket limiti merkezi kapıdan (süresi bitmiş/pasif plan limit vermez)
+        const { integrationLimit } = await planAccessService.getModuleLimits(userId);
 
         const currentIntegrationsCount = await MarketplaceIntegration.count({ where: { userId } });
         if (currentIntegrationsCount >= integrationLimit) {
@@ -144,14 +139,7 @@ class IntegrationService {
                 lastSyncAt: new Date()
             });
         } else {
-            const user = await User.findByPk(userId);
-            let integrationLimit = 1;
-            if (user && user.subscriptionPlan) {
-                const plan = await SubscriptionPlan.findOne({ where: { name: user.subscriptionPlan } });
-                if (plan && plan.integrationLimit !== undefined) {
-                    integrationLimit = plan.integrationLimit;
-                }
-            }
+            const { integrationLimit } = await planAccessService.getModuleLimits(userId);
             const currentIntegrationsCount = await MarketplaceIntegration.count({ where: { userId } });
             if (currentIntegrationsCount >= integrationLimit) {
                 throw new Error(`Entegrasyon limitinize (Maksimum: ${integrationLimit}) ulaştınız. Paketinizi yükseltin.`);

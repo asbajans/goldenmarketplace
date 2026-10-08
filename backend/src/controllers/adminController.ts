@@ -217,7 +217,7 @@ export class AdminController {
 
     static async createSubscriptionPlan(req: Request, res: Response): Promise<Response> {
         try {
-            const { name, description, monthlyPrice, yearlyPrice, currency, interval, productLimit, integrationLimit, aiTranslationEnabled, aiContentEnabled, aiMonthlyCredit, features, stripePriceId, isActive } = req.body;
+            const { name, description, monthlyPrice, yearlyPrice, currency, interval, productLimit, integrationLimit, aiTranslationEnabled, aiContentEnabled, aiMonthlyCredit, b2bEnabled, bulkUploadEnabled, maxExternalFeeds, features, stripePriceId, stripePriceIdYearly, isActive } = req.body;
             const plan = await SubscriptionPlan.create({
                 name,
                 description,
@@ -230,8 +230,12 @@ export class AdminController {
                 aiTranslationEnabled: aiTranslationEnabled || false,
                 aiContentEnabled: aiContentEnabled || false,
                 aiMonthlyCredit: aiMonthlyCredit || 0,
+                b2bEnabled: b2bEnabled || false,
+                bulkUploadEnabled: bulkUploadEnabled || false,
+                maxExternalFeeds: maxExternalFeeds ?? 0,
                 features,
                 stripePriceId,
+                stripePriceIdYearly,
                 isActive: isActive !== undefined ? isActive : true
             });
             return res.status(201).json(plan);
@@ -243,7 +247,7 @@ export class AdminController {
     static async updateSubscriptionPlan(req: Request, res: Response) {
         try {
             const { id } = req.params;
-            const { name, description, monthlyPrice, yearlyPrice, currency, interval, productLimit, integrationLimit, aiTranslationEnabled, aiContentEnabled, aiMonthlyCredit, features, stripePriceId, isActive } = req.body;
+            const { name, description, monthlyPrice, yearlyPrice, currency, interval, productLimit, integrationLimit, aiTranslationEnabled, aiContentEnabled, aiMonthlyCredit, b2bEnabled, bulkUploadEnabled, maxExternalFeeds, features, stripePriceId, stripePriceIdYearly, isActive } = req.body;
             const plan = await SubscriptionPlan.findByPk(id);
             if (!plan) {
                 return res.status(404).json({ error: 'Plan not found' });
@@ -260,8 +264,12 @@ export class AdminController {
                 aiTranslationEnabled: aiTranslationEnabled !== undefined ? aiTranslationEnabled : plan.aiTranslationEnabled,
                 aiContentEnabled: aiContentEnabled !== undefined ? aiContentEnabled : plan.aiContentEnabled,
                 aiMonthlyCredit: aiMonthlyCredit !== undefined ? aiMonthlyCredit : plan.aiMonthlyCredit,
+                b2bEnabled: b2bEnabled !== undefined ? b2bEnabled : plan.b2bEnabled,
+                bulkUploadEnabled: bulkUploadEnabled !== undefined ? bulkUploadEnabled : plan.bulkUploadEnabled,
+                maxExternalFeeds: maxExternalFeeds !== undefined ? maxExternalFeeds : plan.maxExternalFeeds,
                 features,
                 stripePriceId,
+                stripePriceIdYearly: stripePriceIdYearly !== undefined ? stripePriceIdYearly : plan.stripePriceIdYearly,
                 isActive
             });
             return res.status(200).json(plan);
@@ -512,8 +520,7 @@ export class AdminController {
     }
 
     // --- USER PLAN ASSIGNMENT ---
-    static async assignPlanToUser(req: Request, res: Response): Promise<Response> {
-        try {
+    static async assignPlanToUser(req: Request, res: Response): Promise<Response> {        try {
             const { id } = req.params;
             const { subscriptionPlanId, subscriptionStatus } = req.body;
 
@@ -541,6 +548,78 @@ export class AdminController {
         } catch (error: any) {
             console.error('Admin Error [assignPlanToUser]:', error);
             return res.status(500).json({ error: error.message || 'Failed to assign plan' });
+        }
+    }
+
+    // --- PAYMENTS (abonelik + kredi onayları) ---
+    static async getPayments(req: Request, res: Response): Promise<Response> {
+        try {
+            const { status, kind } = req.query;
+            const where: any = {};
+            if (status) where.status = status;
+            if (kind) where.kind = kind;
+            const { default: Payment } = await import('../models/Payment');
+            const payments = await Payment.findAll({
+                where,
+                order: [['createdAt', 'DESC']],
+                limit: 100
+            });
+            return res.json(payments);
+        } catch (error: any) {
+            return res.status(500).json({ error: error.message || 'Failed to fetch payments' });
+        }
+    }
+
+    static async approvePayment(req: Request, res: Response): Promise<Response> {
+        try {
+            const paymentService = await import('../services/paymentService');
+            const adminId = (req as any).user?.id;
+            const payment = await paymentService.approvePayment(req.params.id, adminId);
+            return res.json({ success: true, payment });
+        } catch (error: any) {
+            return res.status(400).json({ error: error.message || 'Onay başarısız' });
+        }
+    }
+
+    static async rejectPayment(req: Request, res: Response): Promise<Response> {
+        try {
+            const paymentService = await import('../services/paymentService');
+            const adminId = (req as any).user?.id;
+            const payment = await paymentService.rejectPayment(req.params.id, adminId, req.body?.reason);
+            return res.json({ success: true, payment });
+        } catch (error: any) {
+            return res.status(400).json({ error: error.message || 'Red başarısız' });
+        }
+    }
+
+    // --- USER CREDITS (haricen kredi tanımlama) ---
+    static async getUserCredits(req: Request, res: Response): Promise<Response> {
+        try {
+            const { default: CreditTransaction } = await import('../models/CreditTransaction');
+            const { default: planAccessService } = await import('../services/planAccessService');
+            const user = await User.findByPk(req.params.id);
+            if (!user) return res.status(404).json({ error: 'User not found' });
+            const balance = await planAccessService.getCreditBalance(req.params.id);
+            const transactions = await CreditTransaction.findAll({
+                where: { userId: req.params.id },
+                order: [['createdAt', 'DESC']],
+                limit: 50
+            });
+            return res.json({ balance, transactions });
+        } catch (error: any) {
+            return res.status(500).json({ error: error.message || 'Failed to fetch credits' });
+        }
+    }
+
+    static async grantUserCredits(req: Request, res: Response): Promise<Response> {
+        try {
+            const paymentService = await import('../services/paymentService');
+            const adminId = (req as any).user?.id;
+            const { credits, reason } = req.body;
+            const result = await paymentService.grantCreditsByAdmin(req.params.id, Number(credits), reason || '', adminId);
+            return res.json({ success: true, ...result });
+        } catch (error: any) {
+            return res.status(400).json({ error: error.message || 'Kredi tanımlanamadı' });
         }
     }
 }

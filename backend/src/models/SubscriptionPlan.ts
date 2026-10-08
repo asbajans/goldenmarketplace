@@ -14,12 +14,16 @@ interface SubscriptionPlanAttributes {
     yearlyPrice: number;
     currency: string;
     interval: string;
-    stripePriceId?: string;
     productLimit: number; // max products a seller can have
     integrationLimit: number; // max marketplaces a seller can connect
     aiTranslationEnabled?: boolean;
     aiContentEnabled?: boolean;
     aiMonthlyCredit?: number;
+    b2bEnabled?: boolean; // B2B pazara erişim + ürün kopyalama
+    bulkUploadEnabled?: boolean; // Excel/CSV toplu ürün yükleme
+    maxExternalFeeds?: number; // harici feed (XML/CSV) adedi, 0 = kapalı
+    stripePriceId?: string;
+    stripePriceIdYearly?: string; // yıllık dönem için ayrı Stripe Price ID
     features: string[];
     isActive: boolean;
     createdAt?: Date;
@@ -40,6 +44,10 @@ class SubscriptionPlan extends Model<SubscriptionPlanAttributes> implements Subs
     public aiTranslationEnabled?: boolean;
     public aiContentEnabled?: boolean;
     public aiMonthlyCredit?: number;
+    public b2bEnabled?: boolean;
+    public bulkUploadEnabled?: boolean;
+    public maxExternalFeeds?: number;
+    public stripePriceIdYearly?: string;
     public features!: string[];
     public isActive!: boolean;
     public readonly createdAt!: Date;
@@ -75,7 +83,7 @@ SubscriptionPlan.init(
         currency: {
             type: DataTypes.STRING,
             allowNull: false,
-            defaultValue: 'TRY'
+            defaultValue: 'USD'
         },
         interval: {
             type: DataTypes.STRING,
@@ -107,6 +115,27 @@ SubscriptionPlan.init(
         aiMonthlyCredit: {
             type: DataTypes.INTEGER,
             defaultValue: 0
+        },
+        b2bEnabled: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false,
+            comment: 'B2B pazara erişim + tedarikçi ürün kopyalama'
+        },
+        bulkUploadEnabled: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false,
+            comment: 'Excel/CSV ile toplu ürün yükleme'
+        },
+        maxExternalFeeds: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            defaultValue: 0,
+            comment: 'Harici feed (XML/CSV içe aktarma) adedi, 0 = kapalı'
+        },
+        stripePriceIdYearly: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            comment: 'Yıllık dönem için Stripe Price ID'
         },
         features: {
             type: DataTypes.JSON,

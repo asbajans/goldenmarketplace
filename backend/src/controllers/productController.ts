@@ -5,7 +5,7 @@
 
 import { Request, Response } from 'express';
 import { Op, Sequelize } from 'sequelize';
-import { Product, ProductVariant, Store, User, SubscriptionPlan } from '../models';
+import { Product, ProductVariant, Store } from '../models';
 import goldPriceService from '../services/goldPriceService';
 import { s3Service } from '../services/s3Service';
 import { productSyncQueue } from '../jobs/productSyncJob';
@@ -83,6 +83,9 @@ export class ProductController {
       const { count, rows } = await Product.findAndCountAll({
         where,
         include: [{ model: ProductVariant, as: 'variants' }],
+        // variants JOIN her varyant için satır çoğaltır; distinct olmadan
+        // count ürün değil satır sayar (örn. 158 ürün → 1183). distinct şart.
+        distinct: true,
         limit: parseInt(limit as string),
         offset,
         order: [['createdAt', 'DESC']]
@@ -155,26 +158,18 @@ export class ProductController {
         });
       }
 
-      // Subscription plan limit enforcement
-      const user = await User.findByPk((req as any).user.id);
-      const FREE_TIER_LIMIT = 5;
-      if (user) {
-        let productLimit = FREE_TIER_LIMIT;
-        if (user.subscriptionPlan) {
-          const plan = await SubscriptionPlan.findOne({ where: { name: user.subscriptionPlan, isActive: true } });
-          if (plan) productLimit = plan.productLimit;
-        }
-        const existingCount = await Product.count({ where: { storeId: store.id } });
-        if (existingCount >= productLimit) {
-          return res.status(403).json({
-            error: {
-              message: `Paket limitinize ulaştınız. Mevcut paketiniz maksimum ${productLimit} ürün izni vermektedir. Lütfen pakedinizi yükseltin.`,
-              status: 403,
-              productLimit,
-              currentCount: existingCount
-            }
-          });
-        }
+      // Subscription plan limit enforcement (merkezi kapı)
+      const { default: planAccessService } = await import('../services/planAccessService');
+      const productLimitCheck = await planAccessService.checkProductLimit((req as any).user.id, store.id);
+      if (!productLimitCheck.allowed) {
+        return res.status(403).json({
+          error: {
+            message: productLimitCheck.message,
+            status: 403,
+            productLimit: productLimitCheck.limit,
+            currentCount: productLimitCheck.current
+          }
+        });
       }
 
       // Calculate prices from gram + effectiveMilyem + profit margin + price multiplier
@@ -184,6 +179,15 @@ export class ProductController {
       // Handle B2B fields
       const finalB2bDiscount = isB2BEnabled ? (b2bDiscount || 0) : 0;
       const b2bPrice = Math.round(priceTRY * (1 - finalB2bDiscount / 100) * 100) / 100;
+
+      // Paket kapısı: B2B'ye açmak B2B modülü gerektirir
+      if (isB2BEnabled) {
+        const { default: planAccessService } = await import('../services/planAccessService');
+        const b2bAccess = await planAccessService.checkB2BAccess((req as any).user.id);
+        if (!b2bAccess.allowed) {
+          return res.status(403).json({ error: { message: b2bAccess.message, status: 403 } });
+        }
+      }
 
       // Handle Golden Marketplace discount
       const finalDiscountRate = discountRate || 0;
@@ -309,6 +313,7 @@ export class ProductController {
         images, videoUrl, marketplaces, marketplaceConfig, gramWeight, milyem, effectiveMilyem, profitMargin, priceMultiplier,
         isB2BEnabled, b2bDiscount, discountRate,
         hasVariants, variantAttributes, variants,
+        translations, defaultLanguage,
         gender, ageGroup, color
       } = req.body;
 
@@ -388,15 +393,33 @@ export class ProductController {
       );
 
       const finalIsB2BEnabled = isCloned ? false : (isB2BEnabled !== undefined ? !!isB2BEnabled : product.isB2BEnabled);
-      const finalB2bDiscount = isCloned ? 0 : (b2bDiscount !== undefined ? b2bDiscount : product.b2bDiscount);
-      const finalDiscountRate = isCloned ? 0 : (discountRate !== undefined ? discountRate : product.discountRate);
+      // Paket kapısı: B2B'yi yeni açmak B2B modülü gerektirir
+      if (finalIsB2BEnabled && !product.isB2BEnabled) {
+        const { default: planAccessService } = await import('../services/planAccessService');
+        const b2bAccess = await planAccessService.checkB2BAccess(user.id);
+        if (!b2bAccess.allowed) {
+          return res.status(403).json({ error: { message: b2bAccess.message, status: 403 } });
+        }
+      }
+      const finalB2bDiscount = isCloned ? 0 : (b2bDiscount !== undefined ? b2bDiscount : product.b2bDiscount);      const finalDiscountRate = isCloned ? 0 : (discountRate !== undefined ? discountRate : product.discountRate);
       const finalDiscountedPrice = finalDiscountRate > 0 ? Math.round(finalPriceTRY * (1 - finalDiscountRate / 100) * 100) / 100 : 0;
       const finalHasVariants = isCloned ? false : (hasVariants !== undefined ? !!hasVariants : product.hasVariants);
       const finalVariantAttributes = isCloned ? [] : (variantAttributes || product.variantAttributes);
 
+      // AI/modal tarafı tüm dillerdeki başlık+a açıklamayı `translations` içinde
+      // gönderir. Bunlar kaydedilmezse AI ile üretilen çeviriler kaybolur.
+      // Mevcut dillerle birleştirerek kaydet (gönderilmeyen dil silinmesin).
+      const existingTranslations = (product as any).translations || {};
+      const finalTranslations = isCloned
+        ? existingTranslations
+        : (translations !== undefined ? { ...existingTranslations, ...translations } : existingTranslations);
+      const finalDefaultLanguage = isCloned
+        ? (product as any).defaultLanguage
+        : (defaultLanguage || (product as any).defaultLanguage || 'en');
+
       await product.update({
         title: isCloned ? product.title : (title || product.title),
-        description: isCloned ? product.description : (description || product.description),
+        description: isCloned ? product.description : (description !== undefined ? description : product.description),
         category: isCloned ? product.category : (category || product.category),
         categoryId: isCloned ? product.categoryId : (categoryId !== undefined ? categoryId : product.categoryId),
         gramWeight: finalGramWeight,
@@ -422,7 +445,11 @@ export class ProductController {
         color: color === undefined ? product.color : (color === '' || color === null ? null : String(color).trim()),
         hasVariants: finalHasVariants,
         variantAttributes: finalVariantAttributes,
-        tags: isCloned ? product.tags : tags
+        tags: isCloned ? product.tags : tags,
+        // @ts-ignore - translations/defaultLanguage added via migration (see Product model)
+        translations: finalTranslations,
+        // @ts-ignore - translations/defaultLanguage added via migration (see Product model)
+        defaultLanguage: finalDefaultLanguage
       });
 
       // Handle variants update

@@ -80,6 +80,9 @@ async function syncAndSeedSettings() {
       // Stripe
       { key: 'stripe_publishable_key', value: '', description: 'Stripe Publishable Key', isPublic: true },
       { key: 'stripe_secret_key', value: '', description: 'Stripe Secret Key', isPublic: false },
+      { key: 'stripe_webhook_secret', value: '', description: 'Stripe Webhook Signing Secret (whsec_...)', isPublic: false },
+      // AI kredi paketleri — fiyatlar USD (satıcı kredi satın alma fiyatları)
+      { key: 'ai_credit_packs', value: '[{"credits":100,"price":9},{"credits":500,"price":39},{"credits":1000,"price":69}]', description: 'AI credit packs (USD): [{"credits":100,"price":9}]', isPublic: true },
       // Google Merchant Center
       { key: 'merchant_center_id', value: '', description: 'Google Merchant Center ID', isPublic: true },
       { key: 'merchant_target_country', value: 'TR', description: 'Google feed target country (e.g. TR)', isPublic: true },
@@ -113,12 +116,35 @@ async function syncAndSeedSettings() {
     }
     logger.info('[DB] GlobalSettings synchronized successfully.');
 
+    // Para birimi standardı: tüm paket + kredi ücretlendirmesi USD.
+    // Eski TRY satırları USD'ye çevrilir (tutarlara dokunulmaz — admin
+    // panelden güncel USD fiyatları girilmelidir).
+    try {
+      const { default: SubscriptionPlan } = await import('./models/SubscriptionPlan');
+      const { Op } = await import('sequelize');
+      const [planCount] = await SubscriptionPlan.update(
+        { currency: 'USD' },
+        { where: { currency: { [Op.ne]: 'USD' } } }
+      );
+      if (planCount > 0) logger.info(`[DB] Normalized ${planCount} subscription plan(s) to USD. Tutarları admin panelden güncelleyin.`);
+
+      // Eski seed kredi paketleri (TRY varsayılanları) hiç ellenmemişse USD'ye geçir.
+      const packsRow = await GlobalSetting.findOne({ where: { key: 'ai_credit_packs' } });
+      const LEGACY_PACKS = '[{"credits":100,"price":99},{"credits":500,"price":399},{"credits":1000,"price":699}]';
+      if (packsRow && packsRow.value === LEGACY_PACKS) {
+        await packsRow.update({ value: '[{"credits":100,"price":9},{"credits":500,"price":39},{"credits":1000,"price":69}]' });
+        logger.info('[DB] Normalized ai_credit_packs to USD defaults.');
+      }
+    } catch (normErr: any) {
+      logger.warn(`[DB] Currency normalization skipped: ${normErr?.message}`);
+    }
+
     // Hardening: secret keys must never be public, no matter what past code
     // versions saved (e.g. updateAISettings used to expose ai_api_key).
     // Values are untouched — only the visibility flag is repaired.
     const SECRET_KEYS = [
       'ai_api_key',
-      'stripe_secret_key',
+      'stripe_secret_key', 'stripe_webhook_secret',
       'iyzico_api_key', 'iyzico_secret_key',
       'paytr_merchant_id', 'paytr_merchant_key', 'paytr_merchant_salt'
     ];
@@ -186,6 +212,10 @@ app.use(cors({
   },
   credentials: true
 }));
+// Stripe webhook ham body ile gelir (imza doğrulaması için) — bu yüzden
+// express.json()'tan ÖNCE mount edilir. Sadece /api/webhooks altını kapsar.
+app.use('/api/webhooks', express.raw({ type: '*/*' }), require('./routes/webhooks').default || require('./routes/webhooks'));
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 

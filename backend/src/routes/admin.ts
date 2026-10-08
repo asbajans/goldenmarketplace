@@ -34,6 +34,15 @@ router.post('/subscription-plans', AdminController.createSubscriptionPlan);
 router.put('/subscription-plans/:id', AdminController.updateSubscriptionPlan);
 router.delete('/subscription-plans/:id', AdminController.deleteSubscriptionPlan);
 
+// --- PAYMENTS (havale/EFT onayları + geçmiş) ---
+router.get('/payments', AdminController.getPayments);
+router.post('/payments/:id/approve', AdminController.approvePayment);
+router.post('/payments/:id/reject', AdminController.rejectPayment);
+
+// --- USER CREDITS (haricen kredi tanımlama) ---
+router.get('/users/:id/credits', AdminController.getUserCredits);
+router.post('/users/:id/credits', AdminController.grantUserCredits);
+
 // --- ALL PRODUCTS (admin view) ---
 router.get('/products', AdminController.getAllProducts);
 router.post('/products/backfill-feed-attributes', AdminController.backfillFeedAttributes);

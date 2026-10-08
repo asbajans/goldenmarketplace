@@ -1,19 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
+import { getSubscriptionPlans, type SubscriptionPlan } from './api/subscription';
 
 /* ─── Types ──────────────────────────────────────────────────── */
 interface Feature {
   icon: string;
   title: string;
   desc: string;
-}
-
-interface Plan {
-  name: string;
-  price: string;
-  period: string;
-  highlight: boolean;
-  features: string[];
 }
 
 /* ─── Data ───────────────────────────────────────────────────── */
@@ -24,30 +17,6 @@ const FEATURES: Feature[] = [
   { icon: '🛒', title: 'Çoklu Pazaryeri Entegrasyonu', desc: 'Trendyol, Hepsiburada, N11, Amazon ve Pazarama entegrasyonlarıyla tek panelden yönetin.' },
   { icon: '🧵', title: 'Etsy Mağaza Yönetimi', desc: 'Etsy mağazanızdaki ürünleri, kategorileri ve stoklarınızı ASB paneli üzerinden kolayca yapılandırın.' },
   { icon: '🔒', title: 'Sadece B2B — Kamuya Kapalı', desc: 'Platform sadece onaylı satıcılara açıktır. Müşteri girişi yoktur; tüm satışlar B2B modelinde gerçekleşir.' },
-];
-
-const PLANS: Plan[] = [
-  {
-    name: 'Başlangıç',
-    price: '₺790',
-    period: '/ ay',
-    highlight: false,
-    features: ['5 ürüne kadar', '2 pazaryeri', 'B2B Ürün Keşfet', 'E-posta destek']
-  },
-  {
-    name: 'Profesyonel',
-    price: '₺1.990',
-    period: '/ ay',
-    highlight: true,
-    features: ['Sınırsız ürün', 'Tüm pazaryerleri', 'B2B talep yönetimi', 'Etsy entegrasyonu', 'Öncelikli destek']
-  },
-  {
-    name: 'Kurumsal',
-    price: 'Teklif Al',
-    period: '',
-    highlight: false,
-    features: ['Özel API limitleri', 'Beyaz etiket seçeneği', 'Özel entegrasyonlar', 'SLA garantili destek']
-  }
 ];
 
 const ETSY_STEPS = [
@@ -61,6 +30,10 @@ const ETSY_STEPS = [
 const App: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('hero');
+  // Paketler admin panelden (Abonelikler) canlı çekilir
+  const [plans, setPlans] = useState<SubscriptionPlan[] | null>(null);
+  const [plansError, setPlansError] = useState(false);
+  const [period, setPeriod] = useState<'monthly' | 'yearly'>('monthly');
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 50);
@@ -68,10 +41,38 @@ const App: React.FC = () => {
     return () => window.removeEventListener('scroll', handler);
   }, []);
 
+  useEffect(() => {
+    getSubscriptionPlans()
+      .then(setPlans)
+      .catch(() => setPlansError(true));
+  }, []);
+
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
     setActiveSection(id);
   };
+
+  // Plandaki modül/limit alanlarından görünen özellik listesi kurulur
+  const planFeatures = (plan: SubscriptionPlan): string[] => {
+    const list: string[] = [];
+    list.push(`${plan.productLimit} ürüne kadar`);
+    list.push(`${plan.integrationLimit} pazaryeri entegrasyonu`);
+    if (plan.b2bEnabled) list.push('B2B erişimi ve ürün kopyalama');
+    if (plan.bulkUploadEnabled) list.push('Toplu ürün yükleme');
+    if ((plan.maxExternalFeeds || 0) > 0) list.push(`${plan.maxExternalFeeds} harici feed`);
+    if (plan.aiTranslationEnabled || plan.aiContentEnabled) {
+      list.push(plan.aiMonthlyCredit ? `AI özellikleri (ayda ${plan.aiMonthlyCredit} kredi hediyeli)` : 'AI özellikleri');
+    }
+    if (Array.isArray(plan.features)) {
+      for (const f of plan.features) {
+        if (f && !list.includes(f)) list.push(f);
+      }
+    }
+    return list;
+  };
+
+  const planPrice = (plan: SubscriptionPlan): number =>
+    period === 'yearly' ? Number(plan.yearlyPrice) : Number(plan.monthlyPrice);
 
   return (
     <div className="landing">
@@ -249,29 +250,64 @@ const App: React.FC = () => {
         <div className="section__inner">
           <div className="section__label">Fiyatlandırma</div>
           <h2 className="section__title">İşletmenize uygun plan seçin</h2>
-          <div className="pricing-grid">
-            {PLANS.map((plan, i) => (
-              <div key={i} className={`pricing-card ${plan.highlight ? 'pricing-card--highlight' : ''}`}>
-                {plan.highlight && <div className="pricing-card__badge">En Popüler</div>}
-                <div className="pricing-card__name">{plan.name}</div>
-                <div className="pricing-card__price">
-                  {plan.price}
-                  {plan.period && <span className="pricing-card__period">{plan.period}</span>}
-                </div>
-                <ul className="pricing-card__features">
-                  {plan.features.map((f, fi) => (
-                    <li key={fi}>✓ {f}</li>
-                  ))}
-                </ul>
-                <a
-                  href={plan.price === 'Teklif Al' ? 'mailto:info@asb.web.tr' : 'https://seller.asb.web.tr/register'}
-                  className={`btn btn--block ${plan.highlight ? 'btn--gold' : 'btn--outline'}`}
-                >
-                  {plan.price === 'Teklif Al' ? 'İletişime Geç' : 'Hemen Başla'}
-                </a>
-              </div>
-            ))}
+          <div style={{ textAlign: 'center', marginBottom: 24 }}>
+            <button
+              className={`btn btn--sm ${period === 'monthly' ? 'btn--gold' : 'btn--ghost'}`}
+              onClick={() => setPeriod('monthly')}
+              style={{ marginRight: 8 }}
+            >
+              Aylık
+            </button>
+            <button
+              className={`btn btn--sm ${period === 'yearly' ? 'btn--gold' : 'btn--ghost'}`}
+              onClick={() => setPeriod('yearly')}
+            >
+              Yıllık
+            </button>
           </div>
+          {plans === null && !plansError && (
+            <p style={{ textAlign: 'center', opacity: 0.7 }}>Paketler yükleniyor...</p>
+          )}
+          {plansError && (
+            <p style={{ textAlign: 'center', opacity: 0.8 }}>
+              Paketler şu an yüklenemedi. Güncel fiyatlar için{' '}
+              <a href="https://seller.asb.web.tr/register" style={{ color: '#d4a017' }}>satıcı paneline göz atın</a>.
+            </p>
+          )}
+          {plans !== null && plans.length > 0 && (
+            <div className="pricing-grid">
+              {plans.map((plan, i) => {
+                const highlight = plans.length > 1 ? i === 1 : true;
+                const price = planPrice(plan);
+                return (
+                  <div key={plan.id} className={`pricing-card ${highlight ? 'pricing-card--highlight' : ''}`}>
+                    {highlight && <div className="pricing-card__badge">En Popüler</div>}
+                    <div className="pricing-card__name">{plan.name}</div>
+                    <div className="pricing-card__price">
+                      {price > 0 ? `$${price}` : 'Ücretsiz'}
+                      {price > 0 && (
+                        <span className="pricing-card__period">/ {period === 'yearly' ? 'yıl' : 'ay'}</span>
+                      )}
+                    </div>
+                    {plan.description && (
+                      <p style={{ opacity: 0.75, fontSize: 14, margin: '0 0 12px' }}>{plan.description}</p>
+                    )}
+                    <ul className="pricing-card__features">
+                      {planFeatures(plan).map((f, fi) => (
+                        <li key={fi}>✓ {f}</li>
+                      ))}
+                    </ul>
+                    <a
+                      href="https://seller.asb.web.tr/register"
+                      className={`btn btn--block ${highlight ? 'btn--gold' : 'btn--outline'}`}
+                    >
+                      Hemen Başla
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 

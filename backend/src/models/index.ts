@@ -21,6 +21,8 @@ import ExternalFeed from './ExternalFeed';
 import FeedSyncLog from './FeedSyncLog';
 import ProductAITask from './ProductAITask';
 import ProductReview from './ProductReview';
+import Payment from './Payment';
+import CreditTransaction from './CreditTransaction';
 
 // User <-> Store (One-to-One)
 User.hasOne(Store, { foreignKey: 'userId', as: 'store' });
@@ -115,6 +117,12 @@ ProductReview.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 User.hasMany(ProductReview, { foreignKey: 'userId', as: 'productReviews' });
 ProductReview.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
+// User <-> Payment / CreditTransaction (One-to-Many)
+User.hasMany(Payment, { foreignKey: 'userId', as: 'payments' });
+Payment.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+User.hasMany(CreditTransaction, { foreignKey: 'userId', as: 'creditTransactions' });
+CreditTransaction.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
 // Export all models
 export {
     User,
@@ -139,5 +147,7 @@ export {
     ExternalFeed,
     FeedSyncLog,
     ProductAITask,
-    ProductReview
+    ProductReview,
+    Payment,
+    CreditTransaction
 };

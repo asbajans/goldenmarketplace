@@ -66,6 +66,8 @@ export const AdminAPI = {
     updateUser: (id: string, data: any) => api.put(`/users/${id}`, data).then((res) => res.data),
     deleteUser: (id: string) => api.delete(`/users/${id}`).then((res) => res.data),
     assignPlanToUser: (id: string, data: any) => api.put(`/users/${id}/assign-plan`, data).then((res) => res.data),
+    getUserCredits: (id: string) => api.get(`/users/${id}/credits`).then((res) => res.data),
+    grantUserCredits: (id: string, data: { credits: number; reason?: string }) => api.post(`/users/${id}/credits`, data).then((res) => res.data),
 
     // Products (All Stores)
     getAllProducts: (params?: { page?: number; limit?: number; search?: string; storeId?: string }) =>
@@ -88,6 +90,10 @@ export const AdminAPI = {
     createSubscriptionPlan: (data: any) => api.post('/subscription-plans', data).then((res) => res.data),
     updateSubscriptionPlan: (id: string, data: any) => api.put(`/subscription-plans/${id}`, data).then((res) => res.data),
     deleteSubscriptionPlan: (id: string) => api.delete(`/subscription-plans/${id}`).then((res) => res.data),
+    // Payments (havale/EFT onayları + geçmiş)
+    getPayments: (params?: { status?: string; kind?: string }) => api.get('/payments', { params }).then((res) => res.data),
+    approvePayment: (id: string) => api.post(`/payments/${id}/approve`).then((res) => res.data),
+    rejectPayment: (id: string, reason?: string) => api.post(`/payments/${id}/reject`, { reason }).then((res) => res.data),
     // Integrations
     getIntegrations: () => api.get('/integrations').then((res) => res.data),
 

@@ -384,6 +384,18 @@ export class B2BController {
       const store = user ? await Store.findOne({ where: { userId: user.id } }) : null;
       if (!store) return res.status(403).json({ error: 'Mağaza bulunamadı' });
 
+      // Paket kapısı: tedarikçi ürününü kopyalamak B2B modülü gerektirir
+      const { default: planAccessService } = await import('../services/planAccessService');
+      const b2bAccess = await planAccessService.checkB2BAccess(user.id);
+      if (!b2bAccess.allowed) {
+        return res.status(403).json({ error: b2bAccess.message });
+      }
+      // Kopya ürün de kotaya dahildir
+      const limitCheck = await planAccessService.checkProductLimit(user.id, store.id);
+      if (!limitCheck.allowed) {
+        return res.status(403).json({ error: limitCheck.message });
+      }
+
       const request = await B2BRequest.findOne({
         where: { id: req.params.id, requesterStoreId: store.id, status: 'approved' }
       });

@@ -80,8 +80,11 @@ const ProductList: React.FC = () => {
         setLoading(true);
         try {
             const marketplaceParams = marketplaces && marketplaces.length > 0 ? marketplaces : undefined;
+            // Satıcının tüm ürünleri tek seferde çekilir (tab sayaçları ve seçim
+            // bu listeden türetilir). Limit 100 iken 100+ üründe hem liste eksik
+            // kalıyor hem sayaçlar tutmuyordu.
             const response = await client.get('/products', {
-                params: { limit: 100, search, marketplaces: marketplaceParams?.join(',') }
+                params: { limit: 1000, search, marketplaces: marketplaceParams?.join(',') }
             });
             const data = response.data?.data || [];
             const pagination = response.data?.pagination;
@@ -144,8 +147,11 @@ const ProductList: React.FC = () => {
         setTranslateLoading(true);
         try {
             const ids = selectedRowKeys.map(k => String(k));
-            const res = await bulkAITranslate(ids, 'translate');
-            message.success(res.message || `${ids.length} ürün çeviri kuyruğuna alındı`);
+            // 'both': açıklaması eksik/kısa ürünlerde önce açıklama üretilir,
+            // sonra başlık+a açıklama 5 dile çevrilir. Sadece 'translate'
+            // gönderilince boş açıklamalar boş kalıyordu.
+            const res = await bulkAITranslate(ids, 'both');
+            message.success(res.message || `${ids.length} ürün AI kuyruğuna alındı`);
             setAiProgressVisible(true);
             setSelectedRowKeys([]);
         } catch (err: any) {
@@ -258,7 +264,9 @@ const ProductList: React.FC = () => {
     const tabItems = [
         {
             key: 'my-products',
-            label: `Kendi Ürünlerim (${totalCount})`,
+            // totalCount sunucudaki TÜM ürün sayısındır (B2B kopyalar dahil).
+            // Sekme sayacı tabloda görünen filtrelenmiş listedir.
+            label: `Kendi Ürünlerim (${myProducts.length})`,
             children: <Table {...tableProps(myProducts)} />
         },
         {
@@ -278,7 +286,8 @@ const ProductList: React.FC = () => {
              {/* Header Area with Gold Rates, Sync Settings, Search and Filters */}
               <Row gutter={[16, 16]} style={{ marginBottom: 20 }} align="middle">
                   <Col span={8}>
-                      <h2>Tüm Ürünler</h2>
+                      <h2 style={{ marginBottom: 0 }}>Tüm Ürünler</h2>
+                      <Text type="secondary">Toplam {totalCount} ürün{products.length !== totalCount ? ` (${products.length} listelendi)` : ''}</Text>
                   </Col>
                   <Col span={16} style={{ textAlign: 'right' }}>
                       <Space size="large" align="center" style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'flex-end' }}>
@@ -375,6 +384,9 @@ const ProductList: React.FC = () => {
                 onCancel={() => handleModalClose(false)}
                 footer={null}
                 destroyOnClose
+                width={1000}
+                style={{ maxWidth: '95vw', top: 20 }}
+                styles={{ body: { maxHeight: '82vh', overflowY: 'auto' } }}
             >
                 <AddProduct
                     initialValues={editingProduct}

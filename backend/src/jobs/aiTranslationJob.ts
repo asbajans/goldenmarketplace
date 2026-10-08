@@ -82,8 +82,15 @@ aiTranslationQueue.process(async (job) => {
       if (taskId) await ProductAITask.update({ progress: 80 }, { where: { id: taskId } });
     }
 
-    // Step 3: Save
+    // Step 3: Save (ana başlık+a açıklama da varsayılan dilin çevirisiyle
+    // senkron tutulur; yoksa liste tablosu hep eski dilde kalır ve
+    // "başlıklar çevrilmedi" gibi görünür)
+    const defaultLang = (product as any).defaultLanguage || 'en';
+    const defaultEntry = (updatedTranslations as any)[defaultLang];
+    if (defaultEntry?.title) updatedTitle = defaultEntry.title;
+    if (defaultEntry?.description) updatedDescription = defaultEntry.description;
     await (product as any).update({
+      title: updatedTitle,
       description: updatedDescription,
       translations: updatedTranslations
     });

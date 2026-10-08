@@ -20,6 +20,7 @@ import SellersPage from './pages/SellersPage';
 import ProductsPage from './pages/ProductsPage';
 import CategoriesPage from './pages/CategoriesPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
+import PaymentsPage from './pages/PaymentsPage';
 import IntegrationsPage from './pages/IntegrationsPage';
 import IntegrationLogsPage from './pages/IntegrationLogsPage';
 import SettingsPage from './pages/SettingsPage';
@@ -99,6 +100,11 @@ function App() {
       key: 'subscriptions',
       icon: <CreditCardOutlined />,
       label: 'Abonelikler'
+    },
+    {
+      key: 'payments',
+      icon: <WalletOutlined />,
+      label: 'Ödeme Onayları'
     },
     {
       key: 'integrations',
@@ -187,6 +193,9 @@ function App() {
 
       case 'subscriptions':
         return <SubscriptionsPage />;
+
+      case 'payments':
+        return <PaymentsPage />;
 
       case 'integrations':
         return <IntegrationsPage />;

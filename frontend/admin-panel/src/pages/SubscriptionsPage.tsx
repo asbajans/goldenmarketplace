@@ -29,7 +29,7 @@ export const SubscriptionsPage: React.FC = () => {
     const handleAdd = () => {
         setEditingPlan(null);
         form.resetFields();
-        form.setFieldsValue({ isActive: true, monthlyPrice: 0, yearlyPrice: 0, productLimit: 50, integrationLimit: 1, features: [] });
+        form.setFieldsValue({ isActive: true, monthlyPrice: 0, yearlyPrice: 0, productLimit: 50, integrationLimit: 1, features: [], b2bEnabled: false, bulkUploadEnabled: false, maxExternalFeeds: 0, aiTranslationEnabled: false, aiContentEnabled: false, aiMonthlyCredit: 0 });
         setIsModalVisible(true);
     };
 
@@ -73,10 +73,22 @@ export const SubscriptionsPage: React.FC = () => {
 
     const columns = [
         { title: 'Paket Adı', dataIndex: 'name', key: 'name' },
-        { title: 'Aylık (₺)', dataIndex: 'monthlyPrice', key: 'monthlyPrice', render: (val: any) => `${val} ₺` },
-        { title: 'Yıllık (₺)', dataIndex: 'yearlyPrice', key: 'yearlyPrice', render: (val: any) => `${val} ₺` },
+        { title: 'Aylık (USD)', dataIndex: 'monthlyPrice', key: 'monthlyPrice', render: (val: any) => `$${val}` },
+        { title: 'Yıllık (USD)', dataIndex: 'yearlyPrice', key: 'yearlyPrice', render: (val: any) => `$${val}` },
         { title: 'Ürün Limiti', dataIndex: 'productLimit', key: 'productLimit' },
         { title: 'Entegrasyon', dataIndex: 'integrationLimit', key: 'integrationLimit' },
+        {
+            title: 'Modüller',
+            key: 'modules',
+            render: (_: any, record: any) => (
+                <Space size={[4, 4]} wrap>
+                    <Tag color={record.b2bEnabled ? 'purple' : 'default'}>B2B{record.b2bEnabled ? '' : ': yok'}</Tag>
+                    <Tag color={record.bulkUploadEnabled ? 'cyan' : 'default'}>Toplu{record.bulkUploadEnabled ? '' : ': yok'}</Tag>
+                    <Tag color={(record.maxExternalFeeds || 0) > 0 ? 'orange' : 'default'}>Feed: {record.maxExternalFeeds || 0}</Tag>
+                    <Tag color={record.aiMonthlyCredit > 0 ? 'gold' : 'default'}>AI: {record.aiMonthlyCredit || 0}/ay</Tag>
+                </Space>
+            )
+        },
         {
             title: 'Özellikler',
             dataIndex: 'features',
@@ -124,7 +136,7 @@ export const SubscriptionsPage: React.FC = () => {
                 open={isModalVisible}
                 onCancel={() => setIsModalVisible(false)}
                 onOk={() => form.submit()}
-                width={600}
+                width={720}
             >
                 <Form form={form} layout="vertical" onFinish={parseSubmit}>
                     <Form.Item name="name" label="Paket Adı" rules={[{ required: true }]}>
@@ -136,12 +148,12 @@ export const SubscriptionsPage: React.FC = () => {
                     </Form.Item>
 
                     <Space size="large" wrap>
-                        <Form.Item name="monthlyPrice" label="Aylık Ücret (₺)" rules={[{ required: true }]}>
-                            <InputNumber min={0} step={10} style={{ width: '130px' }} />
+                        <Form.Item name="monthlyPrice" label="Aylık Ücret (USD)" rules={[{ required: true }]}>
+                            <InputNumber min={0} step={1} style={{ width: '130px' }} />
                         </Form.Item>
 
-                        <Form.Item name="yearlyPrice" label="Yıllık Ücret (₺)" rules={[{ required: true }]}>
-                            <InputNumber min={0} step={50} style={{ width: '130px' }} />
+                        <Form.Item name="yearlyPrice" label="Yıllık Ücret (USD)" rules={[{ required: true }]}>
+                            <InputNumber min={0} step={5} style={{ width: '130px' }} />
                         </Form.Item>
 
                         <Form.Item name="productLimit" label="Ürün Limiti" rules={[{ required: true }]}>
@@ -161,8 +173,37 @@ export const SubscriptionsPage: React.FC = () => {
                         <Form.Item name="aiContentEnabled" label="AI İçerik Üretimi" valuePropName="checked">
                             <Switch />
                         </Form.Item>
-                        <Form.Item name="aiMonthlyCredit" label="Aylık AI Kredisi">
+                        <Form.Item name="aiMonthlyCredit" label="Aylık AI Kredisi (hediye)">
                             <InputNumber min={0} style={{ width: '130px' }} />
+                        </Form.Item>
+                    </Space>
+
+                    <Divider orientation="left">Modüller</Divider>
+                    <p style={{ color: '#888', marginBottom: 12 }}>
+                        Bu paketi alan satıcıda hangi modüllerin açılacağını seçin. Limit varsa adedini girin (0 = kapalı).
+                    </p>
+                    <Space size="large" wrap>
+                        <Form.Item name="b2bEnabled" label="B2B Erişimi" valuePropName="checked" tooltip="B2B pazarı + tedarikçi ürün kopyalama">
+                            <Switch />
+                        </Form.Item>
+                        <Form.Item name="bulkUploadEnabled" label="Toplu Ürün Yükleme" valuePropName="checked" tooltip="Excel/CSV ile toplu ürün içe aktarma">
+                            <Switch />
+                        </Form.Item>
+                        <Form.Item name="maxExternalFeeds" label="Harici Feed Adedi" tooltip="XML/CSV feed içe aktarma hakkı, 0 = kapalı">
+                            <InputNumber min={0} style={{ width: '130px' }} />
+                        </Form.Item>
+                    </Space>
+
+                    <Divider orientation="left">Stripe (Kart ile Ödeme)</Divider>
+                    <p style={{ color: '#888', marginBottom: 12 }}>
+                        Kartla satış için Stripe Price ID'ler (price_...). Boş bırakılırsa o dönem için sadece havale/EFT sunulur.
+                    </p>
+                    <Space size="large" wrap>
+                        <Form.Item name="stripePriceId" label="Aylık Price ID">
+                            <Input placeholder="price_..." style={{ width: '220px' }} />
+                        </Form.Item>
+                        <Form.Item name="stripePriceIdYearly" label="Yıllık Price ID">
+                            <Input placeholder="price_..." style={{ width: '220px' }} />
                         </Form.Item>
                     </Space>
 

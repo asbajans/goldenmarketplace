@@ -5,6 +5,7 @@ import express from 'express';
 import ExternalFeed from '../models/ExternalFeed';
 import FeedSyncLog from '../models/FeedSyncLog';
 import feedService from '../services/feedService';
+import planAccessService from '../services/planAccessService';
 import { triggerFeedSync } from '../jobs/feedSyncJob';
 import { authMiddleware, sellerMiddleware } from '../middleware/authMiddleware';
 
@@ -36,6 +37,12 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const store = (req as any).store;
+    const userId = (req as any).user?.id;
+    // Paket kapısı: harici feed adedi
+    const feedCheck = await planAccessService.checkExternalFeedLimit(userId, store.id);
+    if (!feedCheck.allowed) {
+      return res.status(403).json({ error: feedCheck.message });
+    }
     const feedData = {
       storeId: store.id,
       ...req.body

@@ -178,7 +178,17 @@ Do NOT wrap the JSON in markdown code blocks. Return ONLY raw JSON.`,
             result[l.code] = parsed[l.code];
           }
         }
-        if (Object.keys(result).length >= 3) return result;
+        // Model bazen 1-2 dili eksik döndürür ("sadece İngilizce geldi" şikayeti).
+        // Eksikleri tek tek üreterek tamamla, en azından kısmi sonuçla dönme.
+        if (Object.keys(result).length > 0) {
+          for (const l of languages) {
+            if (!result[l.code]) {
+              const desc = await this.generateProductDescription(title, category, l.name, tags);
+              if (desc && desc !== title) result[l.code] = desc;
+            }
+          }
+          if (Object.keys(result).length >= 3) return result;
+        }
       } catch { /* fallback to per-language */ }
     }
 

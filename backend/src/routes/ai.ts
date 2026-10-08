@@ -33,6 +33,7 @@ router.post('/products/bulk-ai', authMiddleware, AIController.bulkAITranslate);
 // Credits
 router.get('/credits/balance', authMiddleware, AIController.getCreditBalance);
 router.get('/credits/prices', authMiddleware, AIController.getCreditPrices);
-router.post('/credits/purchase', authMiddleware, AIController.purchaseCredits);
+router.post('/credits/checkout', authMiddleware, AIController.checkoutCredits);
+// NOT: /credits/purchase (mock) KALDIRILDI — ödeme doğrulanmadan kredi yüklenemez.
 
 export default router;

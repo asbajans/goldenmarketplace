@@ -3,9 +3,16 @@ import * as xlsx from 'xlsx';
 import { parseStringPromise } from 'xml2js';
 import Product from '../models/Product';
 import Store from '../models/Store';
+import planAccessService from '../services/planAccessService';
 
 export const parseBulkFile = async (req: Request, res: Response) => {
     try {
+        const user = (req as any).user;
+        const bulkAccess = await planAccessService.checkBulkUploadAccess(user.id);
+        if (!bulkAccess.allowed) {
+            return res.status(403).json({ success: false, error: bulkAccess.message });
+        }
+
         const file = (req as any).file;
         if (!file) {
             return res.status(400).json({ success: false, error: 'Dosya yüklenmedi.' });
@@ -78,6 +85,22 @@ export const importBulkProducts = async (req: Request, res: Response) => {
         const store = await Store.findOne({ where: { userId: user.id } });
         if (!store) {
             return res.status(400).json({ success: false, error: 'Mağazanız bulunamadı.' });
+        }
+
+        // Modül kapıları: toplu yükleme yetkisi + ürün limiti
+        const bulkAccess = await planAccessService.checkBulkUploadAccess(user.id);
+        if (!bulkAccess.allowed) {
+            return res.status(403).json({ success: false, error: bulkAccess.message });
+        }
+        const limitCheck = await planAccessService.checkProductLimitForImport(user.id, store.id, products.length);
+        if (!limitCheck.allowed) {
+            return res.status(403).json({ success: false, error: limitCheck.message });
+        }
+        if (isB2BEnabled) {
+            const b2bAccess = await planAccessService.checkB2BAccess(user.id);
+            if (!b2bAccess.allowed) {
+                return res.status(403).json({ success: false, error: b2bAccess.message });
+            }
         }
 
         let successCount = 0;

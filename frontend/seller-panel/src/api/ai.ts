@@ -4,8 +4,8 @@ export const getCreditBalance = () => client.get('/ai/credits/balance').then(res
 
 export const getCreditPrices = () => client.get('/ai/credits/prices').then(res => res.data);
 
-export const purchaseCredits = (credits: number, amount: number) =>
-  client.post('/ai/credits/purchase', { credits, amount }).then(res => res.data);
+export const checkoutCredits = (credits: number, provider: 'stripe' | 'bank' = 'bank') =>
+  client.post('/ai/credits/checkout', { credits, provider }).then(res => res.data);
 
 export const getAITasks = (status?: string) =>
   client.get('/ai/tasks', { params: { status } }).then(res => res.data);
@@ -22,8 +22,8 @@ export const getProductAIStatus = (id: string) =>
 export const bulkAITranslate = (productIds: string[], taskType = 'both') =>
   client.post('/ai/products/bulk-ai', { productIds, taskType }).then(res => res.data);
 
-export const generateDescriptionSync = (title: string, category: string, tags?: string[]) =>
-  client.post('/ai/generate-description', { title, category, tags }).then(res => res.data);
+export const generateDescriptionSync = (title: string, category: string, tags?: string[], language?: string) =>
+  client.post('/ai/generate-description', { title, category, tags, language }).then(res => res.data);
 
 export const generateAllDescriptionsSync = (title: string, category: string, tags?: string[]) =>
   client.post('/ai/generate-all-descriptions', { title, category, tags }).then(res => res.data);

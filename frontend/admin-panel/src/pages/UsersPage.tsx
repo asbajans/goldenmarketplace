@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Card, Button, Space, Modal, Form, Input, Select, Switch, message, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, GiftOutlined } from '@ant-design/icons';
+import { Table, Card, Button, Space, Modal, Form, Input, InputNumber, Select, Switch, message, Tag, Statistic, Row, Col, Divider } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, GiftOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { AdminAPI } from '../services/api';
 
 const { Option } = Select;
@@ -19,6 +19,13 @@ export const UsersPage: React.FC = () => {
     const [isAssignModalVisible, setIsAssignModalVisible] = useState(false);
     const [assigningUser, setAssigningUser] = useState<any>(null);
     const [assignForm] = Form.useForm();
+
+    // Credit Grant Modal
+    const [isCreditModalVisible, setIsCreditModalVisible] = useState(false);
+    const [creditingUser, setCreditingUser] = useState<any>(null);
+    const [creditInfo, setCreditInfo] = useState<any>(null);
+    const [creditLoading, setCreditLoading] = useState(false);
+    const [creditForm] = Form.useForm();
 
     const fetchData = async () => {
         setLoading(true);
@@ -109,6 +116,37 @@ export const UsersPage: React.FC = () => {
         }
     };
 
+    const openCreditModal = async (record: any) => {
+        setCreditingUser(record);
+        creditForm.resetFields();
+        setCreditInfo(null);
+        setIsCreditModalVisible(true);
+        setCreditLoading(true);
+        try {
+            const info = await AdminAPI.getUserCredits(record.id);
+            setCreditInfo(info);
+        } catch {
+            message.error('Kredi bilgisi alınamadı');
+        } finally {
+            setCreditLoading(false);
+        }
+    };
+
+    const submitGrantCredits = async (values: any) => {
+        if (!creditingUser) return;
+        try {
+            const res = await AdminAPI.grantUserCredits(creditingUser.id, values);
+            message.success(`${values.credits} kredi tanımlandı. Yeni bakiye: ${res.balance}`);
+            const info = await AdminAPI.getUserCredits(creditingUser.id);
+            setCreditInfo(info);
+            creditForm.resetFields();
+            fetchData();
+        } catch (error: any) {
+            const errMsg = error.response?.data?.error;
+            message.error(typeof errMsg === 'string' ? errMsg : 'Kredi tanımlanamadı');
+        }
+    };
+
     const columns = [
         { title: 'Ad Soyad', key: 'name', render: (_: any, record: any) => `${record.firstName} ${record.lastName}` },
         { title: 'E-posta', dataIndex: 'email', key: 'email' },
@@ -140,6 +178,14 @@ export const UsersPage: React.FC = () => {
             }
         },
         {
+            title: 'AI Kredisi',
+            key: 'aiCredit',
+            render: (_: any, record: any) => {
+                if (record.userType !== 'seller') return '-';
+                return <Tag icon={<ThunderboltOutlined />} color="purple">{record.aiCreditBalance || 0} kredi</Tag>;
+            }
+        },
+        {
             title: 'Durum',
             dataIndex: 'isActive',
             key: 'isActive',
@@ -153,6 +199,11 @@ export const UsersPage: React.FC = () => {
                     {record.userType === 'seller' && (
                         <Button size="small" type="primary" ghost icon={<GiftOutlined />} onClick={() => handleAssignPlan(record)}>
                             Paket Ata
+                        </Button>
+                    )}
+                    {record.userType === 'seller' && (
+                        <Button size="small" icon={<ThunderboltOutlined />} onClick={() => openCreditModal(record)}>
+                            Kredi
                         </Button>
                     )}
                     <Button icon={<EditOutlined />} type="link" onClick={() => handleEdit(record)} />
@@ -217,8 +268,7 @@ export const UsersPage: React.FC = () => {
                 open={isAssignModalVisible}
                 onCancel={() => setIsAssignModalVisible(false)}
                 onOk={() => assignForm.submit()}
-            >
-                <div style={{ background: '#e6f7ff', padding: '12px', borderRadius: 8, marginBottom: 16 }}>
+            >                <div style={{ background: '#e6f7ff', padding: '12px', borderRadius: 8, marginBottom: 16 }}>
                     <span style={{ color: '#1890ff', fontWeight: 600 }}>Bilgi:</span> Buradan paket atadığınızda satıcının abonelik başlama tarihi bugün olarak ayarlanır ve bitiş tarihi tam <b>30 gün</b> sonrasına uzatılır.
                 </div>
                 <Form form={assignForm} layout="vertical" onFinish={submitAssignPlan}>
@@ -238,6 +288,59 @@ export const UsersPage: React.FC = () => {
                         </Select>
                     </Form.Item>
                 </Form>
+            </Modal>
+
+            <Modal
+                title={`Kredi Tanımla: ${creditingUser?.firstName} ${creditingUser?.lastName}`}
+                open={isCreditModalVisible}
+                onCancel={() => setIsCreditModalVisible(false)}
+                footer={null}
+                width={640}
+            >
+                {creditLoading ? (
+                    <div style={{ textAlign: 'center', padding: 24 }}>Yükleniyor...</div>
+                ) : (
+                    <>
+                        <Row gutter={16} style={{ marginBottom: 16 }}>
+                            <Col span={8}>
+                                <Statistic title="Aylık Kalan" value={creditInfo?.balance?.monthlyRemaining || 0} suffix={`/ ${creditInfo?.balance?.monthlyLimit || 0}`} />
+                            </Col>
+                            <Col span={8}>
+                                <Statistic title="Satın Alınan Bakiye" value={creditInfo?.balance?.purchasedBalance || 0} suffix="kredi" />
+                            </Col>
+                            <Col span={8}>
+                                <Statistic title="Toplam Kalan" value={creditInfo?.balance?.totalRemaining || 0} suffix="kredi" />
+                            </Col>
+                        </Row>
+                        <Divider orientation="left">Haricen Kredi Yükle</Divider>
+                        <Form form={creditForm} layout="vertical" onFinish={submitGrantCredits}>
+                            <Space style={{ width: '100%' }} align="start">
+                                <Form.Item name="credits" label="Kredi Adedi" rules={[{ required: true, message: 'Adet girin' }]} style={{ width: 180 }}>
+                                    <InputNumber min={1} style={{ width: '100%' }} placeholder="örn: 100" />
+                                </Form.Item>
+                                <Form.Item name="reason" label="Açıklama" style={{ flex: 1 }}>
+                                    <Input placeholder="örn: Kampanya hediyesi" />
+                                </Form.Item>
+                                <Form.Item label=" " style={{ marginBottom: 0 }}>
+                                    <Button type="primary" htmlType="submit" icon={<ThunderboltOutlined />}>Yükle</Button>
+                                </Form.Item>
+                            </Space>
+                        </Form>
+                        <Divider orientation="left">Son Kredi Hareketleri</Divider>
+                        <Table
+                            dataSource={creditInfo?.transactions || []}
+                            rowKey="id"
+                            pagination={{ pageSize: 5 }}
+                            size="small"
+                            columns={[
+                                { title: 'Tarih', dataIndex: 'createdAt', render: (d: string) => new Date(d).toLocaleString('tr-TR') },
+                                { title: 'Adet', dataIndex: 'amount', render: (a: number) => `+${a}` },
+                                { title: 'Tür', dataIndex: 'type', render: (t: string) => t === 'admin_grant' ? <Tag color="purple">Admin</Tag> : <Tag color="green">Satın alma</Tag> },
+                                { title: 'Açıklama', dataIndex: 'reason', ellipsis: true, render: (r: string) => r || '-' }
+                            ]}
+                        />
+                    </>
+                )}
             </Modal>
         </Card>
     );

@@ -11,7 +11,12 @@ router.get('/plans', SubscriptionController.getPlans.bind(SubscriptionController
 // Protected routes
 router.use(authMiddleware);
 
+router.get('/me', SubscriptionController.mySubscription.bind(SubscriptionController));
+router.get('/my-payments', SubscriptionController.myPayments.bind(SubscriptionController));
+router.post('/checkout', SubscriptionController.checkout.bind(SubscriptionController));
+router.get('/verify-session', SubscriptionController.verifySession.bind(SubscriptionController));
+// LEGACY (mock üretmez): eski stripePriceId tabanlı akış
 router.post('/create-checkout-session', SubscriptionController.createCheckoutSession.bind(SubscriptionController));
-router.post('/mock-activate', SubscriptionController.mockActivate.bind(SubscriptionController)); // Helper for demo
+// NOT: mock-activate KALDIRILDI — ödeme alınmadan paket aktifleştirilemez.
 
 export default router;
