@@ -5,6 +5,9 @@ import HepsiburadaClient from '../integrations/hepsiburada/hepsiburadaClient';
 import N11Client from '../integrations/n11/n11Client';
 import PazaramaClient from '../integrations/pazarama/pazaramaClient';
 import User from '../models/User';
+import Store from '../models/Store';
+import Product from '../models/Product';
+import ProductMarketplaceListing from '../models/ProductMarketplaceListing';
 import planAccessService from './planAccessService';
 
 class IntegrationService {
@@ -43,10 +46,44 @@ class IntegrationService {
     }
 
     /**
-     * Disconnect platform
+     * Disconnect platform — bağlantıyı SİLER ve platformu satıcının
+     * TÜM ürünlerinden otomatik kaldırır (marketplaces dizisi +
+     * platform ayarları + listeleme kayıtları). Böylece koparılan
+     * pazaryeri "hâlâ bağlıymış" gibi davranmaz ve ürün düzenleme
+     * ekranında ayrıca temizlik gerekmez.
      */
     async disconnectPlatform(userId: string, platform: string) {
-        return await MarketplaceIntegration.destroy({ where: { userId, platform } });
+        const key = String(platform || '').toLowerCase();
+        await MarketplaceIntegration.destroy({ where: { userId, platform } });
+
+        const store = await Store.findOne({ where: { userId } });
+        if (!store) return { success: true, cleanedProducts: 0 };
+
+        const products = await Product.findAll({ where: { storeId: store.id } });
+        let cleaned = 0;
+        for (const product of products) {
+            const markets: string[] = Array.isArray(product.marketplaces) ? [...product.marketplaces] : [];
+            if (!markets.some(m => String(m).toLowerCase() === key)) continue;
+            const nextMarkets = markets.filter(m => String(m).toLowerCase() !== key);
+            const cfg: any = product.marketplaceConfig && typeof product.marketplaceConfig === 'object'
+                ? { ...product.marketplaceConfig }
+                : {};
+            delete cfg[key];
+            delete cfg[platform];
+            await product.update({ marketplaces: nextMarkets, marketplaceConfig: cfg } as any);
+            cleaned++;
+        }
+
+        if (products.length > 0) {
+            await ProductMarketplaceListing.destroy({
+                where: {
+                    productId: products.map(p => p.id) as any,
+                    platform: key as any
+                }
+            }).catch(() => undefined);
+        }
+
+        return { success: true, cleanedProducts: cleaned };
     }
 
     /**

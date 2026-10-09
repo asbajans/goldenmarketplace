@@ -1,9 +1,9 @@
 
-import React, { useEffect, useState } from 'react';
-import { Table, Button, Space, message, Modal, Tabs, Tag, Switch, Typography, Input, Checkbox, Row, Col, Tooltip, Select } from 'antd';
-import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined, DollarOutlined, GoldOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { Table, Button, Space, message, Modal, Tabs, Tag, Switch, Typography, Input, Checkbox, Row, Col, Tooltip, Select, notification } from 'antd';
+import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined, DollarOutlined, GoldOutlined, ThunderboltOutlined, EyeOutlined } from '@ant-design/icons';
 import { deleteProduct, getAutoSyncStatus, setAutoSyncStatus, triggerManualSync, Product } from '../api/product';
-import { bulkAITranslate, cleanupDescriptions } from '../api/ai';
+import { bulkAITranslate, cleanupDescriptions, getAITasks } from '../api/ai';
 import client from '../api/client';
 import AddProduct from './AddProduct';
 import AITaskProgress from './AITaskProgress';
@@ -25,6 +25,11 @@ const ProductList: React.FC = () => {
     const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
     const [translateLoading, setTranslateLoading] = useState(false);
     const [aiProgressVisible, setAiProgressVisible] = useState(false);
+    // AI izleme modu: toplu işlem sürerken buton "İzle" olur, bitince
+    // bildirim gelir ve buton tekrar "Çevir" olur.
+    const [aiWatching, setAiWatching] = useState(false);
+    const [aiActiveCount, setAiActiveCount] = useState(0);
+    const aiDoneRef = useRef(false);
     const [cleanupModalOpen, setCleanupModalOpen] = useState(false);
     const [cleanupKeyword, setCleanupKeyword] = useState('');
     const [cleanupAction, setCleanupAction] = useState<'clear_matching' | 'clear_all'>('clear_matching');
@@ -141,6 +146,42 @@ const ProductList: React.FC = () => {
         if (refresh) fetchProducts();
     };
 
+    const handleAIDone = useCallback(() => {
+        if (aiDoneRef.current) return;
+        aiDoneRef.current = true;
+        setAiWatching(false);
+        setAiActiveCount(0);
+        setAiProgressVisible(false);
+        notification.success({
+            message: 'AI işlemleri tamamlandı',
+            description: 'Seçili ürünlerin çevirileri işlendi. Liste güncellendi.',
+            duration: 6
+        });
+        fetchProducts();
+    }, []);
+
+    // İzleme modu açıkken kuyruğu yokla: bitince bildir + butonu geri çevir.
+    // (İlerleme penceresi kapalı olsa bile çalışır.)
+    useEffect(() => {
+        if (!aiWatching) return;
+        let cancelled = false;
+        const poll = async () => {
+            try {
+                const all = await getAITasks();
+                const arr = Array.isArray(all) ? all : [];
+                const active = arr.filter((t: any) => t.status === 'pending' || t.status === 'processing');
+                if (cancelled) return;
+                setAiActiveCount(active.length);
+                if (arr.length > 0 && active.length === 0) handleAIDone();
+            } catch {
+                /* ağ hatasında sessizce tekrar dene */
+            }
+        };
+        poll();
+        const id = setInterval(poll, 4000);
+        return () => { cancelled = true; clearInterval(id); };
+    }, [aiWatching, handleAIDone]);
+
     const handleBulkTranslate = async () => {
         if (selectedRowKeys.length === 0) {
             message.warning('Lütfen çevrilecek ürünleri seçin.');
@@ -154,6 +195,9 @@ const ProductList: React.FC = () => {
             // gönderilince boş açıklamalar boş kalıyordu.
             const res = await bulkAITranslate(ids, 'both');
             message.success(res.message || `${ids.length} ürün AI kuyruğuna alındı`);
+            aiDoneRef.current = false;
+            setAiWatching(true);
+            setAiActiveCount(ids.length);
             setAiProgressVisible(true);
             setSelectedRowKeys([]);
         } catch (err: any) {
@@ -363,18 +407,31 @@ const ProductList: React.FC = () => {
                           <Button type="default" icon={<SyncOutlined spin={syncing} />} onClick={handleManualSync} loading={syncing}>
                               Fiyatları Senkronize Et
                           </Button>
-                           <Tooltip title={selectedRowKeys.length === 0 ? 'Önce ürünleri seçin' : 'Seçili ürünlerin BAŞLIK ve AÇIKLAMALARI 5 dile çevrilir (model kodları aynen korunur)'}>
-                               <Button
-                                   type="default"
-                                   icon={<ThunderboltOutlined />}
-                                   onClick={handleBulkTranslate}
-                                   loading={translateLoading}
-                                   disabled={selectedRowKeys.length === 0}
-                                   style={{ borderColor: '#722ed1', color: '#722ed1' }}
-                               >
-                                   AI ile Çevir ({selectedRowKeys.length})
-                               </Button>
-                           </Tooltip>
+                           {aiWatching ? (
+                                <Tooltip title="AI çevirisi sürüyor — tıklayıp ilerlemeyi izleyin">
+                                    <Button
+                                        type="default"
+                                        icon={<EyeOutlined />}
+                                        onClick={() => setAiProgressVisible(true)}
+                                        style={{ borderColor: '#722ed1', color: '#722ed1' }}
+                                    >
+                                        AI İzle ({aiActiveCount})
+                                    </Button>
+                                </Tooltip>
+                            ) : (
+                            <Tooltip title={selectedRowKeys.length === 0 ? 'Önce ürünleri seçin' : 'Seçili ürünlerin BAŞLIK ve AÇIKLAMALARI 5 dile çevrilir (model kodları aynen korunur)'}>
+                                <Button
+                                    type="default"
+                                    icon={<ThunderboltOutlined />}
+                                    onClick={handleBulkTranslate}
+                                    loading={translateLoading}
+                                    disabled={selectedRowKeys.length === 0}
+                                    style={{ borderColor: '#722ed1', color: '#722ed1' }}
+                                >
+                                    AI ile Çevir ({selectedRowKeys.length})
+                                </Button>
+                            </Tooltip>
+                            )}
                            <Button
                                type="default"
                                onClick={() => setCleanupModalOpen(true)}
@@ -447,11 +504,7 @@ const ProductList: React.FC = () => {
             <AITaskProgress
                 visible={aiProgressVisible}
                 onClose={() => setAiProgressVisible(false)}
-                onAllComplete={() => {
-                    message.success('Tüm AI işlemleri tamamlandı!');
-                    setAiProgressVisible(false);
-                    fetchProducts();
-                }}
+                onAllComplete={handleAIDone}
             />
         </div>
     );

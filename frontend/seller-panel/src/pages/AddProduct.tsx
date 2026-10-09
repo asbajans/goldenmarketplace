@@ -479,20 +479,25 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         }
     };
 
-    // Build marketplace options from all platforms + mark connected ones
+    // Build marketplace options from all platforms + mark connected ones.
+    // Üründe kayıtlı ama bağlantısı kopmuş platformlar devre dışı BIRAKILMAZ —
+    // böylece eski kalıntılar düzenleme ekranından kaldırılabilir.
+    const productMarketplaces: string[] = Array.isArray(initialValues?.marketplaces) ? initialValues.marketplaces : [];
     const marketplaceOptions = ALL_PLATFORMS.map(p => {
         const isConnected = p.key === 'golden' || (integrations || []).some((i: any) => i.platform === p.key && i.isActive);
+        const isStale = !isConnected && p.key !== 'golden' && productMarketplaces.includes(p.key);
         return {
             label: (
                 <span>
                     <ShopOutlined style={{ color: p.color, marginRight: 4 }} />
                     {p.name}
                     {isConnected && <CheckCircleOutlined style={{ color: '#52c41a', marginLeft: 4, fontSize: 11 }} />}
-                    {!isConnected && p.key !== 'golden' && <Tag color="default" style={{ marginLeft: 4, fontSize: 10 }}>Bağlı Değil</Tag>}
+                    {!isConnected && p.key !== 'golden' && !isStale && <Tag color="default" style={{ marginLeft: 4, fontSize: 10 }}>Bağlı Değil</Tag>}
+                    {isStale && <Tag color="warning" style={{ marginLeft: 4, fontSize: 10 }}>Bağlantı Koptu — kaldırmak için işareti kaldırın</Tag>}
                 </span>
             ),
             value: p.key,
-            disabled: !isConnected && p.key !== 'golden'
+            disabled: !isConnected && p.key !== 'golden' && !isStale
         };
     });
 

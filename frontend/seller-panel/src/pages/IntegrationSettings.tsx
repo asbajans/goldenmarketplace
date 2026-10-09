@@ -150,8 +150,13 @@ const IntegrationSettings: React.FC = () => {
 
     const handleDisconnect = async (platform: string) => {
         try {
-            await client.delete(`/integrations/${platform}`);
-            message.success('Bağlantı kesildi');
+            const { data } = await client.delete(`/integrations/${platform}`);
+            const cleaned = Number(data?.cleanedProducts || 0);
+            message.success(
+                cleaned > 0
+                    ? `Bağlantı kesildi, ${cleaned} üründen ${platform} kaldırıldı`
+                    : 'Bağlantı kesildi'
+            );
             fetchIntegrations();
         } catch (error) {
             message.error('Bağlantı kesilemedi');

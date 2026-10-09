@@ -118,6 +118,29 @@ class AIService {
     return { provider: s.provider, model: s.model, configured: !!(s.apiKey && s.apiKey.trim()) };
   }
 
+  /**
+   * Model adı format kontrolü. En yaygın sessiz patlama nedeni:
+   * OpenRouter'da model "sağlayıcı/model" formatında olmalı
+   * (örn. openai/gpt-4o-mini). Yalın ad 404 verir:
+   * "No endpoints found for <model>".
+   */
+  validateModelFormat(provider: string, model: string): string | null {
+    const m = (model || '').trim();
+    if (!m) return 'AI modeli boş. Admin → Sistem Ayarları → AI bölümünden model girin.';
+    if (provider === 'openrouter' && !m.includes('/')) {
+      return `OpenRouter model adı "sağlayıcı/model" formatında olmalı (örn. openai/gpt-4o-mini). Şu anki değer ("${m}") 404 verir: "No endpoints found".`;
+    }
+    if ((provider === 'openai' || provider === 'gemini') && m.includes('/')) {
+      return `Seçili sağlayıcı (${provider}) için model adı yalın olmalı, ancak değer ("${m}") OpenRouter formatında. Ya sağlayıcıyı openrouter yapın ya da model adını düzeltin.`;
+    }
+    return null;
+  }
+
+  /** 401/403/404 tipi hatalar yapılandırma hatasıdır — retry anlamsız. */
+  private isConfigError(message: string): boolean {
+    return /401|403|404|unauthorized|forbidden|not found|no endpoints|invalid.*(key|model|api)|authentication/i.test(message || '');
+  }
+
   private providerError(action: string, detail?: string): Error {
     return new Error(
       `AI ${action} başarısız. API anahtarını ve modeli Admin → Sistem Ayarları → AI bölümünden kontrol edin.` +
@@ -209,16 +232,23 @@ Do NOT include HTML tags, markdown, or meta text. Return ONLY the description te
   ): Promise<{ translations: Record<string, { title: string; description: string }>; errors: Record<string, string> }> {
     const translations: Record<string, { title: string; description: string }> = {};
     const errors: Record<string, string> = {};
+    let firstCall = true;
     for (const lang of languages) {
       const langName = this.getLanguageName(lang);
       try {
-        const translatedTitle = await this.translateTitleStrict(title, langName);
-        const translatedDesc = description
-          ? await this.translateTextStrict(description, langName, 'açıklama çevirisi')
-          : '';
-        translations[lang] = { title: translatedTitle, description: translatedDesc };
+        // Free-tier rate-limit koruması: çağrılar arası kısa bekleme
+        if (!firstCall) await this.sleep(500);
+        firstCall = false;
+        translations[lang] = await this.translateOneLanguageStrict(title, description, langName);
       } catch (err: any) {
-        errors[lang] = err?.message || 'Bilinmeyen çeviri hatası';
+        const msg = err?.message || 'Unknown translation error';
+        errors[lang] = msg;
+        // Fail fast on config errors (401/403/404): retrying the other
+        // languages would produce the same error and spam the provider.
+        if (this.isConfigError(msg)) {
+          const fmtHint = await this.modelFormatHint();
+          throw new Error(`${msg}${fmtHint ? ` ${fmtHint}` : ''}`);
+        }
       }
     }
     if (Object.keys(translations).length === 0) {
@@ -228,6 +258,80 @@ Do NOT include HTML tags, markdown, or meta text. Return ONLY the description te
       );
     }
     return { translations, errors };
+  }
+
+  /** Model format hint for the current provider/model, if any. */
+  private async modelFormatHint(): Promise<string> {
+    try {
+      const info = await this.getProviderInfo();
+      return this.validateModelFormat(info.provider, info.model) || '';
+    } catch {
+      return '';
+    }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /** Tırnak/code-fence temizliği + başlık kısaltma (VARCHAR(255) taşmasını önler). */
+  private cleanTitle(s: string): string {
+    let t = (s || '').replace(/```[a-z]*|```/gi, '').trim();
+    t = t.replace(/^["'`«»„“”‘’]+|["'`«»„“”‘’]+$/g, '').trim();
+    t = t.split('\n')[0].trim();
+    t = t.replace(/\s+/g, ' ');
+    if (t.length > 180) t = t.slice(0, 180).trim();
+    return t;
+  }
+
+  /** Açıklama temizliği (fence/kırpıntı temizle, makul üst sınır). */
+  private cleanDescription(s: string): string {
+    let t = (s || '').replace(/```[a-z]*|```/gi, '').trim();
+    t = t.replace(/^["'`«»„“”‘’]+|["'`«»„“”‘’]+$/g, '').trim();
+    if (t.length > 4000) t = t.slice(0, 4000).trim();
+    return t;
+  }
+
+  /**
+   * Tek dil için BAŞLIK + AÇIKLAMA tek çağrıda (JSON).
+   * Ürün başına 10 çağrı yerine 5 çağrı → hızlı + rate-limit dostu.
+   */
+  private async translateOneLanguageStrict(
+    title: string,
+    description: string,
+    langName: string
+  ): Promise<{ title: string; description: string }> {
+    const res = await this.generateContent(
+      `You are an expert translator for a jewelry e-commerce site. Translate the product TITLE and DESCRIPTION to ${langName}.
+Rules for TITLE:
+- Translate the descriptive words naturally for shoppers.
+- DO NOT translate model names, collection codes, SKU-like tokens (e.g. BLZ-001, TTYKT 119), numbers, carat stamps (22K, 14K, 585, 916, 750, 333, 999) or measurements — keep them exactly as-is, in place.
+- If the title is already in ${langName}, return it EXACTLY unchanged (do not rephrase, extend or shorten it).
+Rules for DESCRIPTION:
+- Natural, persuasive translation for shoppers; keep jewelry-specific terminology.
+- If it is already in ${langName}, return it EXACTLY unchanged.
+Return ONLY a raw JSON object, no code fences, no extra text: {"title": "...", "description": "..."}`,
+      `TITLE: ${title}\nDESCRIPTION: ${description || '(empty)'}`
+    );
+    if (!res.success || !res.content || !res.content.trim()) {
+      throw this.providerError('çeviri', res.error);
+    }
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(res.content.trim());
+    } catch {
+      const m = res.content.match(/\{[\s\S]*\}/);
+      if (m) {
+        try { parsed = JSON.parse(m[0]); } catch { parsed = null; }
+      }
+    }
+    const cleanT = parsed && typeof parsed.title === 'string' ? this.cleanTitle(parsed.title) : '';
+    const cleanD = parsed && typeof parsed.description === 'string' ? this.cleanDescription(parsed.description) : '';
+    // Kaynak açıklama doluyken boş dönen / başlıksız dönen sonuç çöptür — dile yazma.
+    if (!cleanT || (description && description.trim() && !cleanD)) {
+      throw this.providerError('çeviri', `model geçersiz sonuç döndürdü: ${res.content.slice(0, 200)}`);
+    }
+    return { title: cleanT, description: cleanD };
   }
 
   private getLanguageName(code: string): string {

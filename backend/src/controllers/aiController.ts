@@ -9,6 +9,18 @@ import { queueAITranslation, queueBatchAITranslation } from '../jobs/aiTranslati
 
 export class AIController {
 
+  /**
+   * AI kuyruğuna iş atmadan önce anında yapılandırma kontrolü.
+   * Hata varsa kullanıcıya hemen söylenir (sahte "başarılı" yok).
+   */
+  private static async assertAIReady(): Promise<string | null> {
+    const info = await aiService.getProviderInfo();
+    if (!info.configured) {
+      return 'AI API anahtarı tanımlı değil. Admin → Sistem Ayarları → AI bölümünden API anahtarını girin.';
+    }
+    return aiService.validateModelFormat(info.provider, info.model);
+  }
+
   // ─── Admin AI Settings ───
 
   static async getAISettings(_req: Request, res: Response) {
@@ -69,6 +81,9 @@ export class AIController {
       const product = await Product.findByPk(id);
       if (!product) return res.status(404).json({ error: 'Product not found' });
 
+      const aiProblem = await AIController.assertAIReady();
+      if (aiProblem) return res.status(400).json({ error: aiProblem });
+
       const access = await planAccessService.checkAIAccess(userId, 1);
       if (!access.allowed) {
         return res.status(403).json({ error: access.message, credits: access });
@@ -88,6 +103,9 @@ export class AIController {
 
       const product = await Product.findByPk(id);
       if (!product) return res.status(404).json({ error: 'Product not found' });
+
+      const aiProblem = await AIController.assertAIReady();
+      if (aiProblem) return res.status(400).json({ error: aiProblem });
 
       const access = await planAccessService.checkAIAccess(userId, 1);
       if (!access.allowed) {
@@ -359,13 +377,11 @@ export class AIController {
         return res.status(400).json({ error: 'productIds array is required' });
       }
 
-      // Kuyruğa almadan önce sağlayıcıyı kontrol et — anahtar yoksa
-      // sahte "başarılı" dönüp sessiz kalma.
-      const providerInfo = await aiService.getProviderInfo();
-      if (!providerInfo.configured) {
-        return res.status(400).json({
-          error: 'AI API anahtarı tanımlı değil. Admin → Sistem Ayarları → AI bölümünden API anahtarını girin.'
-        });
+      // Kuyruğa almadan önce sağlayıcıyı kontrol et — anahtar/model
+      // sorunsa sahte "başarılı" dönüp sessiz kalma.
+      const aiProblem = await AIController.assertAIReady();
+      if (aiProblem) {
+        return res.status(400).json({ error: aiProblem });
       }
 
       const access = await planAccessService.checkAIAccess(userId, productIds.length);

@@ -410,7 +410,11 @@ export default function SettingsPage() {
                             </Form.Item>
                         </Col>
                         <Col span={6}>
-                            <Form.Item name="ai_model" label="Model">
+                            <Form.Item
+                                name="ai_model"
+                                label="Model"
+                                tooltip="OpenAI/Gemini: yalın ad (gpt-4o-mini). OpenRouter: ZORUNLU olarak sağlayıcı/model formatı (openai/gpt-4o-mini). Yanlış format 404 verir: No endpoints found."
+                            >
                                 <Input placeholder="gpt-4o-mini" />
                             </Form.Item>
                         </Col>

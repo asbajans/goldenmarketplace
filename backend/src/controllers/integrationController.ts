@@ -37,8 +37,8 @@ export class IntegrationController {
             // @ts-ignore
             const userId = req.user.id;
             const { platform } = req.params;
-            await integrationService.disconnectPlatform(userId, platform);
-            res.json({ success: true });
+            const result = await integrationService.disconnectPlatform(userId, platform);
+            res.json(result);
         } catch (error) {
             res.status(500).json({ error: 'Failed to disconnect' });
         }
