@@ -7,7 +7,16 @@ import planAccessService from '../services/planAccessService';
 const AI_TRANSLATION_LANGUAGES = ['en', 'tr', 'it', 'es', 'ar'];
 
 const aiTranslationQueue = new Bull('ai-translation', process.env.REDIS_URL || 'redis://localhost:6379', {
-  defaultJobOptions: { removeOnComplete: 100, removeOnFail: 50 }
+  defaultJobOptions: { removeOnComplete: 100, removeOnFail: 50 },
+  // Ürün başına ~6-7 AI çağrısı dakikalar sürebilir. Varsayılan 30 sn'lik
+  // kilit, bitmeyen işi "takıldı" sanıp İKİNCİ kez çalıştırıyordu (çift
+  // API harcaması + çift kredi riski). Kilit 10 dk, yenileme 30 sn.
+  settings: {
+    lockDuration: 600000,
+    lockRenewTime: 30000,
+    stalledInterval: 60000,
+    maxStalledCount: 1
+  }
 });
 
 interface AIJobData {

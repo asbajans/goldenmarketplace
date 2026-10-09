@@ -27,6 +27,9 @@ router.post('/cleanup-descriptions', authMiddleware, AIController.cleanupDescrip
 // Seller AI task list
 router.get('/tasks', authMiddleware, AIController.listAITasks);
 
+// Queue health (waiting/active/delayed/failed counts)
+router.get('/queue-status', authMiddleware, AIController.queueStatus);
+
 // Seller bulk AI
 router.post('/products/bulk-ai', authMiddleware, AIController.bulkAITranslate);
 

@@ -167,7 +167,7 @@ const ProductList: React.FC = () => {
         let cancelled = false;
         const poll = async () => {
             try {
-                const all = await getAITasks();
+                const all = await getAITasks(undefined, 200);
                 const arr = Array.isArray(all) ? all : [];
                 const active = arr.filter((t: any) => t.status === 'pending' || t.status === 'processing');
                 if (cancelled) return;

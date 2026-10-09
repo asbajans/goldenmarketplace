@@ -52,7 +52,9 @@ const AITaskProgress: React.FC<AITaskProgressProps> = ({ visible, onClose, onAll
 
     const fetchTasks = async () => {
       try {
-        const data = await getAITasks();
+        // Toplu kuyruklar 50'yi aşabilir; pencere tüm partiyi görmeli,
+        // yoksa erken "tamamlandı" kararı verip kapanır.
+        const data = await getAITasks(undefined, 200);
         setTasks(Array.isArray(data) ? data : []);
         setInitialLoading(false);
       } catch {

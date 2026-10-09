@@ -137,18 +137,30 @@ export class AIController {
     try {
       const userId = (req as any).user.id;
       const status = req.query.status as string;
+      const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
       const where: any = { userId };
       if (status) where.status = status;
 
       const tasks = await ProductAITask.findAll({
         where,
         order: [['createdAt', 'DESC']],
-        limit: 50,
+        limit,
         include: [{ model: Product, as: 'product', attributes: ['id', 'title', 'sku', 'category'] }]
       });
       return res.json(tasks);
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /** Kuyruk sağlığı: Portainer'sız teşhis için bekleyen/işlenen/hatalı sayıları. */
+  static async queueStatus(_req: Request, res: Response) {
+    try {
+      const { default: aiTranslationQueue } = await import('../jobs/aiTranslationJob');
+      const counts = await aiTranslationQueue.getJobCounts();
+      return res.json({ queue: 'ai-translation', counts, at: new Date().toISOString() });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message || 'Kuyruğa ulaşılamadı (Redis kapalı olabilir)' });
     }
   }
 

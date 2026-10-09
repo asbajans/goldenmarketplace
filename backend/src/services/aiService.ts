@@ -7,6 +7,26 @@ export interface AIResponse {
 }
 
 class AIService {
+  /**
+   * Zaman aşımlı fetch. SAĞLAYICI TAKILIRSA kuyruk sonsuza kadar
+   * kilitlenmesin diye (Bull concurrency 1 — tek asılı çağrı tüm
+   * kuyruğu durdurur, modal da hiç kapanmaz).
+   */
+  private async fetchWithTimeout(url: string, init: any, ms: number): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+    try {
+      return await fetch(url, { ...init, signal: controller.signal });
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        throw new Error(`AI sağlayıcısı ${Math.round(ms / 1000)} sn içinde yanıt vermedi (zaman aşımı)`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   private async getSettings() {
     const settings = await GlobalSetting.findAll({
       where: { key: ['ai_provider', 'ai_api_key', 'ai_model'] }
@@ -51,7 +71,7 @@ class AIService {
           headers['X-Title'] = 'Golden Marketplace';
         }
 
-        const res = await fetch(baseUrl, {
+        const res = await this.fetchWithTimeout(baseUrl, {
           method: 'POST',
           headers,
           body: JSON.stringify({
@@ -61,7 +81,7 @@ class AIService {
               { role: 'user', content: userPrompt }
             ]
           })
-        });
+        }, 90000);
 
         if (!res.ok) {
            const errText = await res.text();
@@ -75,7 +95,7 @@ class AIService {
         // Direct Gemini REST API (v1beta or v1)
          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
          
-         const res = await fetch(url, {
+         const res = await this.fetchWithTimeout(url, {
            method: 'POST',
            headers: { 'Content-Type': 'application/json' },
            body: JSON.stringify({
@@ -83,7 +103,7 @@ class AIService {
                 { role: "user", parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }
              ]
            })
-         });
+         }, 90000);
 
          if (!res.ok) {
             const errText = await res.text();
@@ -430,11 +450,11 @@ Do NOT wrap the JSON in markdown code blocks. Return ONLY raw JSON.`,
     const styledPrompt = `Luxurious fine gold jewelry photography for an e-commerce blog cover, photorealistic, elegant warm lighting, no text, no watermark. Subject: ${prompt}`;
     try {
       if (provider === 'openai') {
-        const res = await fetch('https://api.openai.com/v1/images/generations', {
+        const res = await this.fetchWithTimeout('https://api.openai.com/v1/images/generations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
           body: JSON.stringify({ model: imageModel, prompt: styledPrompt, size: '1024x1024', response_format: 'b64_json' })
-        });
+        }, 180000);
         if (!res.ok) throw new Error(`Images API error: ${res.status} ${(await res.text()).slice(0, 200)}`);
         const data: any = await res.json();
         const b64 = data?.data?.[0]?.b64_json;
@@ -445,7 +465,7 @@ Do NOT wrap the JSON in markdown code blocks. Return ONLY raw JSON.`,
         // Dedicated Images API (NOT chat completions: pure image models like
         // recraft/* have no endpoint serving chat+image modalities).
         // Docs: https://openrouter.ai/docs/features/multimodal/image-generation
-        const res = await fetch('https://openrouter.ai/api/v1/images/generations', {
+        const res = await this.fetchWithTimeout('https://openrouter.ai/api/v1/images/generations', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -454,7 +474,7 @@ Do NOT wrap the JSON in markdown code blocks. Return ONLY raw JSON.`,
             'X-Title': 'Golden Crafters Blog'
           },
           body: JSON.stringify({ model: imageModel, prompt: styledPrompt })
-        });
+        }, 180000);
         if (!res.ok) {
           const errText = (await res.text()).slice(0, 300);
           throw new Error(
@@ -472,7 +492,7 @@ Do NOT wrap the JSON in markdown code blocks. Return ONLY raw JSON.`,
         }
         if (typeof item?.url === 'string' && /^https?:\/\//.test(item.url)) {
           // Remote URL (may expire) — download now so we can host it on S3.
-          const imgRes = await fetch(item.url);
+          const imgRes = await this.fetchWithTimeout(item.url, {}, 120000);
           if (!imgRes.ok) throw new Error(`Could not download generated image (${imgRes.status})`);
           const buf = Buffer.from(await imgRes.arrayBuffer());
           const mime = imgRes.headers.get('content-type') || 'image/png';
@@ -481,14 +501,14 @@ Do NOT wrap the JSON in markdown code blocks. Return ONLY raw JSON.`,
         throw new Error('Images API returned no image data');
       }
       if (provider === 'gemini') {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${imageModel}:generateContent?key=${apiKey}`, {
+        const res = await this.fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${imageModel}:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: styledPrompt }] }],
             generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
           })
-        });
+        }, 180000);
         if (!res.ok) throw new Error(`Gemini error: ${res.status} ${(await res.text()).slice(0, 200)}`);
         const data: any = await res.json();
         const parts: any[] = data?.candidates?.[0]?.content?.parts || [];

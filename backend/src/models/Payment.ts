@@ -94,8 +94,7 @@ Payment.init(
     },
     provider: {
       type: DataTypes.ENUM('stripe', 'bank', 'manual'),
-      allowNull: false,
-      comment: 'manual = admin tarafından oluşturulan/onaylanan kayıt'
+      allowNull: false
     },
     providerRef: {
       type: DataTypes.STRING,

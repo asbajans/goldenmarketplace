@@ -7,8 +7,11 @@ export const getCreditPrices = () => client.get('/ai/credits/prices').then(res =
 export const checkoutCredits = (credits: number, provider: 'stripe' | 'bank' = 'bank') =>
   client.post('/ai/credits/checkout', { credits, provider }).then(res => res.data);
 
-export const getAITasks = (status?: string) =>
-  client.get('/ai/tasks', { params: { status } }).then(res => res.data);
+export const getAITasks = (status?: string, limit?: number) =>
+  client.get('/ai/tasks', { params: { status, limit } }).then(res => res.data);
+
+export const getAIQueueStatus = () =>
+  client.get('/ai/queue-status').then(res => res.data);
 
 export const translateProduct = (id: string) =>
   client.post(`/ai/products/${id}/translate`).then(res => res.data);
