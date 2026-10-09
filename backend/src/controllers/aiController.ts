@@ -359,6 +359,15 @@ export class AIController {
         return res.status(400).json({ error: 'productIds array is required' });
       }
 
+      // Kuyruğa almadan önce sağlayıcıyı kontrol et — anahtar yoksa
+      // sahte "başarılı" dönüp sessiz kalma.
+      const providerInfo = await aiService.getProviderInfo();
+      if (!providerInfo.configured) {
+        return res.status(400).json({
+          error: 'AI API anahtarı tanımlı değil. Admin → Sistem Ayarları → AI bölümünden API anahtarını girin.'
+        });
+      }
+
       const access = await planAccessService.checkAIAccess(userId, productIds.length);
       if (!access.allowed) {
         return res.status(403).json({ error: access.message, credits: access });

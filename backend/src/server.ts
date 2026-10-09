@@ -303,6 +303,9 @@ app.listen(PORT, async () => {
 
     // Start Product Sync Worker
     require('./jobs/productSyncJob');
+
+    // Start AI Translation Worker (Bull processor kaydını garantiye al)
+    require('./jobs/aiTranslationJob');
     
     // Start Log Cleanup Job
     const { startLogCleanupJob } = require('./jobs/logCleanupJob');

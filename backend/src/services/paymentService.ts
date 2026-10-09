@@ -139,19 +139,32 @@ export async function createSubscriptionCheckout(
     await payment.update({ status: 'cancelled' });
     throw new Error('Stripe anahtarı tanımlı değil. Havale/EFT ile devam edin.');
   }
-  const priceId = billingPeriod === 'yearly' ? (plan as any).stripePriceIdYearly : plan.stripePriceId;
-  if (!priceId || !String(priceId).startsWith('price_')) {
-    await payment.update({ status: 'cancelled' });
-    throw new Error(`Bu paket için ${billingPeriod === 'yearly' ? 'yıllık' : 'aylık'} Stripe fiyatı tanımlı değil. Havale/EFT ile devam edin.`);
-  }
-
   const customerId = await ensureStripeCustomer(user, stripe);
   const base = sellerBaseUrl();
+
+  // Stripe Price ID girilmişse onu kullan; girilmemişse paket fiyatından
+  // abonelik tipi satır (inline price_data) üretilir — dashboard'da önceden
+  // Price oluşturmak ZORUNLU DEĞİLDİR.
+  const savedPriceId = billingPeriod === 'yearly' ? (plan as any).stripePriceIdYearly : plan.stripePriceId;
+  const useSavedPrice = savedPriceId && String(savedPriceId).startsWith('price_');
+  const stripeCurrency = String(plan.currency || 'USD').toLowerCase();
+  const lineItem = useSavedPrice
+    ? { price: String(savedPriceId), quantity: 1 }
+    : {
+        price_data: {
+          currency: stripeCurrency,
+          unit_amount: Math.round(Number(amount) * 100),
+          recurring: { interval: billingPeriod === 'yearly' ? 'year' : 'month' },
+          product_data: { name: `${plan.name} (${billingPeriod === 'yearly' ? 'Yıllık' : 'Aylık'} Abonelik)` }
+        },
+        quantity: 1
+      };
+
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     payment_method_types: ['card'],
     customer: customerId,
-    line_items: [{ price: priceId, quantity: 1 }],
+    line_items: [lineItem],
     metadata: { paymentId: payment.id, userId, kind: 'subscription', planId: plan.id, billingPeriod },
     success_url: `${base}/seller/subscription/success?session_id={CHECKOUT_SESSION_ID}&kind=subscription`,
     cancel_url: `${base}/seller/subscription?cancelled=1`

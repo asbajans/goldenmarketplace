@@ -112,6 +112,74 @@ class AIService {
     return res.success ? res.content : text;
   }
 
+  /** Sağlayıcı durumu: anahtar tanımlı mı, hangi provider/model? */
+  async getProviderInfo(): Promise<{ provider: string; model: string; configured: boolean }> {
+    const s = await this.getSettings();
+    return { provider: s.provider, model: s.model, configured: !!(s.apiKey && s.apiKey.trim()) };
+  }
+
+  private providerError(action: string, detail?: string): Error {
+    return new Error(
+      `AI ${action} başarısız. API anahtarını ve modeli Admin → Sistem Ayarları → AI bölümünden kontrol edin.` +
+      (detail ? ` Sağlayıcı yanıtı: ${detail.slice(0, 300)}` : '')
+    );
+  }
+
+  /**
+   * Hata fırlatan çeviri (ürün hattı için). Başarısız çağrıda kaynak
+   * metni sessizce geri DÖNMEZ — hata yukarı taşınır, task failed olur.
+   */
+  async translateTextStrict(text: string, targetLanguage: string, action = 'çeviri'): Promise<string> {
+    const res = await this.generateContent(
+      `You are an expert translator for a jewelry e-commerce site. Translate the given text to ${targetLanguage}. Keep the translation natural and persuasive for shoppers. Maintain any jewelry-specific terminology. Return ONLY the translated string, no quotes or surrounding text.`,
+      text
+    );
+    if (!res.success || !res.content || !res.content.trim()) {
+      throw this.providerError(action, res.error);
+    }
+    return res.content;
+  }
+
+  /**
+   * Ürün BAŞLIĞI çevirisi: model ismi / koleksiyon kodu / SKU benzeri
+   * jetonlar (örn. BLZ-001), sayılar, ayar damgaları (22K, 585, 916)
+   * ve ölçüler AYNI BIRAKILIR; geri kalan kelimeler çevrilir.
+   */
+  async translateTitleStrict(title: string, targetLanguage: string): Promise<string> {
+    const res = await this.generateContent(
+      `You are an expert translator for a jewelry e-commerce site. Translate the product TITLE to ${targetLanguage}. Rules:
+- Translate the descriptive words (material, product type, adjectives) naturally for shoppers.
+- DO NOT translate model names, collection codes, SKU-like tokens (e.g. BLZ-001, ABC123), numbers, carat stamps (22K, 585, 916, 750, 333, 999) or measurements — keep them exactly as-is, in place.
+- Return ONLY the translated title, no quotes or surrounding text.`,
+      title
+    );
+    if (!res.success || !res.content || !res.content.trim()) {
+      throw this.providerError('başlık çevirisi', res.error);
+    }
+    return res.content;
+  }
+
+  /** Hata fırlatan açıklama üretimi (ürün hattı için). */
+  async generateProductDescriptionStrict(title: string, category: string, language: string, keywords?: string): Promise<string> {
+    const res = await this.generateContent(
+      `You are a professional jewelry product description writer for an e-commerce marketplace.
+Generate a detailed, persuasive product description in ${language} for the following item.
+The description should be 2-4 sentences, covering:
+- Product type and material quality
+- Craftsmanship and design details
+- Ideal for gifting or special occasions
+- Any care or wearing tips if applicable
+
+Use natural, flowing language appropriate for the target language.
+Do NOT include HTML tags, markdown, or meta text. Return ONLY the description text.`,
+      `Title: ${title}\nCategory: ${category}${keywords ? `\nKeywords: ${keywords}` : ''}`
+    );
+    if (!res.success || !res.content || !res.content.trim() || res.content.trim() === title.trim()) {
+      throw this.providerError('açıklama üretimi', res.error);
+    }
+    return res.content;
+  }
+
   async generateProductDescription(title: string, category: string, language: string, keywords?: string): Promise<string> {
     const res = await this.generateContent(
       `You are a professional jewelry product description writer for an e-commerce marketplace. 
@@ -129,14 +197,37 @@ Do NOT include HTML tags, markdown, or meta text. Return ONLY the description te
     return res.success ? res.content : title;
   }
 
-  async translateProduct(title: string, description: string, languages: string[]): Promise<Record<string, { title: string; description: string }>> {
-    const result: Record<string, { title: string; description: string }> = {};
+  /**
+   * Ürün hattı çevirisi: BAŞLIK + AÇIKLAMA her dile çevrilir.
+   * Başarısız diller `errors` içinde döner; HİÇBİR dil çevrilemediyse
+   * hata fırlatılır (sessiz "başarılı" yok).
+   */
+  async translateProduct(
+    title: string,
+    description: string,
+    languages: string[]
+  ): Promise<{ translations: Record<string, { title: string; description: string }>; errors: Record<string, string> }> {
+    const translations: Record<string, { title: string; description: string }> = {};
+    const errors: Record<string, string> = {};
     for (const lang of languages) {
-      const translatedTitle = await this.translateText(title, this.getLanguageName(lang));
-      const translatedDesc = description ? await this.translateText(description, this.getLanguageName(lang)) : '';
-      result[lang] = { title: translatedTitle, description: translatedDesc };
+      const langName = this.getLanguageName(lang);
+      try {
+        const translatedTitle = await this.translateTitleStrict(title, langName);
+        const translatedDesc = description
+          ? await this.translateTextStrict(description, langName, 'açıklama çevirisi')
+          : '';
+        translations[lang] = { title: translatedTitle, description: translatedDesc };
+      } catch (err: any) {
+        errors[lang] = err?.message || 'Bilinmeyen çeviri hatası';
+      }
     }
-    return result;
+    if (Object.keys(translations).length === 0) {
+      const first = Object.entries(errors)[0];
+      throw new Error(
+        `Hiçbir dile çeviri yapılamadı${first ? ` (${first[0]}: ${first[1]})` : ''}`
+      );
+    }
+    return { translations, errors };
   }
 
   private getLanguageName(code: string): string {

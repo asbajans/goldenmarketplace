@@ -51,32 +51,34 @@ aiTranslationQueue.process(async (job) => {
     // Step 1: Generate description if needed
     if (taskType === 'generate_content' || taskType === 'both') {
       if (!product.description || product.description.length < 50) {
-        const generated = await aiService.generateProductDescription(
+        // Üretim başarısızsa sessiz geçme — task failed olsun, satıcı nedenini görsün
+        const generated = await aiService.generateProductDescriptionStrict(
           product.title,
           product.category,
-          'tr',
+          'Turkish',
           (product.tags || []).join(', ')
         );
-        if (generated && generated !== product.title) {
-          updatedDescription = generated;
-          totalCredits += 1;
-        }
+        updatedDescription = generated;
+        totalCredits += 1;
       }
       if (taskId) await ProductAITask.update({ progress: 40 }, { where: { id: taskId } });
     }
 
-    // Step 2: Translate to all languages
+    // Step 2: Translate title + description to all languages
+    let translateWarnings: Record<string, string> = {};
     if (taskType === 'translate' || taskType === 'both') {
       const needTranslate = AI_TRANSLATION_LANGUAGES.some(
         lang => !updatedTranslations[lang]?.title || !updatedTranslations[lang]?.description
       );
       if (needTranslate) {
-        const translations = await aiService.translateProduct(
+        // Hiçbir dil çevrilemezse hata fırlatır (task failed + mesaj)
+        const { translations, errors } = await aiService.translateProduct(
           updatedTitle,
           updatedDescription,
           AI_TRANSLATION_LANGUAGES
         );
         updatedTranslations = { ...updatedTranslations, ...translations };
+        translateWarnings = errors;
         totalCredits += 1;
       }
       if (taskId) await ProductAITask.update({ progress: 80 }, { where: { id: taskId } });
@@ -106,7 +108,12 @@ aiTranslationQueue.process(async (job) => {
         progress: 100,
         creditsConsumed: totalCredits,
         completedAt: new Date(),
-        result: { title: updatedTitle, description: updatedDescription, translations: updatedTranslations }
+        result: {
+          title: updatedTitle,
+          description: updatedDescription,
+          translations: updatedTranslations,
+          warnings: translateWarnings
+        }
       }, { where: { id: taskId } });
     }
 
@@ -128,7 +135,20 @@ export async function queueAITranslation(productId: string, userId: string, task
   const existing = await ProductAITask.findOne({
     where: { productId, taskType, status: ['pending', 'processing'] }
   });
-  if (existing) return existing;
+  if (existing) {
+    // Ölü kuyrukta takılıp kalmış görevler "başarılı" izlenimi verip hiç
+    // işlemesin diye: 30 dk'yı aşmış pending görevler stale sayılır.
+    const ageMs = Date.now() - new Date(existing.createdAt).getTime();
+    if (existing.status === 'pending' && ageMs > 30 * 60 * 1000) {
+      await existing.update({
+        status: 'failed',
+        error: 'İşlem zaman aşımına uğradı (kuyrukta takıldı), tekrar kuyruğa alındı.',
+        completedAt: new Date()
+      });
+    } else {
+      return existing;
+    }
+  }
 
   const task = await ProductAITask.create({ productId, userId, taskType, status: 'pending' });
 

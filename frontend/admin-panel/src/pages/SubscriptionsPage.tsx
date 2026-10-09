@@ -196,7 +196,7 @@ export const SubscriptionsPage: React.FC = () => {
 
                     <Divider orientation="left">Stripe (Kart ile Ödeme)</Divider>
                     <p style={{ color: '#888', marginBottom: 12 }}>
-                        Kartla satış için Stripe Price ID'ler (price_...). Boş bırakılırsa o dönem için sadece havale/EFT sunulur.
+                        Price ID girilirse o kullanılır; boş bırakılırsa paket fiyatından otomatik abonelik satırı üretilir — Price oluşturmak zorunlu değildir.
                     </p>
                     <Space size="large" wrap>
                         <Form.Item name="stripePriceId" label="Aylık Price ID">

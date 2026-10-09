@@ -21,6 +21,7 @@ const ProductList: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedMarketplaces, setSelectedMarketplaces] = useState<string[]>([]);
     const [totalCount, setTotalCount] = useState(0);
+    const [pagination, setPagination] = useState<{ current: number; pageSize: number }>({ current: 1, pageSize: 15 });
     const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
     const [translateLoading, setTranslateLoading] = useState(false);
     const [aiProgressVisible, setAiProgressVisible] = useState(false);
@@ -30,6 +31,7 @@ const ProductList: React.FC = () => {
     const [cleanupLoading, setCleanupLoading] = useState(false);
 
     useEffect(() => {
+        setPagination(p => ({ ...p, current: 1 }));
         fetchProducts(searchTerm, selectedMarketplaces);
         fetchGoldPrice();
         fetchSyncStatus();
@@ -252,12 +254,23 @@ const ProductList: React.FC = () => {
     const myProducts = products.filter(p => !p.originalProductId && !p.originalStoreName);
     const b2bProducts = products.filter(p => p.originalProductId || p.originalStoreName);
 
+    // Kontrollü sayfalama: statik { pageSize: 15 } prop'u AntD'nin dahili
+    // sayfa boyutu değişimini eziyor, dropdown hep 15 gösteriyordu.
     const tableProps = (data: Product[]) => ({
         dataSource: data,
         columns: columns,
         rowKey: "id",
         loading: loading,
-        pagination: { pageSize: 15 },
+        pagination: {
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: data.length,
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '15', '25', '50', '100'],
+            showTotal: (total: number, range: [number, number]) =>
+                `${total} üründen ${range[0]}-${range[1]} arası • ${selectedRowKeys.length} seçili`,
+            onChange: (page: number, size: number) => setPagination({ current: page, pageSize: size })
+        },
         rowSelection
     });
 
@@ -350,7 +363,7 @@ const ProductList: React.FC = () => {
                           <Button type="default" icon={<SyncOutlined spin={syncing} />} onClick={handleManualSync} loading={syncing}>
                               Fiyatları Senkronize Et
                           </Button>
-                           <Tooltip title={selectedRowKeys.length === 0 ? 'Önce ürünleri seçin' : ''}>
+                           <Tooltip title={selectedRowKeys.length === 0 ? 'Önce ürünleri seçin' : 'Seçili ürünlerin BAŞLIK ve AÇIKLAMALARI 5 dile çevrilir (model kodları aynen korunur)'}>
                                <Button
                                    type="default"
                                    icon={<ThunderboltOutlined />}
