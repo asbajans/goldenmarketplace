@@ -27,7 +27,32 @@ interface AIJobData {
   taskType: 'translate' | 'generate_content' | 'both';
 }
 
-aiTranslationQueue.process(async (job) => {
+/**
+ * Kuyruk eşzamanlılığı (ai_queue_concurrency, 1-10, varsayılan 3).
+ * TEK global kuyruk tüm satıcıları sırayla işletiyordu (concurrency 1);
+ * ürün başına ~5-6 LLM çağrısı dakikalar sürdüğü için eşzamanlı
+ * kullanıcılar birbirini kilitliyordu. Değer değişikliği restart ister.
+ */
+async function getQueueConcurrency(): Promise<number> {
+  try {
+    const { default: GlobalSetting } = await import('../models/GlobalSetting');
+    const row = await GlobalSetting.findOne({ where: { key: 'ai_queue_concurrency' } });
+    const n = parseInt(String(row?.value || '3'), 10);
+    return Math.min(Math.max(n || 3, 1), 10);
+  } catch {
+    return 3;
+  }
+}
+
+getQueueConcurrency().then((n) => {
+  // Bull aynı işleyiciyi concurrency kadar paralel işletir.
+  aiTranslationQueue.process(n, processTranslationJob);
+  console.log(`[AITranslation] Queue worker started (concurrency: ${n})`);
+}).catch((err) => {
+  console.error('[AITranslation] Failed to start queue worker:', err?.message || err);
+});
+
+async function processTranslationJob(job: Bull.Job<AIJobData>) {
   const { productId, userId, taskType } = job.data as AIJobData;
 
   const product = await Product.findByPk(productId);
@@ -150,7 +175,7 @@ aiTranslationQueue.process(async (job) => {
     }
     throw error;
   }
-});
+}
 
 /** Bull'daki iş gerçekten yaşıyor mu (waiting/active/delayed/paused/stuck)? */
 async function isJobLive(jobId: string | null | undefined): Promise<boolean> {

@@ -14,11 +14,7 @@ export class AIController {
    * Hata varsa kullanıcıya hemen söylenir (sahte "başarılı" yok).
    */
   private static async assertAIReady(): Promise<string | null> {
-    const info = await aiService.getProviderInfo();
-    if (!info.configured) {
-      return 'AI API anahtarı tanımlı değil. Admin → Sistem Ayarları → AI bölümünden API anahtarını girin.';
-    }
-    return aiService.validateModelFormat(info.provider, info.model);
+    return aiService.assertTranslationReady();
   }
 
   // ─── Admin AI Settings ───
@@ -26,7 +22,8 @@ export class AIController {
   static async getAISettings(_req: Request, res: Response) {
     try {
       const settings = await GlobalSetting.findAll({
-        where: { key: ['ai_provider', 'ai_api_key', 'ai_model', 'ai_image_model', 'ai_credit_packs', 'ai_translation_cost', 'ai_content_cost'] }
+        where: { key: ['ai_provider', 'ai_api_key', 'ai_model', 'ai_image_model', 'ai_credit_packs', 'ai_translation_cost', 'ai_content_cost',
+          'ai_translation_models', 'ai_content_model', 'ai_blog_model', 'ai_queue_concurrency'] }
       });
       const result: any = {};
       for (const s of settings) result[s.key] = s.value;
@@ -38,16 +35,44 @@ export class AIController {
 
   static async updateAISettings(req: Request, res: Response) {
     try {
-      const allowed = ['ai_provider', 'ai_api_key', 'ai_model', 'ai_image_model', 'ai_credit_packs', 'ai_translation_cost', 'ai_content_cost'];
-      // ai_api_key is a SECRET — it must never be served on public endpoints.
-      const PRIVATE_KEYS = new Set(['ai_api_key']);
+      const allowed = ['ai_provider', 'ai_api_key', 'ai_model', 'ai_image_model', 'ai_credit_packs', 'ai_translation_cost', 'ai_content_cost',
+        'ai_translation_models', 'ai_content_model', 'ai_blog_model', 'ai_queue_concurrency'];
+      // SECRET'lar public endpoint'lere asla düşmemeli (çeviri/içerik/blog
+      // girdileri kendi apiKey'ini taşıyabilir).
+      const PRIVATE_KEYS = new Set(['ai_api_key', 'ai_translation_models', 'ai_content_model', 'ai_blog_model']);
       for (const key of allowed) {
         if (req.body[key] !== undefined) {
-          await GlobalSetting.upsert({ key, value: String(req.body[key]), isPublic: !PRIVATE_KEYS.has(key), description: `AI setting: ${key}` } as any);
+          let value = req.body[key];
+          // JSON ayarlar obje/array gelebilir — string sakla
+          if (typeof value !== 'string') {
+            try { value = JSON.stringify(value); } catch { value = String(value); }
+          }
+          // JSON ayarların sözdizimini girişte doğrula
+          if (['ai_translation_models', 'ai_content_model', 'ai_blog_model'].includes(key) && value.trim() !== '') {
+            try {
+              const parsed = JSON.parse(value);
+              const list = Array.isArray(parsed) ? parsed : [parsed];
+              for (const item of list) {
+                if (!item || typeof item.model !== 'string' || !item.model.trim()) {
+                  return res.status(400).json({ error: `${key}: her girdide geçerli bir model adı olmalı` });
+                }
+              }
+            } catch {
+              return res.status(400).json({ error: `${key}: geçerli JSON olmalı` });
+            }
+          }
+          if (key === 'ai_queue_concurrency') {
+            const n = parseInt(String(value), 10);
+            if (isNaN(n) || n < 1 || n > 10) {
+              return res.status(400).json({ error: 'ai_queue_concurrency 1-10 arası olmalı (değişiklik restart ister)' });
+            }
+            value = String(n);
+          }
+          await GlobalSetting.upsert({ key, value, isPublic: !PRIVATE_KEYS.has(key), description: `AI setting: ${key}` } as any);
         }
       }
       // Repair: if a previous save exposed the secret, make it private again.
-      await GlobalSetting.update({ isPublic: false }, { where: { key: 'ai_api_key' } }).catch(() => undefined);
+      await GlobalSetting.update({ isPublic: false }, { where: { key: ['ai_api_key', 'ai_translation_models', 'ai_content_model', 'ai_blog_model'] } }).catch(() => undefined);
       return res.json({ message: 'AI settings updated' });
     } catch (error) {
       return res.status(500).json({ error: 'Failed to update AI settings' });
@@ -489,7 +514,8 @@ export class AIController {
       }
 
       // 1) Draft in English, strict JSON (plain-text paragraphs, no HTML/markdown)
-      const draftRes = await aiService.generateContent(
+      const draftRes = await aiService.generateForPurpose(
+        'blog',
         `You are an expert jewelry journalist writing for Golden Crafters, a fine gold jewelry marketplace.
 Write in English with a ${tone} tone. Audience: jewelry shoppers and gold enthusiasts.
 Whenever a product price is given, quote it in both TRY and USD exactly as provided.
@@ -523,9 +549,9 @@ Return ONLY a JSON object (no code fences, no extra text) with exactly these key
       let imageError = '';
       const translateAll = Promise.all(Object.entries(LANG_NAMES).map(async ([lang, name]) => {
         const [tTitle, tExcerpt, tContent] = await Promise.all([
-          aiService.translateText(draft.title, name),
-          draft.excerpt ? aiService.translateText(draft.excerpt, name) : Promise.resolve(''),
-          aiService.translateText(draft.content, name)
+          aiService.translateText(draft.title, name, 'blog'),
+          draft.excerpt ? aiService.translateText(draft.excerpt, name, 'blog') : Promise.resolve(''),
+          aiService.translateText(draft.content, name, 'blog')
         ]);
         translations[lang] = { title: tTitle, excerpt: tExcerpt, content: tContent };
       }));

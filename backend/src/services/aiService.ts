@@ -6,6 +6,52 @@ export interface AIResponse {
   error?: string;
 }
 
+export type AIPurpose = 'translation' | 'content' | 'blog';
+
+export interface AIModelEntry {
+  provider: string;
+  model: string;
+  apiKey?: string;
+}
+
+/** Amaç → ayar anahtarı. image ayrı (generateImage zaten kendi modelini okuyor). */
+const PURPOSE_SETTING_KEY: Record<AIPurpose, string> = {
+  translation: 'ai_translation_models',
+  content: 'ai_content_model',
+  blog: 'ai_blog_model'
+};
+
+/** Devre kesici: üst üste patlayan model 10 dk atlanır (tek process belleği). */
+const breaker = new Map<string, { fails: number; until: number }>();
+const BREAKER_FAILS = 3;
+const BREAKER_COOLDOWN_MS = 10 * 60 * 1000;
+
+function breakerKey(e: AIModelEntry): string {
+  return `${e.provider}|${e.model}`;
+}
+
+function breakerOpen(e: AIModelEntry): boolean {
+  const b = breaker.get(breakerKey(e));
+  if (!b) return false;
+  if (Date.now() > b.until) {
+    breaker.delete(breakerKey(e));
+    return false;
+  }
+  return b.fails >= BREAKER_FAILS;
+}
+
+function breakerReport(e: AIModelEntry, ok: boolean): void {
+  const k = breakerKey(e);
+  if (ok) {
+    breaker.delete(k);
+    return;
+  }
+  const b = breaker.get(k) || { fails: 0, until: 0 };
+  b.fails += 1;
+  if (b.fails >= BREAKER_FAILS) b.until = Date.now() + BREAKER_COOLDOWN_MS;
+  breaker.set(k, b);
+}
+
 class AIService {
   /**
    * Zaman aşımlı fetch. SAĞLAYICI TAKILIRSA kuyruk sonsuza kadar
@@ -45,12 +91,136 @@ class AIService {
     return { provider, apiKey, model };
   }
 
+  /** Tüm ai_* ayarlarını tek sorguda harita olarak döndürür. */
+  private async getAllAISettings(): Promise<Record<string, string>> {
+    const settings = await GlobalSetting.findAll({
+      where: {
+        key: ['ai_provider', 'ai_api_key', 'ai_model',
+              'ai_translation_models', 'ai_content_model', 'ai_blog_model']
+      }
+    });
+    const map: Record<string, string> = {};
+    for (const s of settings) map[s.key] = s.value;
+    return map;
+  }
+
+  private parseEntry(raw: any, fallbackProvider: string): AIModelEntry | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const model = String(raw.model || '').trim();
+    if (!model) return null;
+    return {
+      provider: String(raw.provider || fallbackProvider || 'openai').trim() || 'openai',
+      model,
+      apiKey: String(raw.apiKey || '').trim() || undefined
+    };
+  }
+
+  /**
+   * Amaca göre sıralı model zinciri. Önce amaca özel ayar, boşsa
+   * legacy tekli (ai_provider/ai_model) ayar tek elemanlı zincir olur.
+   * Çeviri anahtarı girilmediyse ortak ai_api_key kullanılır.
+   */
+  async resolveChain(purpose: AIPurpose): Promise<AIModelEntry[]> {
+    const all = await this.getAllAISettings();
+    const fallbackProvider = all.ai_provider || 'openai';
+    const fallbackKey = all.ai_api_key || '';
+    const raw = (all[PURPOSE_SETTING_KEY[purpose]] || '').trim();
+
+    const chain: AIModelEntry[] = [];
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        const list = Array.isArray(parsed) ? parsed : [parsed];
+        for (const item of list) {
+          const entry = this.parseEntry(item, fallbackProvider);
+          if (entry) {
+            if (!entry.apiKey && fallbackKey) entry.apiKey = fallbackKey;
+            chain.push(entry);
+          }
+        }
+      } catch {
+        // Bozuk JSON yok sayılır, legacy'ye düşülür
+      }
+    }
+    if (chain.length === 0) {
+      const legacyModel = (all.ai_model || 'gpt-4o-mini').trim();
+      chain.push({ provider: fallbackProvider, model: legacyModel, apiKey: fallbackKey || undefined });
+    }
+    return chain;
+  }
+
+  /** Zincir özeti (admin teşhisi + hazır kontrolü için). */
+  async getChainInfo(purpose: AIPurpose): Promise<{ entries: Array<AIModelEntry & { keyConfigured: boolean; skippedByBreaker: boolean }>; usable: number }> {
+    const chain = await this.resolveChain(purpose);
+    const entries = chain.map(e => ({
+      ...e,
+      apiKey: undefined,
+      keyConfigured: !!((e.apiKey || '').trim()),
+      skippedByBreaker: breakerOpen(e)
+    }));
+    return { entries, usable: entries.filter(e => e.keyConfigured && !e.skippedByBreaker).length };
+  }
+
+  /**
+   * Zincir çağrısı: sırayla dener, hata/zaman aşımında sonrakine geçer.
+   * Hepsi patlarsa birleşik hatayı fırlatır (çağıran task'ı failed yapar).
+   */
+  async generateForPurpose(
+    purpose: AIPurpose,
+    systemPrompt: string,
+    userPrompt: string,
+    opts?: { timeoutMs?: number }
+  ): Promise<AIResponse> {
+    const chain = await this.resolveChain(purpose);
+    const timeoutMs = opts?.timeoutMs || (purpose === 'translation' ? 60000 : 90000);
+    const tried: string[] = [];
+    const errors: string[] = [];
+
+    for (const entry of chain) {
+      if (breakerOpen(entry)) {
+        tried.push(`${entry.provider}/${entry.model} (devre-kesici: atlandı)`);
+        continue;
+      }
+      if (!entry.apiKey) {
+        errors.push(`${entry.provider}/${entry.model}: API anahtarı yok`);
+        continue;
+      }
+      tried.push(`${entry.provider}/${entry.model}`);
+      const res = await this.callModel(entry, systemPrompt, userPrompt, timeoutMs);
+      if (res.success && res.content && res.content.trim()) {
+        breakerReport(entry, true);
+        return res;
+      }
+      breakerReport(entry, false);
+      errors.push(`${entry.provider}/${entry.model}: ${res.error || 'boş yanıt'}`);
+      // Yapılandırma hatası (401/403/404) aynı anahtarla tekrar denemez —
+      // ama FARKLI anahtarlı sıradaki girdiye geçilir (o yüzden continue).
+    }
+
+    const detail = errors.length > 0 ? ` Denenenler: ${tried.join(' → ')}. Hatalar: ${errors.join(' | ').slice(0, 500)}` : '';
+    return {
+      success: false,
+      content: '',
+      error: `Tüm ${purpose} modelleri başarısız.${detail} Admin → Sistem Ayarları → AI bölümünden modelleri kontrol edin.`
+    };
+  }
+
   async generateContent(systemPrompt: string, userPrompt: string, overrides?: { provider?: string; apiKey?: string; model?: string }): Promise<AIResponse> {
     const dbSettings = await this.getSettings();
-    const provider = overrides?.provider || dbSettings.provider;
-    const apiKey = overrides?.apiKey || dbSettings.apiKey;
-    const model = overrides?.model || dbSettings.model;
+    const entry: AIModelEntry = {
+      provider: overrides?.provider || dbSettings.provider,
+      model: overrides?.model || dbSettings.model,
+      apiKey: overrides?.apiKey || dbSettings.apiKey || undefined
+    };
+    if (!entry.apiKey) {
+      return { success: false, content: '', error: 'AI API Key not configured.' };
+    }
+    return this.callModel(entry, systemPrompt, userPrompt, 90000);
+  }
 
+  /** Tek model çağrısı (taşıyıcı). Hata fırlatmaz — AIResponse döner. */
+  private async callModel(entry: AIModelEntry, systemPrompt: string, userPrompt: string, timeoutMs: number): Promise<AIResponse> {
+    const { provider, apiKey, model } = entry;
     if (!apiKey) {
       return { success: false, content: '', error: 'AI API Key not configured.' };
     }
@@ -81,7 +251,7 @@ class AIService {
               { role: 'user', content: userPrompt }
             ]
           })
-        }, 90000);
+        }, timeoutMs);
 
         if (!res.ok) {
            const errText = await res.text();
@@ -100,10 +270,10 @@ class AIService {
            headers: { 'Content-Type': 'application/json' },
            body: JSON.stringify({
              contents: [
-                { role: "user", parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }
-             ]
-           })
-         }, 90000);
+                 { role: "user", parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }
+              ]
+            })
+          }, timeoutMs);
 
          if (!res.ok) {
             const errText = await res.text();
@@ -124,8 +294,9 @@ class AIService {
   }
 
   // Common usecases
-  async translateText(text: string, targetLanguage: string): Promise<string> {
-    const res = await this.generateContent(
+  async translateText(text: string, targetLanguage: string, purpose: AIPurpose = 'translation'): Promise<string> {
+    const res = await this.generateForPurpose(
+      purpose,
       `You are an expert translator for a jewelry e-commerce site. Translate the given text to ${targetLanguage}. Keep the translation natural and persuasive for shoppers. Maintain any jewelry-specific terminology. Return ONLY the translated string, no quotes or surrounding text.`,
       text
     );
@@ -136,6 +307,20 @@ class AIService {
   async getProviderInfo(): Promise<{ provider: string; model: string; configured: boolean }> {
     const s = await this.getSettings();
     return { provider: s.provider, model: s.model, configured: !!(s.apiKey && s.apiKey.trim()) };
+  }
+
+  /** Çeviri hattı hazır mı? Zincirde kullanılabilir ≥1 model + format geçerliliği. */
+  async assertTranslationReady(): Promise<string | null> {
+    const info = await this.getChainInfo('translation');
+    if (info.usable === 0) {
+      return 'Çeviri için kullanılabilir AI modeli yok. Admin → Sistem Ayarları → AI bölümünden çeviri modeli ekleyin (veya genel API anahtarı + modeli girin).';
+    }
+    for (const e of info.entries) {
+      if (!e.keyConfigured) continue;
+      const fmt = this.validateModelFormat(e.provider, e.model);
+      if (fmt) return fmt;
+    }
+    return null;
   }
 
   /**
@@ -173,7 +358,8 @@ class AIService {
    * metni sessizce geri DÖNMEZ — hata yukarı taşınır, task failed olur.
    */
   async translateTextStrict(text: string, targetLanguage: string, action = 'çeviri'): Promise<string> {
-    const res = await this.generateContent(
+    const res = await this.generateForPurpose(
+      'translation',
       `You are an expert translator for a jewelry e-commerce site. Translate the given text to ${targetLanguage}. Keep the translation natural and persuasive for shoppers. Maintain any jewelry-specific terminology. Return ONLY the translated string, no quotes or surrounding text.`,
       text
     );
@@ -189,7 +375,8 @@ class AIService {
    * ve ölçüler AYNI BIRAKILIR; geri kalan kelimeler çevrilir.
    */
   async translateTitleStrict(title: string, targetLanguage: string): Promise<string> {
-    const res = await this.generateContent(
+    const res = await this.generateForPurpose(
+      'translation',
       `You are an expert translator for a jewelry e-commerce site. Translate the product TITLE to ${targetLanguage}. Rules:
 - Translate the descriptive words (material, product type, adjectives) naturally for shoppers.
 - DO NOT translate model names, collection codes, SKU-like tokens (e.g. BLZ-001, ABC123), numbers, carat stamps (22K, 585, 916, 750, 333, 999) or measurements — keep them exactly as-is, in place.
@@ -204,7 +391,8 @@ class AIService {
 
   /** Hata fırlatan açıklama üretimi (ürün hattı için). */
   async generateProductDescriptionStrict(title: string, category: string, language: string, keywords?: string): Promise<string> {
-    const res = await this.generateContent(
+    const res = await this.generateForPurpose(
+      'content',
       `You are a professional jewelry product description writer for an e-commerce marketplace.
 Generate a detailed, persuasive product description in ${language} for the following item.
 The description should be 2-4 sentences, covering:
@@ -224,7 +412,8 @@ Do NOT include HTML tags, markdown, or meta text. Return ONLY the description te
   }
 
   async generateProductDescription(title: string, category: string, language: string, keywords?: string): Promise<string> {
-    const res = await this.generateContent(
+    const res = await this.generateForPurpose(
+      'content',
       `You are a professional jewelry product description writer for an e-commerce marketplace. 
 Generate a detailed, persuasive product description in ${language} for the following item.
 The description should be 2-4 sentences, covering:
@@ -321,7 +510,8 @@ Do NOT include HTML tags, markdown, or meta text. Return ONLY the description te
     description: string,
     langName: string
   ): Promise<{ title: string; description: string }> {
-    const res = await this.generateContent(
+    const res = await this.generateForPurpose(
+      'translation',
       `You are an expert translator for a jewelry e-commerce site. Translate the product TITLE and DESCRIPTION to ${langName}.
 Rules for TITLE:
 - Translate the descriptive words naturally for shoppers.
@@ -372,7 +562,8 @@ Return ONLY a raw JSON object, no code fences, no extra text: {"title": "...", "
     ];
 
     const langList = languages.map(l => `${l.code}: ${l.name}`).join(', ');
-    const res = await this.generateContent(
+    const res = await this.generateForPurpose(
+      'content',
       `You are a professional jewelry product description writer for an e-commerce marketplace.
 Generate a short, persuasive product description (2-4 sentences) for EACH of the following languages: ${langList}.
 
@@ -415,9 +606,10 @@ Do NOT wrap the JSON in markdown code blocks. Return ONLY raw JSON.`,
     return result;
   }
 
-  async generateSEOMeta(productTitle: string, category: string, description: string): Promise<{ title: string, description: string }> {
-     const res = await this.generateContent(
-       `You are an SEO expert for an e-commerce jewelry store. Create a JSON object with 'title' (max 60 chars) and 'description' (max 160 chars) based on the input. Return raw JSON without markdown formatting.`,
+   async generateSEOMeta(productTitle: string, category: string, description: string): Promise<{ title: string, description: string }> {
+      const res = await this.generateForPurpose(
+        'content',
+        `You are an SEO expert for an e-commerce jewelry store. Create a JSON object with 'title' (max 60 chars) and 'description' (max 160 chars) based on the input. Return raw JSON without markdown formatting.`,
        `Title: ${productTitle}\nCategory: ${category}\nDescription: ${description}`
      );
      try {

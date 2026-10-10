@@ -24,6 +24,9 @@ export default function SettingsPage() {
     const [feedResult, setFeedResult] = useState<string | null>(null);
     const [testingAI, setTestingAI] = useState(false);
     const [aiTestResult, setAITestResult] = useState<{ success: boolean; message: string } | null>(null);
+    const [transModels, setTransModels] = useState<Array<{ provider: string; model: string; apiKey?: string }>>([]);
+    const [contentModel, setContentModel] = useState<{ provider: string; model: string; apiKey?: string }>({ provider: 'openai', model: '' });
+    const [blogModel, setBlogModel] = useState<{ provider: string; model: string; apiKey?: string }>({ provider: 'openai', model: '' });
     const [goldPrice, setGoldPrice] = useState<GoldPriceInfo | null>(null);
     const [syncResult, setSyncResult] = useState<string | null>(null);
 
@@ -94,17 +97,41 @@ export default function SettingsPage() {
         }
     };
 
+    const parseModelEntry = (raw: any): { provider: string; model: string; apiKey?: string } => {
+        try {
+            const obj = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
+            return { provider: obj.provider || 'openai', model: obj.model || '', apiKey: obj.apiKey || '' };
+        } catch {
+            return { provider: 'openai', model: '' };
+        }
+    };
+
     const fetchAISettings = async () => {
         try {
             const data = await AdminAPI.getAISettings();
             aiForm.setFieldsValue(data);
+            try {
+                const arr = typeof data.ai_translation_models === 'string'
+                    ? JSON.parse(data.ai_translation_models || '[]')
+                    : (data.ai_translation_models || []);
+                setTransModels(Array.isArray(arr) ? arr.map((m: any) => ({
+                    provider: m.provider || 'openai', model: m.model || '', apiKey: m.apiKey || ''
+                })) : []);
+            } catch { setTransModels([]); }
+            setContentModel(parseModelEntry(data.ai_content_model));
+            setBlogModel(parseModelEntry(data.ai_blog_model));
         } catch { /* noop */ }
     };
 
     const handleSaveAI = async (values: any) => {
         try {
             setSavingAI(true);
-            await AdminAPI.updateAISettings(values);
+            await AdminAPI.updateAISettings({
+                ...values,
+                ai_translation_models: JSON.stringify(transModels.filter(m => m.model.trim())),
+                ai_content_model: JSON.stringify(contentModel.model.trim() ? contentModel : {}),
+                ai_blog_model: JSON.stringify(blogModel.model.trim() ? blogModel : {}),
+            });
             message.success('AI ayarları kaydedildi!');
         } catch (error: any) {
             message.error(error.response?.data?.error || 'AI ayarları kaydedilemedi.');
@@ -426,6 +453,116 @@ export default function SettingsPage() {
                             >
                                 <Input placeholder="google/gemini-2.5-flash-image" />
                             </Form.Item>
+                        </Col>
+                    </Row>
+
+                    <Divider orientation="left">Amaca Özel Modeller</Divider>
+                    <p style={{ color: '#888', marginBottom: 16 }}>
+                        Boş bırakılan her alan genel ayarı (sağlayıcı + anahtar + model) kullanır.
+                        Çeviri listesi sırayla denenir: biri hata verirse/yavaşsa (60 sn) sonrakine geçilir.
+                    </p>
+
+                    <Card size="small" title="Çeviri Modelleri (yedek zincir)" style={{ marginBottom: 16 }}>
+                        {transModels.map((m, i) => (
+                            <Row gutter={8} key={i} style={{ marginBottom: 8 }} align="middle">
+                                <Col span={1}><b>#{i + 1}</b></Col>
+                                <Col span={5}>
+                                    <Select
+                                        value={m.provider}
+                                        style={{ width: '100%' }}
+                                        onChange={v => setTransModels(list => list.map((x, j) => j === i ? { ...x, provider: v } : x))}
+                                    >
+                                        <Select.Option value="openai">OpenAI</Select.Option>
+                                        <Select.Option value="openrouter">OpenRouter</Select.Option>
+                                        <Select.Option value="gemini">Gemini</Select.Option>
+                                    </Select>
+                                </Col>
+                                <Col span={8}>
+                                    <Input
+                                        value={m.model}
+                                        placeholder="model (örn. openai/gpt-4o-mini)"
+                                        onChange={e => setTransModels(list => list.map((x, j) => j === i ? { ...x, model: e.target.value } : x))}
+                                    />
+                                </Col>
+                                <Col span={8}>
+                                    <Input.Password
+                                        value={m.apiKey || ''}
+                                        placeholder="Özel anahtar (boş = genel anahtar)"
+                                        onChange={e => setTransModels(list => list.map((x, j) => j === i ? { ...x, apiKey: e.target.value } : x))}
+                                    />
+                                </Col>
+                                <Col span={2}>
+                                    <Button danger onClick={() => setTransModels(list => list.filter((_, j) => j !== i))}>Sil</Button>
+                                </Col>
+                            </Row>
+                        ))}
+                        <Button
+                            type="dashed"
+                            onClick={() => setTransModels(list => [...list, { provider: 'openai', model: '', apiKey: '' }])}
+                        >
+                            + Model Ekle
+                        </Button>
+                    </Card>
+
+                    <Row gutter={16}>
+                        <Col span={8}>
+                            <Card size="small" title="İçerik Modeli (açıklama üretimi)" style={{ marginBottom: 16 }}>
+                                <Select
+                                    value={contentModel.provider}
+                                    style={{ width: '100%', marginBottom: 8 }}
+                                    onChange={v => setContentModel(m => ({ ...m, provider: v }))}
+                                >
+                                    <Select.Option value="openai">OpenAI</Select.Option>
+                                    <Select.Option value="openrouter">OpenRouter</Select.Option>
+                                    <Select.Option value="gemini">Gemini</Select.Option>
+                                </Select>
+                                <Input
+                                    value={contentModel.model}
+                                    placeholder="model (boş = genel)"
+                                    style={{ marginBottom: 8 }}
+                                    onChange={e => setContentModel(m => ({ ...m, model: e.target.value }))}
+                                />
+                                <Input.Password
+                                    value={contentModel.apiKey || ''}
+                                    placeholder="Özel anahtar (boş = genel)"
+                                    onChange={e => setContentModel(m => ({ ...m, apiKey: e.target.value }))}
+                                />
+                            </Card>
+                        </Col>
+                        <Col span={8}>
+                            <Card size="small" title="Blog Modeli (taslak + çeviri)" style={{ marginBottom: 16 }}>
+                                <Select
+                                    value={blogModel.provider}
+                                    style={{ width: '100%', marginBottom: 8 }}
+                                    onChange={v => setBlogModel(m => ({ ...m, provider: v }))}
+                                >
+                                    <Select.Option value="openai">OpenAI</Select.Option>
+                                    <Select.Option value="openrouter">OpenRouter</Select.Option>
+                                    <Select.Option value="gemini">Gemini</Select.Option>
+                                </Select>
+                                <Input
+                                    value={blogModel.model}
+                                    placeholder="model (boş = genel)"
+                                    style={{ marginBottom: 8 }}
+                                    onChange={e => setBlogModel(m => ({ ...m, model: e.target.value }))}
+                                />
+                                <Input.Password
+                                    value={blogModel.apiKey || ''}
+                                    placeholder="Özel anahtar (boş = genel)"
+                                    onChange={e => setBlogModel(m => ({ ...m, apiKey: e.target.value }))}
+                                />
+                            </Card>
+                        </Col>
+                        <Col span={8}>
+                            <Card size="small" title="Kuyruk" style={{ marginBottom: 16 }}>
+                                <Form.Item
+                                    name="ai_queue_concurrency"
+                                    label="Eşzamanlı AI işi (1-10)"
+                                    tooltip="Çeviri kuyruğu kaç ürünü paralel işlesin. Değişiklik backend restart ister."
+                                >
+                                    <InputNumber min={1} max={10} style={{ width: '100%' }} placeholder="3" />
+                                </Form.Item>
+                            </Card>
                         </Col>
                     </Row>
 

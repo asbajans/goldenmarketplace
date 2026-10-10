@@ -59,6 +59,11 @@ async function syncAndSeedSettings() {
       { key: 'ai_api_key', value: '', description: 'AI Provider API Key', isPublic: false },
       { key: 'ai_model', value: 'gpt-4o-mini', description: 'AI Model (e.g. gpt-4o-mini, gemini-pro)', isPublic: true },
       { key: 'ai_image_model', value: '', description: 'AI image model for blog covers, same key (e.g. gpt-image-1, google/gemini-2.5-flash-image)', isPublic: true },
+      // Amaca özel modeller (boş = genel ai_provider/ai_api_key/ai_model kullanılır)
+      { key: 'ai_translation_models', value: '[]', description: 'Ordered fallback chain for product translations: [{provider, model, apiKey?}]', isPublic: false },
+      { key: 'ai_content_model', value: '{}', description: 'Model for product description generation: {provider, model, apiKey?}', isPublic: false },
+      { key: 'ai_blog_model', value: '{}', description: 'Model for blog draft + translations: {provider, model, apiKey?}', isPublic: false },
+      { key: 'ai_queue_concurrency', value: '3', description: 'AI translation queue parallelism 1-10 (needs restart)', isPublic: true },
       // Bank Transfer
       { key: 'bank_name', value: '', description: 'Bank Name for Wire Transfer', isPublic: true },
       { key: 'bank_iban', value: '', description: 'IBAN for Wire Transfer', isPublic: true },
