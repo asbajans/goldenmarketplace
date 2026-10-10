@@ -37,11 +37,15 @@ aiTranslationQueue.process(async (job) => {
     order: [['createdAt', 'DESC']]
   });
 
-  let taskId: string | null = null;
-  if (task) {
-    taskId = task.id;
-    await task.update({ status: 'processing', progress: 10 });
+  // Açık satır yoksa bu iş yetim/çift demektir: çeviri YAPMA, kredi
+  // DÜŞÜRME, sessizce bitir. (Aksi halde görünmez işler krediyi eritir.)
+  if (!task) {
+    return { skipped: true, productId, taskType };
   }
+
+  let taskId: string | null = null;
+  taskId = task.id;
+  await task.update({ status: 'processing', progress: 10 });
 
   try {
     let totalCredits = 0;
