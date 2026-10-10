@@ -126,9 +126,14 @@ export const CategoriesPage: React.FC = () => {
         try {
             const res = await AdminAPI.autoCategorizeProducts({ preview, onlyGeneral: bulkOnlyGeneral });
             setBulkResult(res);
-            if (!preview) message.success(`${res.updated} ürün kategorilendi`);
-        } catch (error) {
-            message.error('Toplu kategorizasyon başarısız');
+            if (!preview) {
+                message.success(`${res.updated} ürün kategorilendi`);
+            } else if (res.scanned === 0) {
+                message.info('Taranacak ürün yok — Genel/kategorisiz ürün kalmamış');
+            }
+        } catch (error: any) {
+            const serverMsg = error?.response?.data?.error;
+            message.error(typeof serverMsg === 'string' && serverMsg ? `Toplu kategorizasyon başarısız: ${serverMsg}` : 'Toplu kategorizasyon başarısız');
         } finally {
             setBulkLoading(false);
         }
