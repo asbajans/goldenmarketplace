@@ -9,6 +9,7 @@ interface ProductAITaskAttributes {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   progress?: number;
   creditsConsumed?: number;
+  jobId?: string | null;
   result?: any;
   error?: string;
   createdAt?: Date;
@@ -24,6 +25,7 @@ class ProductAITask extends Model<ProductAITaskAttributes> implements ProductAIT
   public status!: 'pending' | 'processing' | 'completed' | 'failed';
   public progress!: number;
   public creditsConsumed!: number;
+  public jobId?: string | null;
   public result?: any;
   public error?: string;
   public readonly createdAt!: Date;
@@ -65,6 +67,11 @@ ProductAITask.init(
     creditsConsumed: {
       type: DataTypes.INTEGER,
       defaultValue: 0
+    },
+    jobId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: 'Bull queue job id — DB satırı ile kuyruk işi eşleşir'
     },
     result: {
       type: DataTypes.JSONB,

@@ -306,6 +306,11 @@ app.listen(PORT, async () => {
 
     // Start AI Translation Worker (Bull processor kaydını garantiye al)
     require('./jobs/aiTranslationJob');
+    // Deploy/restart'ta ölmüş kuyruk işlerinin DB satırlarını canlandır
+    const { requeueOrphanedTasks } = require('./jobs/aiTranslationJob');
+    requeueOrphanedTasks(15)
+      .then((n: number) => { if (n > 0) logger.info(`[AI] Requeued ${n} orphaned translation task(s)`); })
+      .catch((e: any) => logger.warn(`[AI] Orphan sweep skipped: ${e?.message}`));
     
     // Start Log Cleanup Job
     const { startLogCleanupJob } = require('./jobs/logCleanupJob');

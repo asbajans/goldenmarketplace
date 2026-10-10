@@ -92,8 +92,10 @@ const AITaskProgress: React.FC<AITaskProgressProps> = ({ visible, onClose, onAll
       onCancel={onClose}
       footer={null}
       width={600}
-      closable={processing === 0}
-      maskClosable={processing === 0}
+      // İş sürerken de kapatılabilsin — izleme ürün listesindeki
+      // "AI İzle" butonundan devam eder, iş arka planda sürer.
+      closable
+      maskClosable
     >
       {initialLoading ? (
         <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>

@@ -1,4 +1,5 @@
 import Bull from 'bull';
+import { Op } from 'sequelize';
 import { Product } from '../models';
 import ProductAITask from '../models/ProductAITask';
 import aiService from '../services/aiService';
@@ -140,33 +141,72 @@ aiTranslationQueue.process(async (job) => {
   }
 });
 
+/** Bull'daki iş gerçekten yaşıyor mu (waiting/active/delayed/paused/stuck)? */
+async function isJobLive(jobId: string | null | undefined): Promise<boolean> {
+  if (!jobId) return false;
+  try {
+    const job = await aiTranslationQueue.getJob(jobId);
+    if (!job) return false;
+    const state = await job.getState().catch(() => null);
+    return state === 'active' || state === 'waiting' || state === 'delayed' || state === 'paused' || state === 'stuck';
+  } catch {
+    return false;
+  }
+}
+
+async function addJob(productId: string, userId: string, taskType: 'translate' | 'generate_content' | 'both') {
+  return aiTranslationQueue.add(
+    { productId, userId, taskType },
+    { attempts: 3, backoff: { type: 'exponential', delay: 5000 } }
+  );
+}
+
 export async function queueAITranslation(productId: string, userId: string, taskType: 'translate' | 'generate_content' | 'both' = 'both') {
   const existing = await ProductAITask.findOne({
-    where: { productId, taskType, status: ['pending', 'processing'] }
+    where: { productId, taskType, status: ['pending', 'processing'] },
+    order: [['createdAt', 'DESC']]
   });
   if (existing) {
-    // Ölü kuyrukta takılıp kalmış görevler "başarılı" izlenimi verip hiç
-    // işlemesin diye: 30 dk'yı aşmış pending görevler stale sayılır.
-    const ageMs = Date.now() - new Date(existing.createdAt).getTime();
-    if (existing.status === 'pending' && ageMs > 30 * 60 * 1000) {
-      await existing.update({
-        status: 'failed',
-        error: 'İşlem zaman aşımına uğradı (kuyrukta takıldı), tekrar kuyruğa alındı.',
-        completedAt: new Date()
-      });
-    } else {
-      return existing;
-    }
+    // Kuyrukta karşılığı varsa bekle; YOKSA (deploy/restart'ta ölen işler)
+    // eski satırı kapatıp taze iş kur — yoksa "pending" sonsuza dek sürer.
+    if (await isJobLive(existing.jobId)) return existing;
+    await existing.update({
+      status: 'failed',
+      error: 'Kuyruktaki karşılığı bulunamadı (kesintiye uğradı), işlem tekrar kuyruğa alındı.',
+      completedAt: new Date()
+    }).catch(() => undefined);
   }
 
   const task = await ProductAITask.create({ productId, userId, taskType, status: 'pending' });
 
-  await aiTranslationQueue.add(
-    { productId, userId, taskType },
-    { attempts: 3, backoff: { type: 'exponential', delay: 5000 } }
-  );
+  const job = await addJob(productId, userId, taskType);
+  await task.update({ jobId: String(job.id) } as any).catch(() => undefined);
 
   return task;
+}
+
+/**
+ * Boot + periyodik süpürme: Bull karşılığı ölmüş DB satırlarını
+ * (deploy/restart artıkları, jobId'siz eskiler dahil) yeniden kuyruğa al.
+ */
+export async function requeueOrphanedTasks(olderThanMin = 15): Promise<number> {
+  const cutoff = new Date(Date.now() - olderThanMin * 60000);
+  const stuck = await ProductAITask.findAll({
+    where: { status: ['pending', 'processing'], createdAt: { [Op.lt]: cutoff } }
+  });
+  let requeued = 0;
+  for (const t of stuck) {
+    try {
+      if (await isJobLive(t.jobId)) continue;
+      await t.update({ status: 'pending', progress: 0 });
+      const job = await addJob(t.productId, t.userId, t.taskType);
+      await t.update({ jobId: String(job.id) } as any);
+      requeued++;
+    } catch {
+      /* sonrakine geç */
+    }
+  }
+  return requeued;
 }
 
 export async function queueBatchAITranslation(productIds: string[], userId: string, taskType: 'translate' | 'generate_content' | 'both' = 'both') {
