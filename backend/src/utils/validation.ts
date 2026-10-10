@@ -69,3 +69,38 @@ export const validateRequest = (schema: Joi.Schema) => {
     next();
   };
 };
+
+/**
+ * Feed'den gelen açıklamayı düz metne çevirir.
+ * Kaynaklar (öz. Word'den kopyalanmış içerik) `<p class="MsoNormal">`,
+ * `<o:p>`, inline style/class gibi HTML artıkları içerir; sitede ham
+ * etiket olarak görünür. Yeni bağımlılık yok: blok kapanışları satır
+ * sonuna çevrilir, kalan tüm tag'ler ve yaygın entity'ler temizlenir.
+ */
+export const cleanFeedDescription = (html: unknown): string => {
+  if (html === null || html === undefined) return '';
+  let text = String(html);
+  if (!text) return '';
+
+  // Blok kapanışları ve <br> → satır sonu (metinler bitişmesin)
+  text = text.replace(/<\/(p|div|li|ul|ol|tr|table|h[1-6]|blockquote)>/gi, '\n');
+  text = text.replace(/<br\s*\/?>/gi, '\n');
+  // Tüm kalan tag'ler (MsoNormal sarmalayıcıları, o:p, span ve class/style attribute'ları dahil)
+  text = text.replace(/<[^>]*>/g, '');
+  // Yaygın HTML entity'leri
+  text = text
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&amp;/gi, '&');
+  // Satır başına boşlukları kırp, boş satırları at, çoklu boşlukları tekle
+  text = text
+    .split('\n')
+    .map((line) => line.replace(/[ \t\u00a0]+/g, ' ').replace(/^\s+|\s+$/g, ''))
+    .filter((line) => line.length > 0)
+    .join('\n');
+
+  return text;
+};

@@ -6,6 +6,7 @@ import FeedSyncLog from '../models/FeedSyncLog';
 import Product from '../models/Product';
 import Store from '../models/Store';
 import goldPriceService from './goldPriceService';
+import { cleanFeedDescription } from '../utils/validation';
 import { queueBatchAITranslation } from '../jobs/aiTranslationJob';
 import planAccessService from './planAccessService';
 
@@ -253,6 +254,12 @@ class FeedService {
             product.images.push(val.trim());
           }
         }
+      }
+
+      // Feed açıklaması Word/HTML artığı içerebilir (<p class="MsoNormal">, o:p...):
+      // DB'ye düz metin yaz, sitede ham etiket görünmesin
+      if (product.description) {
+        product.description = cleanFeedDescription(product.description);
       }
 
       // Apply pricing mode
