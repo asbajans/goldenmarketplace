@@ -1,5 +1,20 @@
 import client from './client';
 
+export interface TranslationApproval {
+  required: boolean;
+  approved?: boolean;
+  dismissed?: boolean;
+  productIds?: string[];
+  productCount?: number;
+  estimatedCredits?: number;
+  monthlyRemaining?: number;
+  balanceRemaining?: number;
+  allowed?: boolean;
+  message?: string;
+  queued?: number;
+  createdAt?: string;
+}
+
 export interface ExternalFeed {
   id: string;
   storeId: string;
@@ -19,9 +34,10 @@ export interface ExternalFeed {
   defaultQuantity?: number;
   fieldMapping?: Record<string, string>;
   autoSync: boolean;
+  autoTranslate?: boolean;
   updateInterval: 'manual' | 'hourly' | 'daily' | 'weekly';
   lastSyncAt?: string;
-  lastSyncResult?: { total: number; added: number; updated: number; failed: number; errors: string[] };
+  lastSyncResult?: { total: number; added: number; updated: number; failed: number; errors: string[]; translationApproval?: TranslationApproval };
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -61,6 +77,12 @@ export const previewFeed = (id: string, fieldMapping?: Record<string, string>) =
 
 export const syncFeed = (id: string) =>
   client.post<{ message: string }>(`/feeds/${id}/sync`).then(r => r.data);
+
+export const approveFeedTranslation = (id: string) =>
+  client.post<{ message: string; queued: number; estimatedCredits: number }>(`/feeds/${id}/translate-approve`).then(r => r.data);
+
+export const dismissFeedTranslation = (id: string) =>
+  client.post<{ message: string }>(`/feeds/${id}/translate-dismiss`).then(r => r.data);
 
 export const getFeedLogs = (id: string) =>
   client.get<{ data: FeedSyncLog[] }>(`/feeds/${id}/logs`).then(r => r.data.data);

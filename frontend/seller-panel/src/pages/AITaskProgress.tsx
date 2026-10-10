@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Modal, Progress, List, Tag, Typography, Space, Spin, Button, Popconfirm, message } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ClockCircleOutlined, StopOutlined } from '@ant-design/icons';
-import { getAITasks, cancelAITasks } from '../api/ai';
+import { getAITasks, getAITaskSummary, cancelAITasks, AITaskSummary } from '../api/ai';
 
 const { Text } = Typography;
 
@@ -42,6 +42,7 @@ const statusColor = (status: string) => {
 
 const AITaskProgress: React.FC<AITaskProgressProps> = ({ visible, onClose, onAllComplete, onQueueCleared }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [summary, setSummary] = useState<AITaskSummary>({ total: 0, pending: 0, processing: 0, completed: 0, failed: 0 });
   const [initialLoading, setInitialLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -67,10 +68,14 @@ const AITaskProgress: React.FC<AITaskProgressProps> = ({ visible, onClose, onAll
 
     const fetchTasks = async () => {
       try {
-        // Toplu kuyruklar 50'yi aşabilir; pencere tüm partiyi görmeli,
-        // yoksa erken "tamamlandı" kararı verip kapanır.
-        const data = await getAITasks(undefined, 200);
+        // Liste son 200 işi gösterir (detay için); sayılar özet endpointten
+        // gelir — 200 barajına takılmaz.
+        const [data, sum] = await Promise.all([
+          getAITasks(undefined, 200),
+          getAITaskSummary().catch(() => null),
+        ]);
         setTasks(Array.isArray(data) ? data : []);
+        if (sum) setSummary(sum);
         setInitialLoading(false);
       } catch {
         setInitialLoading(false);
@@ -86,18 +91,18 @@ const AITaskProgress: React.FC<AITaskProgressProps> = ({ visible, onClose, onAll
   }, [visible]);
 
   useEffect(() => {
-    if (!visible || tasks.length === 0) return;
-    const allDone = tasks.every(t => t.status === 'completed' || t.status === 'failed');
-    if (allDone) {
+    if (!visible) return;
+    // Tamamlanma kararı özet sayılara göre (liste 200'de kesik olabilir).
+    if (summary.total > 0 && summary.pending === 0 && summary.processing === 0) {
       if (pollingRef.current) clearInterval(pollingRef.current);
       setTimeout(onAllComplete, 2000);
     }
-  }, [tasks, visible]);
+  }, [summary, visible]);
 
-  const total = tasks.length;
-  const completed = tasks.filter(t => t.status === 'completed').length;
-  const failed = tasks.filter(t => t.status === 'failed').length;
-  const processing = tasks.filter(t => t.status === 'processing' || t.status === 'pending').length;
+  const total = summary.total;
+  const completed = summary.completed;
+  const failed = summary.failed;
+  const processing = summary.pending + summary.processing;
   const percent = total > 0 ? Math.round(((completed + failed) / total) * 100) : 0;
 
   return (
@@ -149,6 +154,7 @@ const AITaskProgress: React.FC<AITaskProgressProps> = ({ visible, onClose, onAll
             size="small"
             dataSource={tasks}
             locale={{ emptyText: 'İşlem bulunamadı' }}
+            header={total > tasks.length ? <Text type="secondary">Son {tasks.length} işlem gösteriliyor (toplam {total})</Text> : undefined}
             renderItem={(task) => (
               <List.Item>
                 <List.Item.Meta

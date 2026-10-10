@@ -10,6 +10,17 @@ export const checkoutCredits = (credits: number, provider: 'stripe' | 'bank' = '
 export const getAITasks = (status?: string, limit?: number) =>
   client.get('/ai/tasks', { params: { status, limit } }).then(res => res.data);
 
+export interface AITaskSummary {
+  total: number;
+  pending: number;
+  processing: number;
+  completed: number;
+  failed: number;
+}
+
+export const getAITaskSummary = () =>
+  client.get<AITaskSummary>('/ai/tasks/summary').then(res => res.data);
+
 export const getAIQueueStatus = () =>
   client.get('/ai/queue-status').then(res => res.data);
 

@@ -22,6 +22,7 @@ interface ExternalFeedAttributes {
   defaultMarketplaces?: string[];
   fieldMapping?: any;
   autoSync: boolean;
+  autoTranslate?: boolean;
   updateInterval: 'manual' | 'hourly' | 'daily' | 'weekly';
   lastSyncAt?: Date;
   lastSyncResult?: any;
@@ -51,6 +52,7 @@ class ExternalFeed extends Model<ExternalFeedAttributes> implements ExternalFeed
   public defaultMarketplaces?: string[];
   public fieldMapping?: any;
   public autoSync!: boolean;
+  public autoTranslate!: boolean;
   public updateInterval!: 'manual' | 'hourly' | 'daily' | 'weekly';
   public lastSyncAt?: Date;
   public lastSyncResult?: any;
@@ -154,6 +156,11 @@ ExternalFeed.init(
     autoSync: {
       type: DataTypes.BOOLEAN,
       defaultValue: false
+    },
+    autoTranslate: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      comment: 'Sync bitince AI cevirisi icin kredi hesabi yapilir, satici onaylayinca kuyruga alinir (sessiz kuyruk yok)'
     },
     updateInterval: {
       type: DataTypes.ENUM('manual', 'hourly', 'daily', 'weekly'),

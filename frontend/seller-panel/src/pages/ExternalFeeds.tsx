@@ -9,7 +9,7 @@ import {
   SettingOutlined, ThunderboltOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { getFeeds, createFeed, updateFeed, deleteFeed, testFeed, syncFeed, ExternalFeed } from '../api/externalFeeds';
+import { getFeeds, createFeed, updateFeed, deleteFeed, testFeed, syncFeed, approveFeedTranslation, dismissFeedTranslation, ExternalFeed } from '../api/externalFeeds';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -89,6 +89,7 @@ const ExternalFeeds: React.FC = () => {
       priceMultiplier: 1,
       updateInterval: 'manual',
       autoSync: false,
+      autoTranslate: false,
       isActive: true,
       defaultQuantity: 1,
       defaultIsB2BEnabled: false,
@@ -152,6 +153,32 @@ const ExternalFeeds: React.FC = () => {
       setSyncing(null);
     }
   };
+
+  const handleApproveTranslation = async (id: string) => {
+    try {
+      const res = await approveFeedTranslation(id);
+      message.success(res.message);
+      fetchFeeds();
+    } catch (err: any) {
+      const data = err?.response?.data;
+      message.error(data?.error || 'Çeviri başlatılamadı');
+      fetchFeeds();
+    }
+  };
+
+  const handleDismissTranslation = async (id: string) => {
+    try {
+      await dismissFeedTranslation(id);
+      message.info('Çeviri onayı kapatıldı');
+      fetchFeeds();
+    } catch {
+      message.error('İşlem başarısız');
+    }
+  };
+
+  const pendingApprovals = feeds.filter(
+    f => f.lastSyncResult?.translationApproval?.required && !f.lastSyncResult.translationApproval.approved
+  );
 
   const handleSave = async () => {
     const values = await form.validateFields();
@@ -244,6 +271,13 @@ const ExternalFeeds: React.FC = () => {
       dataIndex: 'autoSync',
       key: 'autoSync',
       render: (val: boolean) => val ? <Tag color="green">Açık</Tag> : <Tag>Kapalı</Tag>,
+      width: 90
+    },
+    {
+      title: 'AI Çeviri',
+      dataIndex: 'autoTranslate',
+      key: 'autoTranslate',
+      render: (val: boolean) => val ? <Tag color="purple">Onaylı</Tag> : <Tag>Kapalı</Tag>,
       width: 90
     },
     {
@@ -550,6 +584,18 @@ const ExternalFeeds: React.FC = () => {
             </Form.Item>
           </Col>
         </Row>
+        <Row gutter={16}>
+          <Col span={24}>
+            <Form.Item
+              name="autoTranslate"
+              label="Otomatik AI Çevirisi"
+              valuePropName="checked"
+              tooltip="Açıksa sync bitince gerekli kredi hesaplanır; çeviri ancak sen onaylayınca başlar. Kapalıysa çeviri hiç kuyruğa girmez."
+            >
+              <Switch />
+            </Form.Item>
+          </Col>
+        </Row>
       </Card>
     </div>
   ];
@@ -562,6 +608,44 @@ const ExternalFeeds: React.FC = () => {
       </div>
 
       <Card>
+        {pendingApprovals.length > 0 && (
+          <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }}>
+            {pendingApprovals.map(f => {
+              const ap = f.lastSyncResult!.translationApproval!;
+              return (
+                <Alert
+                  key={f.id}
+                  type={ap.allowed ? 'info' : 'warning'}
+                  showIcon
+                  message={`${f.name || 'Feed'}: AI çevirisi onay bekliyor`}
+                  description={
+                    <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                      <span>
+                        {ap.productCount || (ap.productIds || []).length} ürün için tahmini{' '}
+                        <b>{ap.estimatedCredits} kredi</b> gerekli
+                        (aylık kalan: {ap.monthlyRemaining ?? 0}, bakiye: {ap.balanceRemaining ?? 0}).
+                        {!ap.allowed && ` ${ap.message || 'Kredi yetersiz.'}`}
+                      </span>
+                      <Space>
+                        <Button
+                          size="small"
+                          type="primary"
+                          disabled={!ap.allowed}
+                          onClick={() => handleApproveTranslation(f.id)}
+                        >
+                          Onayla ve Başlat
+                        </Button>
+                        <Button size="small" onClick={() => handleDismissTranslation(f.id)}>
+                          Vazgeç
+                        </Button>
+                      </Space>
+                    </Space>
+                  }
+                />
+              );
+            })}
+          </Space>
+        )}
         <Table
           dataSource={feeds}
           columns={columns}

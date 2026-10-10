@@ -153,6 +153,28 @@ export class AIController {
     }
   }
 
+  /** Satıcının AI task sayıları (izleme ekranı listeyi değil sayıları gösterir). */
+  static async taskSummary(req: Request, res: Response) {
+    try {
+      const userId = (req as any).user.id;
+      const rows = await ProductAITask.findAll({
+        where: { userId },
+        attributes: ['status', [require('sequelize').fn('COUNT', require('sequelize').col('id')), 'count']],
+        group: ['status'],
+        raw: true
+      }) as any[];
+      const summary: Record<string, number> = { total: 0, pending: 0, processing: 0, completed: 0, failed: 0 };
+      for (const r of rows) {
+        const n = Number(r.count) || 0;
+        if (summary[r.status] !== undefined) summary[r.status] = n;
+        summary.total += n;
+      }
+      return res.json(summary);
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
   /** Kuyruk sağlığı: Portainer'sız teşhis için bekleyen/işlenen/hatalı sayıları. */
   static async queueStatus(_req: Request, res: Response) {
     try {

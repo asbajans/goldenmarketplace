@@ -7,7 +7,6 @@ import Product from '../models/Product';
 import Store from '../models/Store';
 import goldPriceService from './goldPriceService';
 import { cleanFeedDescription } from '../utils/validation';
-import { queueBatchAITranslation } from '../jobs/aiTranslationJob';
 import planAccessService from './planAccessService';
 
 interface MappedProduct {
@@ -36,6 +35,15 @@ interface SyncResult {
   skipped: number;
   errors: string[];
   aiQueued?: number;
+  translationApproval?: {
+    required: boolean;
+    productCount: number;
+    estimatedCredits: number;
+    monthlyRemaining: number;
+    balanceRemaining: number;
+    allowed: boolean;
+    message: string;
+  };
 }
 
 class FeedService {
@@ -359,6 +367,9 @@ class FeedService {
     });
 
     const result: SyncResult = { total: 0, added: 0, updated: 0, skipped: 0, failed: 0, errors: [] };
+    // Bu sync'te dokunulan ürün ID'leri + AI kredi tahmini (try dışında da lazım: onay state'i)
+    const syncedProductIds: string[] = [];
+    let estimatedCredits = 0;
 
     try {
       // 1. Fetch
@@ -385,7 +396,7 @@ class FeedService {
         mappedProducts = await this.calculateGoldPrices(mappedProducts);
       }
 
-      // 5. Upsert by SKU
+      // 5. Upsert by SKU (sync'lenen ürün ID'leri + kredi tahmini burada toplanır)
       for (const prod of mappedProducts) {
         try {
           if (!prod.title || !prod.sku) {
@@ -430,10 +441,16 @@ class FeedService {
           if (existingProduct) {
             await existingProduct.update(productData);
             result.updated++;
+            syncedProductIds.push(existingProduct.id);
           } else {
-            await Product.create(productData as any);
+            const created = await Product.create(productData as any);
             result.added++;
+            syncedProductIds.push((created as any).id);
           }
+          // Kredi tahmini (AI job ile aynı kural): açıklama yoksa/kısaysa
+          // içerik üretimi (1) + çeviri (1) = 2 kredi, yoksa 1 kredi
+          const desc = String(prod.description || '');
+          estimatedCredits += (!desc || desc.length < 50) ? 2 : 1;
         } catch (err: any) {
           result.failed++;
           result.errors.push(`SKU ${prod.sku}: ${err.message}`);
@@ -450,30 +467,40 @@ class FeedService {
       await feed.update({ lastSyncResult: result });
     }
 
-    // Trigger AI translation for synced products (non-blocking)
+    // AI çevirisi: sessiz kuyruk YOK. Feed'de autoTranslate açıksa kredi
+    // hesabı yapılıp onay state'i saklanır; satıcı onaylayınca başlar.
     try {
-      if (result.added > 0 || result.updated > 0) {
+      if (feed.autoTranslate && syncedProductIds.length > 0) {
         const store = await Store.findByPk(feed.storeId);
         if (store) {
-          const access = await planAccessService.checkAIAccess(store.userId, 1);
-          if (access.allowed) {
-            const syncedProducts = await Product.findAll({
-              where: { feedSourceId: feed.id },
-              attributes: ['id'],
-              order: [['createdAt', 'DESC']],
-              limit: result.added + result.updated
-            });
-            const productIds = syncedProducts.map(p => p.id);
-            if (productIds.length > 0) {
-              await queueBatchAITranslation(productIds, store.userId, 'both');
-              result.aiQueued = productIds.length;
-            }
-          }
+          const access = await planAccessService.checkAIAccess(store.userId, estimatedCredits);
+          const approval = {
+            required: true,
+            approved: false,
+            productIds: syncedProductIds,
+            estimatedCredits,
+            monthlyRemaining: (access as any).monthlyRemaining ?? 0,
+            balanceRemaining: (access as any).balanceRemaining ?? 0,
+            allowed: access.allowed,
+            message: access.message || '',
+            createdAt: new Date().toISOString()
+          };
+          (result as any).translationApproval = {
+            required: true,
+            productCount: syncedProductIds.length,
+            estimatedCredits,
+            monthlyRemaining: (approval as any).monthlyRemaining,
+            balanceRemaining: (approval as any).balanceRemaining,
+            allowed: access.allowed,
+            message: access.message || ''
+          };
+          const prevResult = (feed.lastSyncResult as any) || {};
+          await feed.update({ lastSyncResult: { ...prevResult, ...result, translationApproval: approval } });
         }
       }
     } catch (e) {
-      // AI queue is best-effort
-      console.error('[FeedSync] Failed to queue AI tasks:', e);
+      // Kredi hesabı best-effort
+      console.error('[FeedSync] Failed to prepare translation approval:', e);
     }
 
     return result;
