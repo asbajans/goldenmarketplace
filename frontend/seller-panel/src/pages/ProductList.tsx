@@ -160,6 +160,19 @@ const ProductList: React.FC = () => {
         fetchProducts();
     }, []);
 
+    const handleQueueCleared = useCallback(() => {
+        aiDoneRef.current = true;
+        setAiWatching(false);
+        setAiActiveCount(0);
+        setAiProgressVisible(false);
+        notification.info({
+            message: 'Kuyruk temizlendi',
+            description: 'Bekleyen işlemler iptal edildi. Çevirisi biten ürünler duruyor; kalanları yeniden seçip çevirebilirsin.',
+            duration: 6
+        });
+        fetchProducts();
+    }, []);
+
     // İzleme modu açıkken kuyruğu yokla: bitince bildir + butonu geri çevir.
     // (İlerleme penceresi kapalı olsa bile çalışır.)
     useEffect(() => {
@@ -524,6 +537,7 @@ const ProductList: React.FC = () => {
                 visible={aiProgressVisible}
                 onClose={() => setAiProgressVisible(false)}
                 onAllComplete={handleAIDone}
+                onQueueCleared={handleQueueCleared}
             />
         </div>
     );

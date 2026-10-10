@@ -164,6 +164,18 @@ export class AIController {
     }
   }
 
+  /** Satıcının bekleyen tüm AI işlerini iptal et (kuyruğu temizle). */
+  static async cancelMyTasks(req: Request, res: Response) {
+    try {
+      const userId = (req as any).user.id;
+      const { cancelUserTasks } = await import('../jobs/aiTranslationJob');
+      const cancelled = await cancelUserTasks(userId);
+      return res.json({ success: true, cancelled });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message || 'İptal başarısız' });
+    }
+  }
+
   // ─── Credits ───
 
   static async getCreditBalance(req: Request, res: Response) {

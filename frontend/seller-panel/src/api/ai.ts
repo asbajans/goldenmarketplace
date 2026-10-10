@@ -13,6 +13,9 @@ export const getAITasks = (status?: string, limit?: number) =>
 export const getAIQueueStatus = () =>
   client.get('/ai/queue-status').then(res => res.data);
 
+export const cancelAITasks = () =>
+  client.post('/ai/tasks/cancel').then(res => res.data);
+
 export const translateProduct = (id: string) =>
   client.post(`/ai/products/${id}/translate`).then(res => res.data);
 

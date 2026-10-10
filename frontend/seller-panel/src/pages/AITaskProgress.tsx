@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Modal, Progress, List, Tag, Typography, Space, Spin } from 'antd';
-import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ClockCircleOutlined } from '@ant-design/icons';
-import { getAITasks } from '../api/ai';
+import { Modal, Progress, List, Tag, Typography, Space, Spin, Button, Popconfirm, message } from 'antd';
+import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ClockCircleOutlined, StopOutlined } from '@ant-design/icons';
+import { getAITasks, cancelAITasks } from '../api/ai';
 
 const { Text } = Typography;
 
@@ -19,6 +19,7 @@ interface AITaskProgressProps {
   visible: boolean;
   onClose: () => void;
   onAllComplete: () => void;
+  onQueueCleared?: () => void;
 }
 
 const statusIcon = (status: string) => {
@@ -39,10 +40,24 @@ const statusColor = (status: string) => {
   }
 };
 
-const AITaskProgress: React.FC<AITaskProgressProps> = ({ visible, onClose, onAllComplete }) => {
+const AITaskProgress: React.FC<AITaskProgressProps> = ({ visible, onClose, onAllComplete, onQueueCleared }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const handleClearQueue = async () => {
+    setCancelling(true);
+    try {
+      const res = await cancelAITasks();
+      message.info(`${res.cancelled || 0} bekleyen işlem iptal edildi`);
+      onQueueCleared?.();
+    } catch {
+      message.error('Kuyruk temizlenemedi');
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   useEffect(() => {
     if (!visible) {
@@ -113,6 +128,21 @@ const AITaskProgress: React.FC<AITaskProgressProps> = ({ visible, onClose, onAll
               {failed > 0 && <Tag color="red">{failed} başarısız</Tag>}
               {processing > 0 && <Tag color="blue">{processing} işleniyor</Tag>}
             </Space>
+            {processing > 0 && (
+              <div style={{ textAlign: 'center', marginTop: 8 }}>
+                <Popconfirm
+                  title="Kuyruk temizlensin mi?"
+                  description="Bekleyen tüm işlemler iptal edilir. Bitenler durur, kalanları yeniden seçip çevirebilirsin."
+                  okText="Evet, Temizle"
+                  cancelText="Vazgeç"
+                  onConfirm={handleClearQueue}
+                >
+                  <Button size="small" danger icon={<StopOutlined />} loading={cancelling}>
+                    Kuyruğu Temizle
+                  </Button>
+                </Popconfirm>
+              </div>
+            )}
           </div>
 
           <List
@@ -131,7 +161,9 @@ const AITaskProgress: React.FC<AITaskProgressProps> = ({ visible, onClose, onAll
                   }
                   description={
                     task.status === 'failed'
-                      ? <Text type="danger">{task.error || 'Bilinmeyen hata'}</Text>
+                      ? (task.error || '').includes('iptal')
+                        ? <Text type="secondary">İptal edildi</Text>
+                        : <Text type="danger">{task.error || 'Bilinmeyen hata'}</Text>
                       : task.status === 'processing'
                         ? <Text type="secondary">İşleniyor... (%{task.progress || 0})</Text>
                         : task.status === 'completed'

@@ -186,7 +186,46 @@ export async function queueAITranslation(productId: string, userId: string, task
 }
 
 /**
- * Boot + periyodik süpürme: Bull karşılığı ölmüş DB satırlarını
+ * Satıcının bekleyen/işlenen TÜM işlerini iptal et (kuyruğu temizle).
+ * Bull karşılığı silinir, DB satırı "iptal edildi" olarak kapatılır.
+ * Bitmiş işlere dokunulmaz; kredi yalnızca gerçekten işlenene düşer
+ * (iptal edilenlerden kredi gitmez).
+ */
+export async function cancelUserTasks(userId: string): Promise<number> {
+  const open = await ProductAITask.findAll({
+    where: { userId, status: ['pending', 'processing'] }
+  });
+  let cancelled = 0;
+  for (const t of open) {
+    try {
+      if (t.jobId) {
+        const job = await aiTranslationQueue.getJob(t.jobId).catch(() => null);
+        // Aktif iş bitmek üzeredir — zorla öldürme, kendi haline bırak
+        // (bitince sonucunu kaydeder); sadece kuyruktakileri düşür.
+        if (job) {
+          const state = await job.getState().catch(() => null);
+          if (state === 'waiting' || state === 'delayed' || state === 'paused') {
+            await job.remove().catch(() => undefined);
+          } else {
+            continue;
+          }
+        }
+      }
+      await t.update({
+        status: 'failed',
+        error: 'Satıcı tarafından iptal edildi.',
+        completedAt: new Date()
+      });
+      cancelled++;
+    } catch {
+      /* sonrakine geç */
+    }
+  }
+  return cancelled;
+}
+
+/**
+ * Boot süpürmesi: Bull karşılığı ölmüş DB satırlarını
  * (deploy/restart artıkları, jobId'siz eskiler dahil) yeniden kuyruğa al.
  */
 export async function requeueOrphanedTasks(olderThanMin = 15): Promise<number> {

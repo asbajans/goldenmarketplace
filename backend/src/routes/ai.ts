@@ -27,6 +27,9 @@ router.post('/cleanup-descriptions', authMiddleware, AIController.cleanupDescrip
 // Seller AI task list
 router.get('/tasks', authMiddleware, AIController.listAITasks);
 
+// Cancel my pending AI tasks (flush queue)
+router.post('/tasks/cancel', authMiddleware, AIController.cancelMyTasks);
+
 // Queue health (waiting/active/delayed/failed counts)
 router.get('/queue-status', authMiddleware, AIController.queueStatus);
 
