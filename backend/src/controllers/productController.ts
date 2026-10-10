@@ -119,7 +119,7 @@ export class ProductController {
         isB2BEnabled, b2bDiscount, discountRate,
         hasVariants, variantAttributes, variants,
         translations, defaultLanguage = 'en',
-        gender, ageGroup, color
+        gender, ageGroup, color, pricingType, priceTRY: fixedPriceTRY, priceUSD: fixedPriceUSD
       } = req.body;
 
       let feedGender: string | null = null;
@@ -133,21 +133,29 @@ export class ProductController {
         return res.status(400).json({ error: { message: feedErr.message, status: 400 } });
       }
 
-      // Validate required gold fields
-      if (!gramWeight || gramWeight <= 0) {
-        return res.status(400).json({
-          error: { message: 'Gram ağırlığı zorunludur ve 0\'dan büyük olmalıdır.', status: 400 }
-        });
+      // Validate required gold fields (fixed-price products may omit gram/milyem)
+      const isFixedPrice = pricingType === 'fixed' || (!gramWeight && Number(fixedPriceTRY) > 0);
+      if (isFixedPrice) {
+        if (!fixedPriceTRY || Number(fixedPriceTRY) <= 0) {
+          return res.status(400).json({
+            error: { message: 'Sabit fiyatlı üründe priceTRY zorunludur.', status: 400 }
+          });
+        }
+      } else {
+        if (!gramWeight || gramWeight <= 0) {
+          return res.status(400).json({
+            error: { message: 'Gram ağırlığı zorunludur ve 0\'dan büyük olmalıdır.', status: 400 }
+          });
+        }
+        if (!milyem || milyem <= 0 || milyem > 1000) {
+          return res.status(400).json({
+            error: { message: 'Geçerli bir milyem değeri giriniz (1-1000).', status: 400 }
+          });
+        }
       }
-      if (!milyem || milyem <= 0 || milyem > 1000) {
-        return res.status(400).json({
-          error: { message: 'Geçerli bir milyem değeri giriniz (1-1000).', status: 400 }
-        });
-      }
-
       // effectiveMilyem must be >= milyem if provided
-      const finalEffectiveMilyem = effectiveMilyem && effectiveMilyem >= milyem ? effectiveMilyem : milyem;
-      const gramHas = Math.round(gramWeight * (finalEffectiveMilyem / 1000) * 10000) / 10000;
+      const finalEffectiveMilyem = !isFixedPrice && effectiveMilyem && effectiveMilyem >= milyem ? effectiveMilyem : (isFixedPrice ? null : milyem);
+      const gramHas = !isFixedPrice && gramWeight ? Math.round(gramWeight * (finalEffectiveMilyem / 1000) * 10000) / 10000 : null;
 
       // Find store for current user
       const store = await Store.findOne({ where: { userId: (req as any).user.id } });
@@ -173,8 +181,23 @@ export class ProductController {
       }
 
       // Calculate prices from gram + effectiveMilyem + profit margin + price multiplier
+      // (fixed-price products keep their feed/manual price, no gold formula)
       const finalPriceMultiplier = priceMultiplier || 1;
-      const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(gramWeight, finalEffectiveMilyem, profitMargin || 0, finalPriceMultiplier);
+      let priceTRY: number;
+      let priceUSD: number;
+      if (isFixedPrice) {
+        priceTRY = Math.round(Number(fixedPriceTRY) * 100) / 100;
+        if (fixedPriceUSD && Number(fixedPriceUSD) > 0) {
+          priceUSD = Math.round(Number(fixedPriceUSD) * 100) / 100;
+        } else {
+          const currentGold = await goldPriceService.getCurrentGoldPrice();
+          priceUSD = Math.round((priceTRY / currentGold.usdTryRate) * 100) / 100;
+        }
+      } else {
+        const calc = await goldPriceService.calculateProductPrice(gramWeight, finalEffectiveMilyem, profitMargin || 0, finalPriceMultiplier);
+        priceTRY = calc.priceTRY;
+        priceUSD = calc.priceUSD;
+      }
 
       // Handle B2B fields
       const finalB2bDiscount = isB2BEnabled ? (b2bDiscount || 0) : 0;
@@ -207,8 +230,10 @@ export class ProductController {
         // @ts-ignore - defaultLanguage field added via migration
         defaultLanguage: defaultLanguage || 'en',
         sku,
-        gramWeight,
-        milyem,
+        gramWeight: isFixedPrice ? null : gramWeight,
+        milyem: isFixedPrice ? null : milyem,
+        // @ts-ignore - pricingType added via migration
+        pricingType: isFixedPrice ? 'fixed' : 'gold',
         effectiveMilyem: finalEffectiveMilyem,
         gramHas,
         profitMargin: profitMargin || 0,
@@ -311,7 +336,7 @@ export class ProductController {
       const {
         title, description, category, categoryId, quantity,
         images, videoUrl, marketplaces, marketplaceConfig, gramWeight, milyem, effectiveMilyem, profitMargin, priceMultiplier,
-        isB2BEnabled, b2bDiscount, discountRate,
+        isB2BEnabled, b2bDiscount, discountRate, pricingType, priceTRY: bodyPriceTRY, priceUSD: bodyPriceUSD,
         hasVariants, variantAttributes, variants,
         translations, defaultLanguage,
         gender, ageGroup, color
@@ -354,11 +379,15 @@ export class ProductController {
       let finalPriceTRY, finalPriceUSD, finalB2bPrice;
       const finalProfitMargin = profitMargin !== undefined ? profitMargin : product.profitMargin;
       const finalPriceMultiplier = priceMultiplier !== undefined ? priceMultiplier : product.priceMultiplier;
-      const finalGramWeight = isCloned ? product.gramWeight : (gramWeight || product.gramWeight);
-      const finalMilyem = isCloned ? product.milyem : (milyem || product.milyem);
+      const finalPricingType = isCloned ? (product as any).pricingType : (pricingType || (product as any).pricingType || 'gold');
+      const isFixedUpdate = finalPricingType === 'fixed';
+      const finalGramWeight = isCloned ? product.gramWeight : (gramWeight !== undefined ? (gramWeight || null) : product.gramWeight);
+      const finalMilyem = isCloned ? product.milyem : (milyem !== undefined ? (milyem || null) : product.milyem);
       const rawEffective = isCloned ? product.effectiveMilyem : (effectiveMilyem || product.effectiveMilyem);
-      const finalEffectiveMilyem = rawEffective && rawEffective >= finalMilyem ? rawEffective : finalMilyem;
-      const finalGramHas = Math.round(finalGramWeight * (finalEffectiveMilyem / 1000) * 10000) / 10000;
+      const finalEffectiveMilyem = isFixedUpdate ? null : (rawEffective && finalMilyem && rawEffective >= finalMilyem ? rawEffective : finalMilyem);
+      const finalGramHas = !isFixedUpdate && finalGramWeight && finalEffectiveMilyem
+        ? Math.round(Number(finalGramWeight) * (Number(finalEffectiveMilyem) / 1000) * 10000) / 10000
+        : null;
       
       if (isCloned && product.originalProductId) {
          const parent = await Product.findByPk(product.originalProductId);
@@ -372,10 +401,24 @@ export class ProductController {
             );
             finalPriceTRY = priceTRY;
          }
-         const currentGold = await goldPriceService.getCurrentGoldPrice();
-         finalPriceUSD = Math.round((finalPriceTRY / currentGold.usdTryRate) * 100) / 100;
-         finalB2bPrice = 0;
-       } else {
+          const currentGold = await goldPriceService.getCurrentGoldPrice();
+          finalPriceUSD = Math.round((finalPriceTRY / currentGold.usdTryRate) * 100) / 100;
+          finalB2bPrice = 0;
+        } else if (!isCloned && isFixedUpdate) {
+         // Sabit fiyatlı ürün: altın formülü çalıştırma, mevcut fiyatı koru (body'de yeni fiyat varsa onu kullan)
+         finalPriceTRY = bodyPriceTRY !== undefined ? Math.round(Number(bodyPriceTRY) * 100) / 100 : Number(product.priceTRY);
+         if (bodyPriceUSD !== undefined && Number(bodyPriceUSD) > 0) {
+           finalPriceUSD = Math.round(Number(bodyPriceUSD) * 100) / 100;
+         } else if (bodyPriceTRY !== undefined) {
+           const currentGold = await goldPriceService.getCurrentGoldPrice();
+           finalPriceUSD = Math.round((finalPriceTRY / currentGold.usdTryRate) * 100) / 100;
+         } else {
+           finalPriceUSD = Number(product.priceUSD);
+         }
+         const fixedB2BEnabled = isB2BEnabled !== undefined ? !!isB2BEnabled : product.isB2BEnabled;
+         const fixedB2bDiscount = b2bDiscount !== undefined ? b2bDiscount : product.b2bDiscount;
+         finalB2bPrice = Math.round(finalPriceTRY * (1 - (fixedB2BEnabled ? fixedB2bDiscount : 0) / 100) * 100) / 100;
+        } else {
         const calcRes = await goldPriceService.calculateProductPrice(
           Number(finalGramWeight), Number(finalEffectiveMilyem), Number(finalProfitMargin), Number(finalPriceMultiplier)
         );
@@ -424,6 +467,8 @@ export class ProductController {
         categoryId: isCloned ? product.categoryId : (categoryId !== undefined ? categoryId : product.categoryId),
         gramWeight: finalGramWeight,
         milyem: finalMilyem,
+        // @ts-ignore - pricingType added via migration
+        pricingType: finalPricingType,
         effectiveMilyem: finalEffectiveMilyem,
         gramHas: finalGramHas,
         profitMargin: finalProfitMargin,
@@ -457,6 +502,22 @@ export class ProductController {
         await ProductVariant.destroy({ where: { productId: id } });
         if (variants.length > 0) {
             const variantRecords = await Promise.all(variants.map(async (v: any) => {
+               if (isFixedUpdate) {
+                 const vPriceTRY = v.priceTRY ? Math.round(Number(v.priceTRY) * 100) / 100 : Number(finalPriceTRY);
+                 const vPriceUSD = v.priceUSD ? Math.round(Number(v.priceUSD) * 100) / 100 : Number(finalPriceUSD);
+                 const vB2BPrice = finalIsB2BEnabled ? Math.round(vPriceTRY * (1 - finalB2bDiscount / 100) * 100) / 100 : 0;
+                 return {
+                    productId: product.id,
+                    sku: v.sku || `${product.sku}-${Math.floor(Math.random() * 10000)}`,
+                    attributes: v.attributes || {},
+                    gramWeight: v.gramWeight || finalGramWeight || 0,
+                    quantity: v.quantity || 0,
+                    priceTRY: vPriceTRY,
+                    priceUSD: vPriceUSD,
+                    b2bPrice: vB2BPrice,
+                    isActive: true
+                 };
+               }
                const vFinalEffectiveMilyem = v.effectiveMilyem && v.effectiveMilyem >= finalMilyem ? v.effectiveMilyem : finalMilyem;
                const vPriceData = await goldPriceService.calculateProductPrice(v.gramWeight || finalGramWeight, vFinalEffectiveMilyem, finalProfitMargin);
                const vB2BPrice = finalIsB2BEnabled ? Math.round(vPriceData.priceTRY * (1 - finalB2bDiscount / 100) * 100) / 100 : 0;
@@ -726,11 +787,11 @@ export class ProductController {
                       clonedVariant = allParentVariants.find(v => JSON.stringify(v.attributes) === JSON.stringify(variant.attributes)) || null;
                   }
 
-                  if (clonedVariant) {
+                   if (clonedVariant) {
                        const priceTRY = Math.round(clonedVariant.priceTRY * (1 + (clone.profitMargin || 0) / 100) * 100) / 100;
                        const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
                        await variant.update({ priceTRY, priceUSD });
-                  } else {
+                   } else {
                        const priceTRY = Math.round(parent.priceTRY * (1 + (clone.profitMargin || 0) / 100) * 100) / 100;
                        const priceUSD = Math.round((priceTRY / gold.usdTryRate) * 100) / 100;
                        await variant.update({ priceTRY, priceUSD });

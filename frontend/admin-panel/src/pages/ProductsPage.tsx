@@ -88,13 +88,13 @@ export const ProductsPage: React.FC = () => {
         { title: 'Ürün Adı', dataIndex: 'title', key: 'title' },
         { title: 'Kategori', dataIndex: 'category', key: 'category', width: 120 },
         { title: 'Mağaza', key: 'store', render: (_: any, record: any) => record.store?.storeName || record.store?.name || 'Bilinmiyor' },
-        { title: 'Gram', dataIndex: 'gramWeight', key: 'gramWeight', render: (val: number) => `${val} gr` },
+        { title: 'Gram', dataIndex: 'gramWeight', key: 'gramWeight', render: (val: number | null) => val ? `${val} gr` : <span style={{ color: '#bbb' }}>—</span> },
         { 
             title: 'Milyem', 
             key: 'milyem', 
             render: (_: any, record: any) => (
                 <Space direction="vertical" size="small" style={{ lineHeight: '1.2' }}>
-                    <span style={{ fontSize: 12 }}>Alaşım: <b>{record.milyem}</b></span>
+                    <span style={{ fontSize: 12 }}>Alaşım: <b>{record.milyem || '—'}</b></span>
                     {record.effectiveMilyem && <span style={{ fontSize: 12, color: '#d4a017' }}>Efektif: <b>{record.effectiveMilyem}</b></span>}
                 </Space>
             )

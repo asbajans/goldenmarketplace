@@ -392,6 +392,9 @@ class FeedService {
             where: { sku: prod.sku as string, storeId: feed.storeId }
           });
 
+          const hasGram = prod.gramWeight !== undefined && prod.gramWeight !== null && Number(prod.gramWeight) > 0;
+          const isFixedPrice = feed.pricingMode === 'fixed' && !hasGram;
+
           const productData: any = {
             storeId: feed.storeId,
             title: prod.title,
@@ -400,8 +403,10 @@ class FeedService {
             category: prod.category || feed.defaultCategory || 'Genel',
             categoryId: prod.categoryId || feed.defaultCategoryId || undefined,
             sku: prod.sku,
-            gramWeight: prod.gramWeight || 1,
-            milyem: prod.milyem || 585,
+            // Gramsız + sabit fiyatlı üründe sahte "1 gr" yazma: NULL tut, frontend gizler
+            gramWeight: hasGram ? Number(prod.gramWeight) : null,
+            milyem: prod.milyem ? Number(prod.milyem) : (hasGram ? 585 : null),
+            pricingType: isFixedPrice ? 'fixed' : 'gold',
             profitMargin: prod.profitMargin || 0,
             priceMultiplier: prod.priceMultiplier || feed.priceMultiplier || 1,
             priceTRY: prod.priceTRY || 0,

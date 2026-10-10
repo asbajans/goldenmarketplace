@@ -16,10 +16,11 @@ interface ProductAttributes {
   category: string;
   categoryId?: string;
   sku: string;
-  gramWeight: number;
-  milyem: number;
-  effectiveMilyem?: number;
-  gramHas?: number;
+  gramWeight: number | null;
+  milyem: number | null;
+  pricingType?: 'gold' | 'fixed';
+  effectiveMilyem?: number | null;
+  gramHas?: number | null;
   profitMargin: number;
   priceMultiplier?: number;
   priceTRY: number;
@@ -62,10 +63,11 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public translations?: any;
   public defaultLanguage?: string;
   public sku!: string;
-  public gramWeight!: number;
-  public milyem!: number;
-  public effectiveMilyem?: number;
-  public gramHas?: number;
+  public gramWeight!: number | null;
+  public milyem!: number | null;
+  public pricingType!: 'gold' | 'fixed';
+  public effectiveMilyem?: number | null;
+  public gramHas?: number | null;
   public profitMargin!: number;
   public priceMultiplier!: number;
   public priceTRY!: number;
@@ -154,13 +156,21 @@ Product.init(
     },
     gramWeight: {
       type: DataTypes.DECIMAL(15, 4),
-      allowNull: false,
-      comment: 'Product weight in grams'
+      allowNull: true,
+      defaultValue: null,
+      comment: 'Product weight in grams. NULL = unknown/fixed-price product, do NOT display gram info'
     },
     milyem: {
       type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: null,
+      comment: 'Gold fineness of the alloy (333=8K, 585=14K, 750=18K, 916=22K, 999=24K). NULL when gram unknown.'
+    },
+    pricingType: {
+      type: DataTypes.ENUM('gold', 'fixed'),
       allowNull: false,
-      comment: 'Gold fineness of the alloy (333=8K, 585=14K, 750=18K, 916=22K, 999=24K)'
+      defaultValue: 'gold',
+      comment: 'gold = gram x milyem formula pricing, fixed = feed/manual fixed price without gram info'
     },
     effectiveMilyem: {
       type: DataTypes.INTEGER,

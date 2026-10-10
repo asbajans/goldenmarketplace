@@ -164,8 +164,12 @@ export class GoldPriceService {
     const nonClones = syncableProducts.filter((p: any) => !p.originalProductId);
     const clones = syncableProducts.filter((p: any) => !!p.originalProductId);
 
-    // Update original products first
+    // Update original products first (fixed-price products without gram are skipped:
+    // their price comes from the feed, not the gold formula)
     for (const product of nonClones) {
+      if ((product as any).pricingType === 'fixed' || !product.gramWeight || !product.milyem) {
+        continue;
+      }
       const usedMilyem = Number(product.effectiveMilyem || product.milyem);
       const { priceTRY } = this.calculatePrice(
         Number(product.gramWeight),

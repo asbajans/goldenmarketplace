@@ -425,12 +425,20 @@ export class AdminController {
             }
 
             const goldPriceService = require('../services/goldPriceService').default;
+            const isFixedAdmin = (product as any).pricingType === 'fixed';
             const finalMilyem = milyem ?? product.milyem;
-            const finalEffective = (effectiveMilyem && effectiveMilyem >= finalMilyem) ? effectiveMilyem : finalMilyem;
+            const finalEffective = !isFixedAdmin && (effectiveMilyem && finalMilyem && effectiveMilyem >= finalMilyem) ? effectiveMilyem : (isFixedAdmin ? null : finalMilyem);
             const finalGram = gramWeight ?? product.gramWeight;
             const finalMargin = profitMargin ?? product.profitMargin;
-            const gramHas = Math.round(finalGram * (finalEffective / 1000) * 10000) / 10000;
-            const { priceTRY, priceUSD } = await goldPriceService.calculateProductPrice(finalGram, finalEffective, finalMargin);
+            let gramHas: number | null = null;
+            let priceTRY: number = Number(product.priceTRY);
+            let priceUSD: number = Number(product.priceUSD);
+            if (!isFixedAdmin && finalGram && finalEffective) {
+              gramHas = Math.round(Number(finalGram) * (Number(finalEffective) / 1000) * 10000) / 10000;
+              const calc = await goldPriceService.calculateProductPrice(Number(finalGram), Number(finalEffective), finalMargin);
+              priceTRY = calc.priceTRY;
+              priceUSD = calc.priceUSD;
+            }
             const finalIsB2B = isB2BEnabled !== undefined ? !!isB2BEnabled : product.isB2BEnabled;
             const finalDiscount = b2bDiscount ?? product.b2bDiscount;
             const b2bPrice = finalIsB2B ? Math.round(priceTRY * (1 - finalDiscount / 100) * 100) / 100 : 0;

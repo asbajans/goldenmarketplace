@@ -4,8 +4,9 @@ export interface Product {
     id: string;
     title: string;
     description: string;
-    gramWeight: number;
-    milyem: number;
+    gramWeight: number | null;
+    milyem: number | null;
+    pricingType?: 'gold' | 'fixed';
     effectiveMilyem?: number;
     gramHas?: number;
     profitMargin: number;
