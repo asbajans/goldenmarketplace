@@ -4,6 +4,7 @@ import { Product } from '../models';
 import ProductAITask from '../models/ProductAITask';
 import aiService from '../services/aiService';
 import planAccessService from '../services/planAccessService';
+import { cleanFeedDescription } from '../utils/validation';
 
 const AI_TRANSLATION_LANGUAGES = ['en', 'tr', 'it', 'es', 'ar'];
 
@@ -50,7 +51,8 @@ aiTranslationQueue.process(async (job) => {
   try {
     let totalCredits = 0;
     let updatedTitle = product.title;
-    let updatedDescription = product.description || '';
+    // AI'ya kirli HTML gitmesin ve kirli çeviri geri yazılmasın: girişte temizle
+    let updatedDescription = cleanFeedDescription(product.description || '');
     let updatedTranslations = product.translations || {};
 
     // Check access before starting
@@ -104,10 +106,15 @@ aiTranslationQueue.process(async (job) => {
     const defaultLang = (product as any).defaultLanguage || 'en';
     const defaultEntry = (updatedTranslations as any)[defaultLang];
     if (defaultEntry?.title) updatedTitle = defaultEntry.title;
-    if (defaultEntry?.description) updatedDescription = defaultEntry.description;
+    if (defaultEntry?.description) updatedDescription = cleanFeedDescription(defaultEntry.description);
+    // AI kirli HTML döndürebilir (eski çevirilerde MsoNormal vardı): kaydetmeden arındır
+    for (const lang of Object.keys(updatedTranslations)) {
+      const entry = (updatedTranslations as any)[lang];
+      if (entry?.description) entry.description = cleanFeedDescription(entry.description);
+    }
     await (product as any).update({
       title: updatedTitle,
-      description: updatedDescription,
+      description: cleanFeedDescription(updatedDescription),
       translations: updatedTranslations
     });
 

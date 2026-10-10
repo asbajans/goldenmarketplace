@@ -84,6 +84,8 @@ export const AdminAPI = {
     createCategory: (data: any) => api.post('/categories', data).then((res) => res.data),
     updateCategory: (id: string, data: any) => api.put(`/categories/${id}`, data).then((res) => res.data),
     deleteCategory: (id: string) => api.delete(`/categories/${id}`).then((res) => res.data),
+    autoCategorizeProducts: (data: { preview?: boolean; onlyGeneral?: boolean; limit?: number }) =>
+        api.post('/products/auto-categorize', data).then((res) => res.data),
 
     // Subscription Plans
     getSubscriptionPlans: () => api.get('/subscription-plans').then((res) => res.data),

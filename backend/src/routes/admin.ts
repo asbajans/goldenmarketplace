@@ -46,6 +46,7 @@ router.post('/users/:id/credits', AdminController.grantUserCredits);
 // --- ALL PRODUCTS (admin view) ---
 router.get('/products', AdminController.getAllProducts);
 router.post('/products/backfill-feed-attributes', AdminController.backfillFeedAttributes);
+router.post('/products/auto-categorize', AdminController.autoCategorizeProducts);
 router.put('/products/:id', AdminController.updateProductByAdmin);
 
 // --- PRODUCT REVIEWS (moderation) ---

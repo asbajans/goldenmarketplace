@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useState } from 'react';
-import { Table, Card, Button, Space, Modal, Form, Input, Switch, message, Tabs, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Table, Card, Button, Space, Modal, Form, Input, Switch, message, Tabs, Tag, Select } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, TagsOutlined } from '@ant-design/icons';
 import { AdminAPI } from '../services/api';
 
 const { TabPane } = Tabs;
@@ -36,6 +36,10 @@ export const CategoriesPage: React.FC = () => {
     const [editingCategory, setEditingCategory] = useState<any>(null);
     const [activeLang, setActiveLang] = useState('en');
     const [form] = Form.useForm();
+    const [bulkVisible, setBulkVisible] = useState(false);
+    const [bulkLoading, setBulkLoading] = useState(false);
+    const [bulkOnlyGeneral, setBulkOnlyGeneral] = useState(true);
+    const [bulkResult, setBulkResult] = useState<any>(null);
 
     const fetchCategories = async () => {
         setLoading(true);
@@ -69,6 +73,7 @@ export const CategoriesPage: React.FC = () => {
             slug: record.slug,
             description: record.description,
             isActive: record.isActive !== false,
+            keywords: record.keywords || [],
             translations: normalizeTranslations(record.translations),
         });
         setActiveLang('en');
@@ -97,6 +102,7 @@ export const CategoriesPage: React.FC = () => {
                 slug: values.slug,
                 description: values.description,
                 isActive: values.isActive,
+                keywords: values.keywords || [],
                 translations: values.translations || {},
             };
 
@@ -115,10 +121,34 @@ export const CategoriesPage: React.FC = () => {
         }
     };
 
+    const runBulk = async (preview: boolean) => {
+        setBulkLoading(true);
+        try {
+            const res = await AdminAPI.autoCategorizeProducts({ preview, onlyGeneral: bulkOnlyGeneral });
+            setBulkResult(res);
+            if (!preview) message.success(`${res.updated} ürün kategorilendi`);
+        } catch (error) {
+            message.error('Toplu kategorizasyon başarısız');
+        } finally {
+            setBulkLoading(false);
+        }
+    };
+
     const columns = [
         { title: 'Kategori Adı', dataIndex: 'name', key: 'name' },
         { title: 'Slug', dataIndex: 'slug', key: 'slug' },
         { title: 'Açıklama', dataIndex: 'description', key: 'description' },
+        {
+            title: 'Anahtar Kelimeler',
+            key: 'keywords',
+            render: (_: any, record: any) => (
+                <span style={{ fontSize: 12, color: '#888' }}>
+                    {Array.isArray(record.keywords) && record.keywords.length > 0
+                        ? `${record.keywords.length} kelime`
+                        : <span style={{ color: '#bbb' }}>varsayılan</span>}
+                </span>
+            )
+        },
         {
             title: 'Durum',
             dataIndex: 'isActive',
@@ -138,7 +168,12 @@ export const CategoriesPage: React.FC = () => {
     ];
 
     return (
-        <Card title="Kategori Yönetimi" extra={<Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>Yeni Kategori</Button>}>
+        <Card title="Kategori Yönetimi" extra={(
+            <Space>
+                <Button icon={<TagsOutlined />} onClick={() => { setBulkResult(null); setBulkVisible(true); }}>Toplu Kategorize</Button>
+                <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>Yeni Kategori</Button>
+            </Space>
+        )}>
             <Table
                 dataSource={categories}
                 columns={columns}
@@ -167,6 +202,10 @@ export const CategoriesPage: React.FC = () => {
                         <Input.TextArea rows={3} />
                     </Form.Item>
 
+                    <Form.Item name="keywords" label="Otomatik Tanıma Anahtar Kelimeleri (TR+EN, virgülle ayırıp Enter'a bas)">
+                        <Select mode="tags" tokenSeparators={[',']} placeholder="ör. yüzük, ring, tektaş" />
+                    </Form.Item>
+
                     <div style={{ marginBottom: 16 }}>
                         <Tabs activeKey={activeLang} onChange={setActiveLang} type="card">
                             {LANGUAGES.map(lang => (
@@ -187,6 +226,42 @@ export const CategoriesPage: React.FC = () => {
                         <Switch />
                     </Form.Item>
                 </Form>
+            </Modal>
+
+            <Modal
+                title="Toplu Otomatik Kategorize"
+                open={bulkVisible}
+                onCancel={() => setBulkVisible(false)}
+                width={900}
+                footer={[
+                    <Button key="preview" loading={bulkLoading} onClick={() => runBulk(true)}>Önizle</Button>,
+                    <Button key="apply" type="primary" loading={bulkLoading} onClick={() => runBulk(false)}>Uygula</Button>,
+                ]}
+            >
+                <Space style={{ marginBottom: 12 }}>
+                    <span>Sadece Genel/kategorisiz ürünler:</span>
+                    <Switch checked={bulkOnlyGeneral} onChange={setBulkOnlyGeneral} />
+                </Space>
+                {bulkResult && (
+                    <>
+                        <p>
+                            Taranan: <b>{bulkResult.scanned}</b> — Eşleşen: <b>{bulkResult.matched}</b>
+                            {bulkResult.updated ? <> — Güncellenen: <b>{bulkResult.updated}</b></> : null}
+                            {' '}— Eşleşmeyen: <b>{String(bulkResult.unmatchedCount)}</b>
+                        </p>
+                        <Table
+                            dataSource={bulkResult.matches || []}
+                            rowKey="id"
+                            pagination={{ pageSize: 8 }}
+                            columns={[
+                                { title: 'SKU', dataIndex: 'sku', key: 'sku', width: 140 },
+                                { title: 'Ürün', dataIndex: 'title', key: 'title' },
+                                { title: 'Eski', dataIndex: 'from', key: 'from', width: 100, render: (v: string) => v || '—' },
+                                { title: 'Yeni', dataIndex: 'to', key: 'to', width: 100 },
+                            ]}
+                        />
+                    </>
+                )}
             </Modal>
         </Card>
     );

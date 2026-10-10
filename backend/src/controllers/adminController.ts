@@ -7,6 +7,18 @@ import SubscriptionPlan from '../models/SubscriptionPlan';
 import Integration from '../models/Integration';
 import IntegrationLog from '../models/IntegrationLog';
 import PasswordService from '../utils/password';
+import { detectCategoryFromTitle } from '../services/categoryDetectService';
+
+/** Keywords: string[] → trimmed, lowercased, unique, non-empty */
+function normalizeKeywords(input: unknown): string[] {
+    if (!Array.isArray(input)) return [];
+    const seen = new Set<string>();
+    for (const item of input) {
+        const kw = String(item || '').trim().toLocaleLowerCase('tr-TR');
+        if (kw && !seen.has(kw)) seen.add(kw);
+    }
+    return Array.from(seen);
+}
 
 
 export class AdminController {
@@ -166,8 +178,8 @@ export class AdminController {
 
     static async createCategory(req: Request, res: Response): Promise<Response> {
         try {
-            const { name, slug, description, isActive, translations } = req.body;
-            const category = await Category.create({ name, slug, description, isActive, translations: translations || {} });
+            const { name, slug, description, isActive, translations, keywords } = req.body;
+            const category = await Category.create({ name, slug, description, isActive, translations: translations || {}, keywords: normalizeKeywords(keywords) });
             return res.status(201).json(category);
         } catch (error: any) {
             return res.status(400).json({ error: error.message || 'Failed to create category' });
@@ -177,14 +189,16 @@ export class AdminController {
     static async updateCategory(req: Request, res: Response): Promise<Response> {
         try {
             const { id } = req.params;
-            const { name, slug, description, isActive, translations } = req.body;
+            const { name, slug, description, isActive, translations, keywords } = req.body;
 
             const category = await Category.findByPk(id);
             if (!category) return res.status(404).json({ error: 'Category not found' });
 
             const existingTranslations = category.get('translations') || {};
             const mergedTranslations = { ...(typeof existingTranslations === 'object' ? existingTranslations : {}), ...(translations || {}) };
-            await category.update({ name, slug, description, isActive, translations: mergedTranslations });
+            const updateData: any = { name, slug, description, isActive, translations: mergedTranslations };
+            if (keywords !== undefined) updateData.keywords = normalizeKeywords(keywords);
+            await category.update(updateData);
             return res.json(category);
         } catch (error: any) {
             return res.status(400).json({ error: error.message || 'Failed to update category' });
@@ -201,6 +215,74 @@ export class AdminController {
             return res.json({ success: true });
         } catch (error) {
             return res.status(500).json({ error: 'Failed to delete category' });
+        }
+    }
+
+    /**
+     * Manuel toplu oto-kategorizasyon (feed'e özel değil — TÜM ürünler).
+     * Body: { preview?: boolean (default true), onlyGeneral?: boolean (default true), limit?: number }
+     * - preview=true: eşleşmeleri listeler, DB'ye dokunmaz.
+     * - preview=false: categoryId + category (slug) günceller.
+     */
+    static async autoCategorizeProducts(req: Request, res: Response): Promise<Response> {
+        try {
+            const { Op } = require('sequelize');
+            const { preview = true, onlyGeneral = true, limit = 2000 } = req.body || {};
+
+            const categories = await Category.findAll({ where: { isActive: true }, order: [['name', 'ASC']] });
+            const genel = categories.find((c: any) => c.slug === 'genel');
+
+            let where: any = {};
+            if (onlyGeneral) {
+                const orConds: any[] = [{ categoryId: null }];
+                if (genel) orConds.push({ categoryId: (genel as any).id });
+                where = { [Op.or]: orConds };
+            }
+
+            const products = await Product.findAll({
+                where,
+                limit: Math.min(Number(limit) || 2000, 10000),
+                attributes: ['id', 'sku', 'title', 'category', 'categoryId'],
+                order: [['createdAt', 'ASC']]
+            });
+
+            const matches: Array<{ id: string; sku: string; title: string; from: string | null; to: string }> = [];
+            const unmatched: Array<{ id: string; sku: string; title: string }> = [];
+
+            for (const p of products as any[]) {
+                const hit = detectCategoryFromTitle(p.title, categories as any[]);
+                if (hit) {
+                    matches.push({ id: p.id, sku: p.sku, title: p.title, from: p.category || null, to: hit.slug });
+                } else {
+                    if (unmatched.length < 50) unmatched.push({ id: p.id, sku: p.sku, title: p.title });
+                }
+            }
+
+            let updated = 0;
+            if (!preview) {
+                for (const m of matches) {
+                    const cat = categories.find((c: any) => c.slug === m.to);
+                    if (!cat) continue;
+                    await Product.update(
+                        { categoryId: (cat as any).id, category: (cat as any).slug },
+                        { where: { id: m.id } }
+                    );
+                    updated++;
+                }
+            }
+
+            return res.json({
+                preview: !!preview,
+                scanned: products.length,
+                matched: matches.length,
+                updated,
+                unmatchedCount: unmatched.length === 50 ? `50+ (toplam eşleşmeyen: ${products.length - matches.length})` : products.length - matches.length,
+                matches: preview ? matches.slice(0, 200) : matches.slice(0, 50),
+                unmatchedSample: unmatched
+            });
+        } catch (error: any) {
+            console.error('Admin Error [autoCategorizeProducts]:', error);
+            return res.status(500).json({ error: error.message || 'Failed to auto-categorize products' });
         }
     }
 
