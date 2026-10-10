@@ -8,6 +8,7 @@ import Store from '../models/Store';
 import goldPriceService from './goldPriceService';
 import { cleanFeedDescription } from '../utils/validation';
 import planAccessService from './planAccessService';
+import { detectCategoryFromTitle } from './categoryDetectService';
 
 interface MappedProduct {
   title: string;
@@ -388,6 +389,15 @@ class FeedService {
       // 3. Apply mapping
       let mappedProducts = this.applyMapping(rawData, feed.fieldMapping || {}, feed);
 
+      // Kategori tespiti için aktif kategoriler (feed'de kategori yoksa başlıktan bulunur)
+      let activeCategories: any[] = [];
+      try {
+        const Category = require('../models/Category').default;
+        activeCategories = await Category.findAll({ where: { isActive: true } });
+      } catch {
+        activeCategories = [];
+      }
+
       // 4. Apply pricing
       if (feed.currency === 'USD') {
         mappedProducts = await this.convertUSDPrices(mappedProducts);
@@ -413,13 +423,24 @@ class FeedService {
           const hasGram = prod.gramWeight !== undefined && prod.gramWeight !== null && Number(prod.gramWeight) > 0;
           const isFixedPrice = feed.pricingMode === 'fixed' && !hasGram;
 
+          // Kategori: önce feed eşleşmesi / varsayılan, hiçbiri yoksa başlıktan otomatik tespit
+          let finalCategoryId = prod.categoryId || feed.defaultCategoryId || undefined;
+          let finalCategory = prod.category || feed.defaultCategory || 'Genel';
+          if (!finalCategoryId && activeCategories.length > 0) {
+            const hit = detectCategoryFromTitle(prod.title, activeCategories);
+            if (hit) {
+              finalCategoryId = hit.categoryId;
+              finalCategory = hit.slug;
+            }
+          }
+
           const productData: any = {
             storeId: feed.storeId,
             title: prod.title,
             slug,
             description: prod.description || '',
-            category: prod.category || feed.defaultCategory || 'Genel',
-            categoryId: prod.categoryId || feed.defaultCategoryId || undefined,
+            category: finalCategory,
+            categoryId: finalCategoryId,
             sku: prod.sku,
             // Gramsız + sabit fiyatlı üründe sahte "1 gr" yazma: NULL tut, frontend gizler
             gramWeight: hasGram ? Number(prod.gramWeight) : null,
@@ -439,6 +460,17 @@ class FeedService {
           };
 
           if (existingProduct) {
+            // Manuel düzeltilmiş kategoriyi ezme: sadece kategorisiz/Genel olanı otomatik ata
+            const curId = (existingProduct as any).categoryId;
+            const genelCat = activeCategories.find((c: any) => c.slug === 'genel');
+            const needsCat = !curId || (genelCat && curId === (genelCat as any).id);
+            if (!needsCat) {
+              delete productData.category;
+              delete productData.categoryId;
+            } else if (!finalCategoryId) {
+              // Tespit yoksa categoryId'ye dokunma (null ezmesin), ham metni koru
+              delete productData.categoryId;
+            }
             await existingProduct.update(productData);
             result.updated++;
             syncedProductIds.push(existingProduct.id);
