@@ -83,16 +83,45 @@ export const ReviewsPage: React.FC = () => {
                 count: values.count || 5,
                 languages: values.languages && values.languages.length > 0 ? values.languages : undefined
             });
-            message.success(res.message || 'Yorumlar üretildi');
+            message.success(res.message || 'Üretim kuyruğa alındı');
             setAiVisible(false);
             aiForm.resetFields();
-            setFilter('pending');
-            fetchReviews(1, false);
+            if (res.batchJobId) {
+                pollAiBatch(res.batchJobId);
+            } else {
+                setFilter('pending');
+                fetchReviews(1, false);
+            }
         } catch (err: any) {
             message.error(err?.response?.data?.error || 'Üretim başarısız');
         } finally {
             setAiLoading(false);
         }
+    };
+
+    const pollAiBatch = (jobId: string) => {
+        const key = 'ai-batch';
+        message.loading({ content: 'AI yorum üretiyor...', key, duration: 0 });
+        const timer = setInterval(async () => {
+            try {
+                const st = await AdminAPI.aiReviewBatchStatus(jobId);
+                if (st.state === 'completed') {
+                    clearInterval(timer);
+                    const n = st.result?.created ?? 0;
+                    message.success({ content: `${n} yorum üretildi (onay bekliyor)`, key, duration: 4 });
+                    setFilter('pending');
+                    fetchReviews(1, false);
+                } else if (st.state === 'failed') {
+                    clearInterval(timer);
+                    message.error({ content: `Üretim başarısız: ${st.failedReason || 'bilinmeyen hata'}`, key, duration: 6 });
+                } else {
+                    message.loading({ content: `AI yorum üretiyor... %${st.progress || 0}`, key, duration: 0 });
+                }
+            } catch {
+                clearInterval(timer);
+                message.error({ content: 'Durum alınamadı', key, duration: 4 });
+            }
+        }, 3000);
     };
 
     const handleApproveAll = async (productId: string) => {

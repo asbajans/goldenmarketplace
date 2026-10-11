@@ -115,6 +115,8 @@ export const AdminAPI = {
     deleteReview: (id: string) => api.delete(`/reviews/${id}`).then((res) => res.data),
     aiGenerateReviews: (data: { productId: string; count?: number; languages?: string[] }) =>
         api.post('/reviews/ai-generate', data).then((res) => res.data),
+    aiReviewBatchStatus: (jobId: string) =>
+        api.get(`/reviews/ai-batch/${jobId}`).then((res) => res.data),
     approveAllReviews: (productId: string) =>
         api.post(`/reviews/product/${productId}/approve-all`).then((res) => res.data),
 

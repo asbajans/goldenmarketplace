@@ -38,9 +38,9 @@ export class ReviewController {
       });
 
       const data = [];
-      for (const r of reviews.slice(0, 10)) {
-        data.push(await publicReviewJson(r, lang));
-      }
+      // Çeviriler paralel üretilir (seri çağrı sayfa açılışını dakikalara taşıyordu)
+      const first = await Promise.all(reviews.slice(0, 10).map(r => publicReviewJson(r, lang)));
+      data.push(...first);
       // Kalanlar çevirisiz (AI fatura koruması: istek başına en fazla 10 çeviri)
       for (const r of reviews.slice(10)) {
         data.push({
@@ -284,91 +284,30 @@ export class ReviewController {
       const readiness = await aiService.assertTranslationReady().catch(() => null);
       if (readiness) return res.status(400).json({ error: readiness });
 
-      const created: any[] = [];
-      let lastError = '';
-      for (let i = 0; i < count; i++) {
-        // Puan dağılımı: çoğunluk 5/4, ara sıra 3 (gerçekçi karışım)
-        const roll = Math.random();
-        const rating = roll < 0.6 ? 5 : roll < 0.9 ? 4 : 3;
-        const lang = langs[i % langs.length];
-        const langNames: Record<string, string> = { en: 'English', tr: 'Turkish', it: 'Italian', es: 'Spanish', ar: 'Arabic' };
-        const sysPrompt =
-          `You are a verified-style jewelry shopper writing a short product review in ${langNames[lang]}. ` +
-          `Write a realistic ${rating}-star review: 1-6 word TITLE and 1-3 sentence COMMENT about quality, look, packaging or gifting. ` +
-          `Vary tone across reviews (enthusiastic, practical, gift-giver). No HTML, no markdown, no quotes around the whole text. ` +
-          `Return ONLY raw JSON: {"title": "...", "comment": "..."}`;
-        const userPrompt = `Product: ${product.title}\nCategory: ${product.category || ''}\nRating: ${rating}/5`;
-        // Ücretsiz modeller ara sıra boş döner — her yorumu 1 kez daha dene
-        // Yorum üretimi kendi modelini kullanır (Admin → AI → Yorum Modeli, boşsa genel)
-        let res: any = null;
-        for (let attempt = 0; attempt < 2; attempt++) {
-          res = await aiService.generateForPurpose('reviews', sysPrompt, userPrompt);
-          if (res.success && res.content) break;
-          lastError = res.error || lastError;
-        }
-        if (!res.success || !res.content) {
-          continue;
-        }
-        let parsed: any = null;
-        try {
-          parsed = JSON.parse(res.content.trim());
-        } catch {
-          const m = res.content.match(/\{[\s\S]*\}/);
-          if (m) {
-            try { parsed = JSON.parse(m[0]); } catch { parsed = null; }
-          }
-        }
-        const title = typeof parsed?.title === 'string' ? parsed.title.slice(0, 255).trim() : '';
-        const comment = typeof parsed?.comment === 'string' ? parsed.comment.slice(0, 5000).trim() : '';
-        if (!comment) continue;
-        const name = pickReviewerName(lang);
-        const row = await ProductReview.create({
-          productId,
-          userId: null,
-          reviewerName: name,
-          rating,
-          title: title || null,
-          comment,
-          language: lang,
-          translations: {},
-          source: 'ai',
-          isApproved: false,
-          isVerifiedPurchase: false
-        });
-        created.push({ id: row.id, rating, language: lang, reviewerName: maskReviewerName(name) });
-      }
-
-      if (created.length === 0) {
-        return res.status(500).json({
-          error: `Hiçbir yorum üretilemedi.${lastError ? ` Son hata: ${String(lastError).slice(0, 400)}` : ''}`
-        });
-      }
-
+      // Üretim kuyrukta (Bull ai-reviews): HTTP anında döner, panel durum izler.
+      const { queueReviewBatch } = await import('../jobs/aiReviewJob');
+      const job = await queueReviewBatch({ productId, count, langs });
       return res.json({
-        message: `${created.length} yorum üretildi (onay bekliyor)`,
-        created
+        message: `${count} yorum üretim kuyruğuna alındı. Tamamlanınca onay bekleyenlere düşer.`,
+        batchJobId: String(job.id)
       });
     } catch (error: any) {
       console.error('Review Error [aiGenerate]:', error);
-      return res.status(500).json({ error: error.message || 'Failed to generate reviews' });
+      return res.status(500).json({ error: error.message || 'Failed to queue review generation' });
     }
   }
-}
 
-/** Dile göre isim havuzu (soyadı baş harfi — zaten maskeli formatta saklanır). */
-function pickReviewerName(lang: string): string {
-  const first: Record<string, string[]> = {
-    en: ['Emma', 'James', 'Sophia', 'Liam', 'Olivia', 'Noah', 'Ava', 'William', 'Mia', 'Lucas'],
-    tr: ['Elif', 'Mehmet', 'Zeynep', 'Ahmet', 'Selin', 'Burak', 'Deniz', 'Emre', 'Gül', 'Kaan'],
-    it: ['Sofia', 'Marco', 'Giulia', 'Alessandro', 'Martina', 'Lorenzo', 'Chiara', 'Davide'],
-    es: ['Lucía', 'Mateo', 'Sofía', 'Hugo', 'Martina', 'Pablo', 'Valeria', 'Diego'],
-    ar: ['Layla', 'Omar', 'Fatima', 'Yusuf', 'Nour', 'Karim', 'Salma', 'Tariq']
-  };
-  const pool = first[lang] || first.en;
-  const f = pool[Math.floor(Math.random() * pool.length)];
-  const letters = 'ABCDEFGHIJKLMNOPRSTUVYZ';
-  const initial = letters[Math.floor(Math.random() * letters.length)];
-  return `${f} ${initial}.`;
+  /**
+   * GET /api/admin/reviews/ai-batch/:jobId — toplu üretim durumu.
+   */
+  static async aiGenerateStatus(req: Request, res: Response) {
+    try {
+      const { getReviewBatchStatus } = await import('../jobs/aiReviewJob');
+      return res.json(await getReviewBatchStatus(req.params.jobId));
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message || 'Failed to fetch batch status' });
+    }
+  }
 }
 
 export default ReviewController;

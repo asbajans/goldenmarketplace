@@ -58,6 +58,7 @@ router.get('/reviews', ReviewController.adminList);
 router.put('/reviews/:id', ReviewController.adminUpdate);
 router.delete('/reviews/:id', ReviewController.adminDelete);
 router.post('/reviews/ai-generate', ReviewController.aiGenerate);
+router.get('/reviews/ai-batch/:jobId', ReviewController.aiGenerateStatus);
 router.post('/reviews/product/:productId/approve-all', ReviewController.approveAllForProduct);
 
 // --- INTEGRATIONS ---
