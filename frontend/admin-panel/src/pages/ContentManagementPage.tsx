@@ -95,6 +95,15 @@ export default function ContentManagementPage() {
   const [blogLang, setBlogLang] = useState('en');
   const [blogForm, setBlogForm] = useState({ slug: '', imageUrl: '', isActive: true, order: 0, translations: { ...initialTranslations } });
 
+  // Return policy (Merchant Center: herkese açık iade politikası)
+  const emptyPolicy = LANGUAGES.reduce((acc, lang) => {
+    acc[lang.key] = { title: '', body: '' };
+    return acc;
+  }, {} as Record<string, any>);
+  const [policyLang, setPolicyLang] = useState('tr');
+  const [policyForm, setPolicyForm] = useState<Record<string, any>>({ ...emptyPolicy });
+  const [policySaving, setPolicySaving] = useState(false);
+
   // AI blog generation state
   const [aiBlogModal, setAiBlogModal] = useState(false);
   const [aiTopic, setAiTopic] = useState('');
@@ -156,7 +165,36 @@ export default function ContentManagementPage() {
     loadSliders();
     loadMenuItems();
     loadBlogPosts();
+    loadReturnPolicy();
   }, []);
+
+  const loadReturnPolicy = async () => {
+    try {
+      const allSettings = await AdminAPI.getSettings();
+      if (allSettings.return_policy) {
+        const parsed = JSON.parse(allSettings.return_policy);
+        const merged = { ...emptyPolicy };
+        Object.entries(parsed || {}).forEach(([lang, data]: [string, any]) => {
+          merged[lang] = { title: data?.title || '', body: data?.body || '' };
+        });
+        setPolicyForm(merged);
+      }
+    } catch {
+      // yoksa boş form (tohum SQL'i koşulunca dolar)
+    }
+  };
+
+  const saveReturnPolicy = async () => {
+    setPolicySaving(true);
+    try {
+      await AdminAPI.updateSettings({ return_policy: JSON.stringify(policyForm) });
+      message.success('İade politikası kaydedildi!');
+    } catch {
+      message.error('Kaydetme hatası');
+    } finally {
+      setPolicySaving(false);
+    }
+  };
 
   const loadPageContents = async () => {
     try {
@@ -612,6 +650,47 @@ export default function ContentManagementPage() {
               }
             ]}
           />
+        </Card>
+      ),
+    },
+    {
+      key: 'policies',
+      label: '↩️ İade Politikası',
+      children: (
+        <Card
+          title="İade ve Geri Ödeme Politikası"
+          extra={
+            <Button type="primary" icon={<SaveOutlined />} loading={policySaving} onClick={saveReturnPolicy}>
+              Kaydet
+            </Button>
+          }
+        >
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="Bu sayfa girişsiz herkese açıktır (GET /api/marketplace/policies/return?lang=) — Google Merchant Center şartı. TR + EN zorunlu, diğer diller opsiyonel (eksik dil EN'ye düşer)."
+          />
+          <Tabs activeKey={policyLang} onChange={setPolicyLang} type="card" style={{ marginBottom: 16 }}>
+            {LANGUAGES.map(lang => (
+              <TabPane tab={<span>{lang.flag} {lang.label}</span>} key={lang.key} />
+            ))}
+          </Tabs>
+          <div style={{ marginBottom: 16 }}>
+            <label>Başlık</label>
+            <Input
+              value={policyForm[policyLang]?.title || ''}
+              onChange={e => setPolicyForm(prev => ({ ...prev, [policyLang]: { ...prev[policyLang], title: e.target.value } }))}
+            />
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <label>Metin (boş satırla paragraf ayırın)</label>
+            <TextArea
+              rows={18}
+              value={policyForm[policyLang]?.body || ''}
+              onChange={e => setPolicyForm(prev => ({ ...prev, [policyLang]: { ...prev[policyLang], body: e.target.value } }))}
+            />
+          </div>
         </Card>
       ),
     },

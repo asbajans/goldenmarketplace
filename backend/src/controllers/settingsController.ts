@@ -11,6 +11,8 @@ const PUBLIC_PREFIXES = [
     'about_',
     'blog_',
     'footer_',
+    'return_',
+    'policy_',
     'feed_',
     'merchant_',
     // Payment method visibility flags (values are safe to expose; secrets stay private)

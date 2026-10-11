@@ -21,6 +21,7 @@ import ExternalFeed from './ExternalFeed';
 import FeedSyncLog from './FeedSyncLog';
 import ProductAITask from './ProductAITask';
 import ProductReview from './ProductReview';
+import ReturnRequest from './ReturnRequest';
 import Payment from './Payment';
 import CreditTransaction from './CreditTransaction';
 
@@ -117,6 +118,14 @@ ProductReview.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 User.hasMany(ProductReview, { foreignKey: 'userId', as: 'productReviews' });
 ProductReview.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
+// ReturnRequest associations
+Order.hasMany(ReturnRequest, { foreignKey: 'orderId', as: 'returnRequests' });
+ReturnRequest.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
+Product.hasMany(ReturnRequest, { foreignKey: 'productId', as: 'returnRequests' });
+ReturnRequest.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+Store.hasMany(ReturnRequest, { foreignKey: 'storeId', as: 'returnRequests' });
+ReturnRequest.belongsTo(Store, { foreignKey: 'storeId', as: 'store' });
+
 // User <-> Payment / CreditTransaction (One-to-Many)
 User.hasMany(Payment, { foreignKey: 'userId', as: 'payments' });
 Payment.belongsTo(User, { foreignKey: 'userId', as: 'user' });
@@ -148,6 +157,7 @@ export {
     FeedSyncLog,
     ProductAITask,
     ProductReview,
+    ReturnRequest,
     Payment,
     CreditTransaction
 };
