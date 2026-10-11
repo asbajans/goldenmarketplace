@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useState } from 'react';
-import { Table, Card, Button, Space, Modal, Form, Input, Switch, message, Tabs, Tag, Select } from 'antd';
+import { Table, Card, Button, Space, Modal, Form, Input, InputNumber, Switch, message, Tabs, Tag, Select } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, TagsOutlined } from '@ant-design/icons';
 import { AdminAPI } from '../services/api';
 
@@ -103,6 +103,7 @@ export const CategoriesPage: React.FC = () => {
                 description: values.description,
                 isActive: values.isActive,
                 keywords: values.keywords || [],
+                showcaseWeight: values.showcaseWeight ?? 0,
                 translations: values.translations || {},
             };
 
@@ -209,6 +210,14 @@ export const CategoriesPage: React.FC = () => {
 
                     <Form.Item name="keywords" label="Otomatik Tanıma Anahtar Kelimeleri (TR+EN, virgülle ayırıp Enter'a bas)">
                         <Select mode="tags" tokenSeparators={[',']} placeholder="ör. yüzük, ring, tektaş" />
+                    </Form.Item>
+
+                    <Form.Item
+                        name="showcaseWeight"
+                        label="Vitrin Ağırlığı (ana sayfa bölüm sırası)"
+                        tooltip="Yüksek ağırlıklı kategori ana sayfada üstte gösterilir."
+                    >
+                        <InputNumber min={0} style={{ width: '100%' }} placeholder="0" />
                     </Form.Item>
 
                     <div style={{ marginBottom: 16 }}>

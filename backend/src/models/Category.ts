@@ -13,6 +13,7 @@ interface CategoryAttributes {
     description?: string;
     translations?: any;
     keywords?: string[];
+    showcaseWeight?: number;
     isActive: boolean;
     createdAt?: Date;
     updatedAt?: Date;
@@ -25,6 +26,7 @@ class Category extends Model<CategoryAttributes> implements CategoryAttributes {
     public description?: string;
     public translations?: any;
     public keywords!: string[];
+    public showcaseWeight!: number;
     public isActive!: boolean;
     public readonly createdAt!: Date;
     public readonly updatedAt!: Date;
@@ -62,6 +64,12 @@ Category.init(
             allowNull: true,
             defaultValue: [],
             comment: 'Auto-categorization keywords matched against product titles (lowercased, TR+EN). Empty = use built-in defaults.'
+        },
+        showcaseWeight: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            defaultValue: 0,
+            comment: 'Ana sayfa bölüm sırası: yüksek ağırlık üstte gösterilir'
         },
         isActive: {
             type: DataTypes.BOOLEAN,

@@ -338,6 +338,59 @@ export class MarketplaceController {
   }
 
   /**
+   * GET /api/marketplace/homepage?lang=en&perCategory=6
+   * Ana sayfa vitrini: bölüm sırası kategori ağırlığına göre; her bölümde
+   * dopingli önce, sonra mağaza ağırlığına oranlı adil kota (her mağaza
+   * en az 1 ürün), her istekte karıştırılır (yenilemede ürünler değişir).
+   */
+  static async getHomepage(req: Request, res: Response) {
+    try {
+      const lang = (req.query.lang as string) || 'en';
+      const perCategory = Math.min(Math.max(parseInt(req.query.perCategory as string) || 6, 1), 12);
+
+      const categories = await Category.findAll({
+        where: { isActive: true },
+        order: [['showcaseWeight', 'DESC'], ['name', 'ASC']]
+      });
+
+      const sections: any[] = [];
+      for (const cat of categories as any[]) {
+        const candidates = await Product.findAll({
+          where: {
+            isActive: true,
+            [Op.and]: [
+              goldenFilter,
+              { [Op.or]: [{ categoryId: cat.id }, { category: { [Op.iLike]: cat.slug } }] }
+            ]
+          } as any,
+          attributes: ['id', 'storeId', 'title', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'description', 'discountRate', 'discountedPrice', 'isDoped', 'dopedUntil', 'dopingStyle'],
+          include: [
+            {
+              model: Store,
+              as: 'store',
+              attributes: ['id', 'storeName', 'storeSlug', 'logo', 'showcaseWeight', 'showcaseUntil']
+            },
+            { model: Category, as: 'categoryRef', attributes: ['id', 'name', 'translations', 'slug'] }
+          ],
+          limit: 200
+        });
+        if (candidates.length === 0) continue;
+        const picked = showcaseService.pickHomepageProducts(candidates, perCategory);
+        sections.push({
+          slug: cat.slug,
+          name: resolveCategoryName(cat.slug, cat, lang),
+          products: picked.map(p => applyTranslation(p, lang))
+        });
+      }
+
+      return res.json({ sections });
+    } catch (error) {
+      console.error('[Marketplace] getHomepage error:', error);
+      return res.status(500).json({ error: 'Failed to fetch homepage' });
+    }
+  }
+
+  /**
    * GET /api/marketplace/products/:slug
    */
   static async getProductBySlug(req: Request, res: Response) {

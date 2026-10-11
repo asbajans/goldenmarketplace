@@ -235,8 +235,8 @@ export class AdminController {
 
     static async createCategory(req: Request, res: Response): Promise<Response> {
         try {
-            const { name, slug, description, isActive, translations, keywords } = req.body;
-            const category = await Category.create({ name, slug, description, isActive, translations: translations || {}, keywords: normalizeKeywords(keywords) });
+            const { name, slug, description, isActive, translations, keywords, showcaseWeight } = req.body;
+            const category = await Category.create({ name, slug, description, isActive, translations: translations || {}, keywords: normalizeKeywords(keywords), showcaseWeight: Math.max(0, Number(showcaseWeight) || 0) });
             return res.status(201).json(category);
         } catch (error: any) {
             return res.status(400).json({ error: error.message || 'Failed to create category' });
@@ -246,7 +246,7 @@ export class AdminController {
     static async updateCategory(req: Request, res: Response): Promise<Response> {
         try {
             const { id } = req.params;
-            const { name, slug, description, isActive, translations, keywords } = req.body;
+            const { name, slug, description, isActive, translations, keywords, showcaseWeight } = req.body;
 
             const category = await Category.findByPk(id);
             if (!category) return res.status(404).json({ error: 'Category not found' });
@@ -255,6 +255,7 @@ export class AdminController {
             const mergedTranslations = { ...(typeof existingTranslations === 'object' ? existingTranslations : {}), ...(translations || {}) };
             const updateData: any = { name, slug, description, isActive, translations: mergedTranslations };
             if (keywords !== undefined) updateData.keywords = normalizeKeywords(keywords);
+            if (showcaseWeight !== undefined) updateData.showcaseWeight = Math.max(0, Number(showcaseWeight) || 0);
             await category.update(updateData);
             return res.json(category);
         } catch (error: any) {

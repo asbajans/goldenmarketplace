@@ -83,6 +83,81 @@ class ShowcaseService {
     if (!p.dopedUntil) return true;
     return new Date(p.dopedUntil).getTime() > Date.now();
   }
+
+  /** Mağazanın geçerli vitrin ağırlığı (süresi dolmuşsa 0). */
+  storeWeight(p: any, now = Date.now()): number {
+    const s = (p as any)?.store;
+    if (!s) return 0;
+    const until = (s as any).showcaseUntil ? new Date((s as any).showcaseUntil).getTime() : null;
+    if (until !== null && until < now) return 0;
+    return Number((s as any).showcaseWeight) || 0;
+  }
+
+  /**
+   * Ana sayfa bölüm seçimi: dopingli önce (en fazla 2), sonra ağırlık-oranlı
+   * adil kota — her mağaza en az 1 ürünle temsil edilir, kalan kontenjan
+   * ağırlığa göre dolar. Her çağrıda karıştırılır (yenilemede ürünler değişir).
+   */
+  pickHomepageProducts(candidates: any[], n: number): any[] {
+    const now = Date.now();
+    const dopedActive = (p: any) =>
+      !!(p as any).isDoped && (p as any).dopedUntil && new Date((p as any).dopedUntil).getTime() > now;
+    const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+    const out: any[] = [];
+    for (const p of shuffled) {
+      if (out.length >= Math.min(2, n)) break;
+      if (dopedActive(p)) out.push(p);
+    }
+    const pickedIds = new Set(out.map((p: any) => (p as any).id));
+    const rest = shuffled.filter((p: any) => !pickedIds.has((p as any).id));
+
+    const byStore = new Map<string, any[]>();
+    for (const p of rest) {
+      const key = String((p as any).storeId || 'none');
+      if (!byStore.has(key)) byStore.set(key, []);
+      byStore.get(key)!.push(p);
+    }
+    const stores = [...byStore.entries()]
+      .map(([id, items]) => ({ id, items, w: this.storeWeight(items[0], now) }))
+      .sort((a, b) => b.w - a.w);
+    if (stores.length === 0) return out;
+
+    const remaining = n - out.length;
+    const totalW = stores.reduce((s, x) => s + x.w, 0);
+    const quotaOf = (w: number): number =>
+      totalW > 0 ? Math.max(1, Math.round((remaining * w) / totalW)) : 1;
+
+    const taken = new Map<string, number>();
+    let progressed = true;
+    let guard = 0;
+    while (out.length < n && progressed && guard++ < n * (stores.length + 1) + 10) {
+      progressed = false;
+      for (const st of stores) {
+        if (out.length >= n) break;
+        const have = taken.get(st.id) || 0;
+        if (have >= quotaOf(st.w)) continue;
+        const item = st.items[have];
+        if (!item) continue;
+        out.push(item);
+        taken.set(st.id, have + 1);
+        progressed = true;
+      }
+    }
+    // Kota artığı: ağırlık sırasına göre doldur
+    if (out.length < n) {
+      const inOut = new Set(out.map((p: any) => (p as any).id));
+      for (const st of stores) {
+        for (const item of st.items) {
+          if (out.length >= n) break;
+          if (!(inOut.has((item as any).id))) {
+            out.push(item);
+            inOut.add((item as any).id);
+          }
+        }
+      }
+    }
+    return out;
+  }
 }
 
 export default new ShowcaseService();
