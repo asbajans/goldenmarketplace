@@ -23,7 +23,7 @@ export class AIController {
     try {
       const settings = await GlobalSetting.findAll({
         where: { key: ['ai_provider', 'ai_api_key', 'ai_model', 'ai_image_model', 'ai_credit_packs', 'ai_translation_cost', 'ai_content_cost',
-          'ai_translation_models', 'ai_content_model', 'ai_blog_model', 'ai_queue_concurrency'] }
+          'ai_translation_models', 'ai_content_model', 'ai_blog_model', 'ai_reviews_model', 'ai_queue_concurrency'] }
       });
       const result: any = {};
       for (const s of settings) result[s.key] = s.value;
@@ -36,10 +36,10 @@ export class AIController {
   static async updateAISettings(req: Request, res: Response) {
     try {
       const allowed = ['ai_provider', 'ai_api_key', 'ai_model', 'ai_image_model', 'ai_credit_packs', 'ai_translation_cost', 'ai_content_cost',
-        'ai_translation_models', 'ai_content_model', 'ai_blog_model', 'ai_queue_concurrency'];
-      // SECRET'lar public endpoint'lere asla düşmemeli (çeviri/içerik/blog
+        'ai_translation_models', 'ai_content_model', 'ai_blog_model', 'ai_reviews_model', 'ai_queue_concurrency'];
+      // SECRET'lar public endpoint'lere asla düşmemeli (çeviri/içerik/blog/yorum
       // girdileri kendi apiKey'ini taşıyabilir).
-      const PRIVATE_KEYS = new Set(['ai_api_key', 'ai_translation_models', 'ai_content_model', 'ai_blog_model']);
+      const PRIVATE_KEYS = new Set(['ai_api_key', 'ai_translation_models', 'ai_content_model', 'ai_blog_model', 'ai_reviews_model']);
       for (const key of allowed) {
         if (req.body[key] !== undefined) {
           let value = req.body[key];
@@ -48,7 +48,7 @@ export class AIController {
             try { value = JSON.stringify(value); } catch { value = String(value); }
           }
           // JSON ayarların sözdizimini girişte doğrula
-          if (['ai_translation_models', 'ai_content_model', 'ai_blog_model'].includes(key) && value.trim() !== '') {
+          if (['ai_translation_models', 'ai_content_model', 'ai_blog_model', 'ai_reviews_model'].includes(key) && value.trim() !== '') {
             try {
               const parsed = JSON.parse(value);
               const list = Array.isArray(parsed) ? parsed : [parsed];
@@ -72,7 +72,7 @@ export class AIController {
         }
       }
       // Repair: if a previous save exposed the secret, make it private again.
-      await GlobalSetting.update({ isPublic: false }, { where: { key: ['ai_api_key', 'ai_translation_models', 'ai_content_model', 'ai_blog_model'] } }).catch(() => undefined);
+      await GlobalSetting.update({ isPublic: false }, { where: { key: ['ai_api_key', 'ai_translation_models', 'ai_content_model', 'ai_blog_model', 'ai_reviews_model'] } }).catch(() => undefined);
       return res.json({ message: 'AI settings updated' });
     } catch (error) {
       return res.status(500).json({ error: 'Failed to update AI settings' });

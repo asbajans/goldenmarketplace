@@ -6,7 +6,7 @@ export interface AIResponse {
   error?: string;
 }
 
-export type AIPurpose = 'translation' | 'content' | 'blog';
+export type AIPurpose = 'translation' | 'content' | 'blog' | 'reviews';
 
 export interface AIModelEntry {
   provider: string;
@@ -18,7 +18,8 @@ export interface AIModelEntry {
 const PURPOSE_SETTING_KEY: Record<AIPurpose, string> = {
   translation: 'ai_translation_models',
   content: 'ai_content_model',
-  blog: 'ai_blog_model'
+  blog: 'ai_blog_model',
+  reviews: 'ai_reviews_model'
 };
 
 /** Devre kesici: üst üste patlayan model 10 dk atlanır (tek process belleği). */
@@ -96,7 +97,7 @@ class AIService {
     const settings = await GlobalSetting.findAll({
       where: {
         key: ['ai_provider', 'ai_api_key', 'ai_model',
-              'ai_translation_models', 'ai_content_model', 'ai_blog_model']
+              'ai_translation_models', 'ai_content_model', 'ai_blog_model', 'ai_reviews_model']
       }
     });
     const map: Record<string, string> = {};
@@ -259,7 +260,17 @@ class AIService {
         }
 
         const data: any = await res.json();
-        return { success: true, content: data.choices[0].message.content };
+        // OpenRouter bazen 200 ile hata gövdesi döner (örn. endpoint yok/limit):
+        // {"error": {"message": "...", "code": ...}}
+        if ((data as any)?.error) {
+          const em = (data as any).error;
+          throw new Error(`API Error: ${res.status} ${typeof em === 'string' ? em : (em.message || em.code || JSON.stringify(em).slice(0, 300))}`);
+        }
+        const content = (data as any)?.choices?.[0]?.message?.content;
+        if (typeof content !== 'string' || !content.trim()) {
+          throw new Error(`API Error: ${res.status} model boş/geçersiz yanıt döndürdü: ${JSON.stringify(data).slice(0, 300)}`);
+        }
+        return { success: true, content };
       } 
       else if (provider === 'gemini') {
         // Direct Gemini REST API (v1beta or v1)

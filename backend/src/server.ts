@@ -63,6 +63,7 @@ async function syncAndSeedSettings() {
       { key: 'ai_translation_models', value: '[]', description: 'Ordered fallback chain for product translations: [{provider, model, apiKey?}]', isPublic: false },
       { key: 'ai_content_model', value: '{}', description: 'Model for product description generation: {provider, model, apiKey?}', isPublic: false },
       { key: 'ai_blog_model', value: '{}', description: 'Model for blog draft + translations: {provider, model, apiKey?}', isPublic: false },
+      { key: 'ai_reviews_model', value: '{}', description: 'Model for AI review generation: {provider, model, apiKey?}', isPublic: false },
       { key: 'ai_queue_concurrency', value: '3', description: 'AI translation queue parallelism 1-10 (needs restart)', isPublic: true },
       // Bank Transfer
       { key: 'bank_name', value: '', description: 'Bank Name for Wire Transfer', isPublic: true },

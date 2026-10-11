@@ -27,6 +27,7 @@ export default function SettingsPage() {
     const [transModels, setTransModels] = useState<Array<{ provider: string; model: string; apiKey?: string }>>([]);
     const [contentModel, setContentModel] = useState<{ provider: string; model: string; apiKey?: string }>({ provider: 'openai', model: '' });
     const [blogModel, setBlogModel] = useState<{ provider: string; model: string; apiKey?: string }>({ provider: 'openai', model: '' });
+    const [reviewsModel, setReviewsModel] = useState<{ provider: string; model: string; apiKey?: string }>({ provider: 'openai', model: '' });
     const [goldPrice, setGoldPrice] = useState<GoldPriceInfo | null>(null);
     const [syncResult, setSyncResult] = useState<string | null>(null);
 
@@ -120,6 +121,7 @@ export default function SettingsPage() {
             } catch { setTransModels([]); }
             setContentModel(parseModelEntry(data.ai_content_model));
             setBlogModel(parseModelEntry(data.ai_blog_model));
+            setReviewsModel(parseModelEntry(data.ai_reviews_model));
         } catch { /* noop */ }
     };
 
@@ -131,6 +133,7 @@ export default function SettingsPage() {
                 ai_translation_models: JSON.stringify(transModels.filter(m => m.model.trim())),
                 ai_content_model: JSON.stringify(contentModel.model.trim() ? contentModel : {}),
                 ai_blog_model: JSON.stringify(blogModel.model.trim() ? blogModel : {}),
+                ai_reviews_model: JSON.stringify(reviewsModel.model.trim() ? reviewsModel : {}),
             });
             message.success('AI ayarları kaydedildi!');
         } catch (error: any) {
@@ -505,7 +508,7 @@ export default function SettingsPage() {
                     </Card>
 
                     <Row gutter={16}>
-                        <Col span={8}>
+                        <Col span={6}>
                             <Card size="small" title="İçerik Modeli (açıklama üretimi)" style={{ marginBottom: 16 }}>
                                 <Select
                                     value={contentModel.provider}
@@ -529,7 +532,7 @@ export default function SettingsPage() {
                                 />
                             </Card>
                         </Col>
-                        <Col span={8}>
+                        <Col span={6}>
                             <Card size="small" title="Blog Modeli (taslak + çeviri)" style={{ marginBottom: 16 }}>
                                 <Select
                                     value={blogModel.provider}
@@ -553,7 +556,31 @@ export default function SettingsPage() {
                                 />
                             </Card>
                         </Col>
-                        <Col span={8}>
+                        <Col span={6}>
+                            <Card size="small" title="Yorum Modeli (AI yorum üretimi)" style={{ marginBottom: 16 }}>
+                                <Select
+                                    value={reviewsModel.provider}
+                                    style={{ width: '100%', marginBottom: 8 }}
+                                    onChange={v => setReviewsModel(m => ({ ...m, provider: v }))}
+                                >
+                                    <Select.Option value="openai">OpenAI</Select.Option>
+                                    <Select.Option value="openrouter">OpenRouter</Select.Option>
+                                    <Select.Option value="gemini">Gemini</Select.Option>
+                                </Select>
+                                <Input
+                                    value={reviewsModel.model}
+                                    placeholder="model (boş = genel)"
+                                    style={{ marginBottom: 8 }}
+                                    onChange={e => setReviewsModel(m => ({ ...m, model: e.target.value }))}
+                                />
+                                <Input.Password
+                                    value={reviewsModel.apiKey || ''}
+                                    placeholder="Özel anahtar (boş = genel)"
+                                    onChange={e => setReviewsModel(m => ({ ...m, apiKey: e.target.value }))}
+                                />
+                            </Card>
+                        </Col>
+                        <Col span={6}>
                             <Card size="small" title="Kuyruk" style={{ marginBottom: 16 }}>
                                 <Form.Item
                                     name="ai_queue_concurrency"

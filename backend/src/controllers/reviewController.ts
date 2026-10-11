@@ -285,20 +285,27 @@ export class ReviewController {
       if (readiness) return res.status(400).json({ error: readiness });
 
       const created: any[] = [];
+      let lastError = '';
       for (let i = 0; i < count; i++) {
         // Puan dağılımı: çoğunluk 5/4, ara sıra 3 (gerçekçi karışım)
         const roll = Math.random();
         const rating = roll < 0.6 ? 5 : roll < 0.9 ? 4 : 3;
         const lang = langs[i % langs.length];
         const langNames: Record<string, string> = { en: 'English', tr: 'Turkish', it: 'Italian', es: 'Spanish', ar: 'Arabic' };
-        const res = await aiService.generateForPurpose(
-          'content',
+        const sysPrompt =
           `You are a verified-style jewelry shopper writing a short product review in ${langNames[lang]}. ` +
           `Write a realistic ${rating}-star review: 1-6 word TITLE and 1-3 sentence COMMENT about quality, look, packaging or gifting. ` +
           `Vary tone across reviews (enthusiastic, practical, gift-giver). No HTML, no markdown, no quotes around the whole text. ` +
-          `Return ONLY raw JSON: {"title": "...", "comment": "..."}`,
-          `Product: ${product.title}\nCategory: ${product.category || ''}\nRating: ${rating}/5`
-        );
+          `Return ONLY raw JSON: {"title": "...", "comment": "..."}`;
+        const userPrompt = `Product: ${product.title}\nCategory: ${product.category || ''}\nRating: ${rating}/5`;
+        // Ücretsiz modeller ara sıra boş döner — her yorumu 1 kez daha dene
+        // Yorum üretimi kendi modelini kullanır (Admin → AI → Yorum Modeli, boşsa genel)
+        let res: any = null;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          res = await aiService.generateForPurpose('reviews', sysPrompt, userPrompt);
+          if (res.success && res.content) break;
+          lastError = res.error || lastError;
+        }
         if (!res.success || !res.content) {
           continue;
         }
@@ -329,6 +336,12 @@ export class ReviewController {
           isVerifiedPurchase: false
         });
         created.push({ id: row.id, rating, language: lang, reviewerName: maskReviewerName(name) });
+      }
+
+      if (created.length === 0) {
+        return res.status(500).json({
+          error: `Hiçbir yorum üretilemedi.${lastError ? ` Son hata: ${String(lastError).slice(0, 400)}` : ''}`
+        });
       }
 
       return res.json({
