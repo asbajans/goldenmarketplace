@@ -20,6 +20,7 @@ router.put('/users/:id/assign-plan', AdminController.assignPlanToUser);
 router.get('/stores', AdminController.getStores);
 router.post('/stores', AdminController.createStore);
 router.put('/stores/:id', AdminController.updateStore);
+router.put('/stores/:id/showcase', AdminController.setStoreShowcase);
 router.delete('/stores/:id', AdminController.deleteStore);
 
 // --- CATEGORIES ---
@@ -47,6 +48,8 @@ router.post('/users/:id/credits', AdminController.grantUserCredits);
 router.get('/products', AdminController.getAllProducts);
 router.post('/products/backfill-feed-attributes', AdminController.backfillFeedAttributes);
 router.post('/products/auto-categorize', AdminController.autoCategorizeProducts);
+router.post('/products/:id/dope', AdminController.dopeAnyProduct);
+router.delete('/products/:id/dope', AdminController.undopeAnyProduct);
 router.put('/products/:id', AdminController.updateProductByAdmin);
 
 // --- PRODUCT REVIEWS (moderation) ---
@@ -54,6 +57,8 @@ import { ReviewController } from '../controllers/reviewController';
 router.get('/reviews', ReviewController.adminList);
 router.put('/reviews/:id', ReviewController.adminUpdate);
 router.delete('/reviews/:id', ReviewController.adminDelete);
+router.post('/reviews/ai-generate', ReviewController.aiGenerate);
+router.post('/reviews/product/:productId/approve-all', ReviewController.approveAllForProduct);
 
 // --- INTEGRATIONS ---
 router.get('/integrations', AdminController.getIntegrations);

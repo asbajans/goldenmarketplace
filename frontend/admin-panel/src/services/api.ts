@@ -73,6 +73,8 @@ export const AdminAPI = {
     getAllProducts: (params?: { page?: number; limit?: number; search?: string; storeId?: string }) =>
         api.get('/products', { params }).then((res) => res.data),
     updateProduct: (id: string, data: any) => api.put(`/products/${id}`, data).then((res) => res.data),
+    dopeProduct: (id: string, data?: { days?: number; style?: string }) => api.post(`/products/${id}/dope`, data || {}).then((res) => res.data),
+    undopeProduct: (id: string) => api.delete(`/products/${id}/dope`).then((res) => res.data),
 
     // Stores
     getStores: () => api.get('/stores').then((res) => res.data),
@@ -111,6 +113,10 @@ export const AdminAPI = {
     updateReview: (id: string, data: { isApproved?: boolean; isVerifiedPurchase?: boolean }) =>
         api.put(`/reviews/${id}`, data).then((res) => res.data),
     deleteReview: (id: string) => api.delete(`/reviews/${id}`).then((res) => res.data),
+    aiGenerateReviews: (data: { productId: string; count?: number; languages?: string[] }) =>
+        api.post('/reviews/ai-generate', data).then((res) => res.data),
+    approveAllReviews: (productId: string) =>
+        api.post(`/reviews/product/${productId}/approve-all`).then((res) => res.data),
 
     // Settings – single key helpers (used by ContentManagementPage)
     getSetting: (key: string) =>

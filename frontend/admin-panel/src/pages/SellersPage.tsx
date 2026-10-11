@@ -51,7 +51,8 @@ export const SellersPage: React.FC = () => {
 
     const handleEdit = (record: any) => {
         setEditingStore(record);
-        form.setFieldsValue(record);
+        const until = record.showcaseUntil ? String(record.showcaseUntil).slice(0, 10) : undefined;
+        form.setFieldsValue({ ...record, showcaseUntil: until });
         setIsModalVisible(true);
     };
 
@@ -104,6 +105,21 @@ export const SellersPage: React.FC = () => {
             render: (user: any) => user ? `${user.firstName} ${user.lastName}` : '-'
         },
         { title: 'Ürün Sayısı', dataIndex: 'totalProducts', key: 'totalProducts' },
+        {
+            title: 'Vitrin Ağırlığı',
+            key: 'showcaseWeight',
+            render: (_: any, record: any) => {
+                const w = Number(record.showcaseWeight) || 0;
+                const until = record.showcaseUntil ? new Date(record.showcaseUntil) : null;
+                const expired = until && until.getTime() < Date.now();
+                if (w <= 0 || expired) return <Tag>Yok</Tag>;
+                return (
+                    <Tag color="gold">
+                        {w}{until ? ` (${until.toLocaleDateString('tr-TR')}'e kadar)` : ''}
+                    </Tag>
+                );
+            }
+        },
         { 
             title: 'Komisyon (%)', 
             dataIndex: 'commissionRate', 
@@ -184,6 +200,20 @@ export const SellersPage: React.FC = () => {
                             </Form.Item>
                             <Form.Item name="defaultShippingDays" label="Varsayılan Kargo Süresi (Gün)">
                                 <Input type="number" min={1} max={30} />
+                            </Form.Item>
+                            <Form.Item
+                                name="showcaseWeight"
+                                label="Vitrin Ağırlığı"
+                                tooltip="Ana sayfa ve kategorilerde öne çıkarır. Yüksek ağırlık üstte görünür. 0 = vitrin yok."
+                            >
+                                <Input type="number" min={0} />
+                            </Form.Item>
+                            <Form.Item
+                                name="showcaseUntil"
+                                label="Vitrin Bitişi (opsiyonel)"
+                                tooltip="Boş bırakılırsa süresiz. Tarih geçince ağırlık yok sayılır."
+                            >
+                                <Input type="date" />
                             </Form.Item>
                         </>
                     )}

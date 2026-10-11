@@ -28,6 +28,11 @@ router.get('/store/sync-status', authMiddleware, sellerMiddleware, ProductContro
 router.put('/store/sync-status', authMiddleware, sellerMiddleware, ProductController.setAutoPriceSyncStatus);
 router.post('/store/sync-prices', authMiddleware, sellerMiddleware, ProductController.syncStorePrices);
 
+// Showcase doping (paket kotası)
+router.get('/store/doping-quota', authMiddleware, sellerMiddleware, ProductController.dopingQuota);
+router.post('/:id/dope', authMiddleware, sellerMiddleware, ProductController.dopeProduct);
+router.delete('/:id/dope', authMiddleware, sellerMiddleware, ProductController.undopeProduct);
+
 // Bulk Upload
 router.post('/bulk-parse', authMiddleware, sellerMiddleware, upload.single('file'), productBulkController.parseBulkFile);
 router.post('/bulk-import', authMiddleware, sellerMiddleware, productBulkController.importBulkProducts);

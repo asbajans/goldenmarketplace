@@ -7,6 +7,7 @@ import { Request, Response } from 'express';
 import { Op, Sequelize } from 'sequelize';
 import { Product, ProductVariant, Store } from '../models';
 import goldPriceService from '../services/goldPriceService';
+import showcaseService from '../services/showcaseService';
 import { s3Service } from '../services/s3Service';
 import { productSyncQueue } from '../jobs/productSyncJob';
 
@@ -816,6 +817,67 @@ export class ProductController {
           console.error('Sync store prices error:', error);
           return res.status(500).json({ error: 'Manual sync failed' });
       }
+  }
+
+  /**
+   * GET /products/store/doping-quota — satıcının doping hakkı (kota doluluk)
+   */
+  static async dopingQuota(req: Request, res: Response) {
+    try {
+      const user = (req as any).user;
+      const store = await Store.findOne({ where: { userId: user.id } });
+      if (!store) return res.status(400).json({ error: { message: 'Mağazanız yok.', status: 400 } });
+      const access = await showcaseService.checkDopingAccess(user.id, store.id);
+      return res.status(200).json(access);
+    } catch (error: any) {
+      return res.status(500).json({ error: { message: error.message || 'Kota alınamadı', status: 500 } });
+    }
+  }
+
+  /**
+   * POST /products/:id/dope — ürünü dopingli yap (paket kotası düşer)
+   */
+  static async dopeProduct(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const user = (req as any).user;
+      const store = await Store.findOne({ where: { userId: user.id } });
+      if (!store) return res.status(400).json({ error: { message: 'Mağazanız yok.', status: 400 } });
+      const product = await Product.findByPk(id);
+      if (!product || product.storeId !== store.id) {
+        return res.status(404).json({ error: { message: 'Ürün bulunamadı.', status: 404 } });
+      }
+      const alreadyActive = showcaseService.isDopingActive(product);
+      const access = await showcaseService.checkDopingAccess(user.id, store.id);
+      // Kendi aktif dopingini uzatmak kota yemez (sayıma zaten dahil)
+      if (!alreadyActive && !access.allowed) {
+        return res.status(403).json({ error: { status: 403, ...access } });
+      }
+      await showcaseService.dopeProduct(product, access.durationDays);
+      return res.status(200).json({ message: 'Ürün dopinglendi', product });
+    } catch (error: any) {
+      return res.status(500).json({ error: { message: error.message || 'Doping başarısız', status: 500 } });
+    }
+  }
+
+  /**
+   * DELETE /products/:id/dope — dopingi kaldır (kota yeri boşalır)
+   */
+  static async undopeProduct(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const user = (req as any).user;
+      const store = await Store.findOne({ where: { userId: user.id } });
+      if (!store) return res.status(400).json({ error: { message: 'Mağazanız yok.', status: 400 } });
+      const product = await Product.findByPk(id);
+      if (!product || product.storeId !== store.id) {
+        return res.status(404).json({ error: { message: 'Ürün bulunamadı.', status: 404 } });
+      }
+      await showcaseService.undopeProduct(product);
+      return res.status(200).json({ message: 'Doping kaldırıldı', product });
+    } catch (error: any) {
+      return res.status(500).json({ error: { message: error.message || 'İşlem başarısız', status: 500 } });
+    }
   }
 
   /**

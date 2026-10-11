@@ -30,6 +30,9 @@ interface ProductAttributes {
   b2bPrice: number;
   discountRate: number;
   discountedPrice: number;
+  isDoped?: boolean;
+  dopedUntil?: Date | null;
+  dopingStyle?: string;
   quantity: number;
   images: string[];
   videos?: string[];
@@ -77,6 +80,9 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public b2bPrice!: number;
   public discountRate!: number;
   public discountedPrice!: number;
+  public isDoped!: boolean;
+  public dopedUntil?: Date | null;
+  public dopingStyle?: string;
   public quantity!: number;
   public images!: string[];
   public videos?: string[];
@@ -234,6 +240,24 @@ Product.init(
       allowNull: true,
       defaultValue: null,
       comment: 'Calculated: priceTRY × (1 - discountRate/100)'
+    },
+    isDoped: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      comment: 'Vitrin dopingi aktif mi (süre dopedUntil ile sınırlı)'
+    },
+    dopedUntil: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
+      comment: 'Doping bitiş tarihi. Süresi dolan doping sıralamada ve çerçevede yok sayılır.'
+    },
+    dopingStyle: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'gold',
+      comment: 'Vitrin görsel stili sözleşmesi (örn. gold = altın çerçeve). market/ reposu uygular.'
     },
     quantity: {
       type: DataTypes.INTEGER,

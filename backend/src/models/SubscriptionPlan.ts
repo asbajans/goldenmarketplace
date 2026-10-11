@@ -22,6 +22,8 @@ interface SubscriptionPlanAttributes {
     b2bEnabled?: boolean; // B2B pazara erişim + ürün kopyalama
     bulkUploadEnabled?: boolean; // Excel/CSV toplu ürün yükleme
     maxExternalFeeds?: number; // harici feed (XML/CSV) adedi, 0 = kapalı
+    dopingMonthlyLimit?: number; // aynı anda dopingli olabilecek ürün adedi, 0 = kapalı
+    dopingDurationDays?: number; // doping süresi (gün)
     stripePriceId?: string;
     stripePriceIdYearly?: string; // yıllık dönem için ayrı Stripe Price ID
     features: string[];
@@ -47,6 +49,8 @@ class SubscriptionPlan extends Model<SubscriptionPlanAttributes> implements Subs
     public b2bEnabled?: boolean;
     public bulkUploadEnabled?: boolean;
     public maxExternalFeeds?: number;
+    public dopingMonthlyLimit?: number;
+    public dopingDurationDays?: number;
     public stripePriceIdYearly?: string;
     public features!: string[];
     public isActive!: boolean;
@@ -131,6 +135,18 @@ SubscriptionPlan.init(
             allowNull: false,
             defaultValue: 0,
             comment: 'Harici feed (XML/CSV içe aktarma) adedi, 0 = kapalı'
+        },
+        dopingMonthlyLimit: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            defaultValue: 0,
+            comment: 'Aynı anda dopingli olabilecek ürün adedi (süre bitenler kota yerini boşaltır), 0 = kapalı'
+        },
+        dopingDurationDays: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            defaultValue: 30,
+            comment: 'Satıcı dopinginin geçerlilik süresi (gün)'
         },
         stripePriceIdYearly: {
             type: DataTypes.STRING,

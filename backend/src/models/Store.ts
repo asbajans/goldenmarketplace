@@ -32,6 +32,8 @@ interface StoreAttributes {
   branchCode?: string;
   cryptoWallet?: string;
   paymentMethods?: { stripe: boolean; bankTransfer: boolean; crypto: boolean };
+  showcaseWeight?: number;
+  showcaseUntil?: Date;
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -58,6 +60,8 @@ class Store extends Model<StoreAttributes> implements StoreAttributes {
   public branchCode?: string;
   public cryptoWallet?: string;
   public paymentMethods?: { stripe: boolean; bankTransfer: boolean; crypto: boolean };
+  public showcaseWeight!: number;
+  public showcaseUntil?: Date;
   public isActive!: boolean;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -201,6 +205,18 @@ Store.init(
       field: 'paymentmethods',
       defaultValue: { stripe: true, bankTransfer: false, crypto: false },
       comment: 'Enabled payment methods'
+    },
+    showcaseWeight: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+      comment: 'Vitrin onceligi (admin belirler): yuksek agirlik ana sayfa/kategoride onde cikar'
+    },
+    showcaseUntil: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
+      comment: 'Vitrin agirliginin gecerlilik bitisi (bos = suresiz). Bitince agirlik yok sayilir.'
     },
     isActive: {
       type: DataTypes.BOOLEAN,

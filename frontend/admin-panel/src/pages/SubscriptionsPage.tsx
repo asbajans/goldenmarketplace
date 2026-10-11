@@ -29,7 +29,7 @@ export const SubscriptionsPage: React.FC = () => {
     const handleAdd = () => {
         setEditingPlan(null);
         form.resetFields();
-        form.setFieldsValue({ isActive: true, monthlyPrice: 0, yearlyPrice: 0, productLimit: 50, integrationLimit: 1, features: [], b2bEnabled: false, bulkUploadEnabled: false, maxExternalFeeds: 0, aiTranslationEnabled: false, aiContentEnabled: false, aiMonthlyCredit: 0 });
+        form.setFieldsValue({ isActive: true, monthlyPrice: 0, yearlyPrice: 0, productLimit: 50, integrationLimit: 1, features: [], b2bEnabled: false, bulkUploadEnabled: false, maxExternalFeeds: 0, aiTranslationEnabled: false, aiContentEnabled: false, aiMonthlyCredit: 0, dopingMonthlyLimit: 0, dopingDurationDays: 30 });
         setIsModalVisible(true);
     };
 
@@ -86,6 +86,7 @@ export const SubscriptionsPage: React.FC = () => {
                     <Tag color={record.bulkUploadEnabled ? 'cyan' : 'default'}>Toplu{record.bulkUploadEnabled ? '' : ': yok'}</Tag>
                     <Tag color={(record.maxExternalFeeds || 0) > 0 ? 'orange' : 'default'}>Feed: {record.maxExternalFeeds || 0}</Tag>
                     <Tag color={record.aiMonthlyCredit > 0 ? 'gold' : 'default'}>AI: {record.aiMonthlyCredit || 0}/ay</Tag>
+                    <Tag color={(record.dopingMonthlyLimit || 0) > 0 ? 'magenta' : 'default'}>Doping: {record.dopingMonthlyLimit || 0}</Tag>
                 </Space>
             )
         },
@@ -191,6 +192,12 @@ export const SubscriptionsPage: React.FC = () => {
                         </Form.Item>
                         <Form.Item name="maxExternalFeeds" label="Harici Feed Adedi" tooltip="XML/CSV feed içe aktarma hakkı, 0 = kapalı">
                             <InputNumber min={0} style={{ width: '130px' }} />
+                        </Form.Item>
+                        <Form.Item name="dopingMonthlyLimit" label="Doping Hakkı (ürün)" tooltip="Aynı anda dopingli olabilecek ürün adedi. Süresi dolan yer açar. 0 = kapalı">
+                            <InputNumber min={0} style={{ width: '130px' }} />
+                        </Form.Item>
+                        <Form.Item name="dopingDurationDays" label="Doping Süresi (gün)" tooltip="Satıcı dopinginin geçerlilik süresi">
+                            <InputNumber min={1} style={{ width: '130px' }} />
                         </Form.Item>
                     </Space>
 

@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Table, Button, Space, message, Modal, Tabs, Tag, Switch, Typography, Input, Checkbox, Row, Col, Tooltip, Select, notification } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined, DollarOutlined, GoldOutlined, ThunderboltOutlined, EyeOutlined } from '@ant-design/icons';
-import { deleteProduct, getAutoSyncStatus, setAutoSyncStatus, triggerManualSync, Product } from '../api/product';
+import { deleteProduct, getAutoSyncStatus, setAutoSyncStatus, triggerManualSync, getDopingQuota, dopeProduct, undopeProduct, DopingQuota, Product } from '../api/product';
 import { bulkAITranslate, cleanupDescriptions, getAITasks } from '../api/ai';
 import client from '../api/client';
 import AddProduct from './AddProduct';
@@ -34,6 +34,40 @@ const ProductList: React.FC = () => {
     const [cleanupKeyword, setCleanupKeyword] = useState('');
     const [cleanupAction, setCleanupAction] = useState<'clear_matching' | 'clear_all'>('clear_matching');
     const [cleanupLoading, setCleanupLoading] = useState(false);
+    const [dopingQuota, setDopingQuota] = useState<DopingQuota | null>(null);
+
+    const isDopedActive = (p: Product) =>
+        !!p.isDoped && (!p.dopedUntil || new Date(p.dopedUntil).getTime() > Date.now());
+
+    const fetchDopingQuota = async () => {
+        try {
+            setDopingQuota(await getDopingQuota());
+        } catch {
+            setDopingQuota(null);
+        }
+    };
+
+    const handleDope = async (record: Product) => {
+        try {
+            await dopeProduct(record.id);
+            message.success(`Doping aktif (${dopingQuota?.durationDays || 30} gün) — ürün vitrinde öne çıkar`);
+            fetchProducts();
+            fetchDopingQuota();
+        } catch (err: any) {
+            message.error(err?.response?.data?.error?.message || err?.response?.data?.error || 'Doping başarısız');
+        }
+    };
+
+    const handleUndope = async (record: Product) => {
+        try {
+            await undopeProduct(record.id);
+            message.success('Doping kaldırıldı');
+            fetchProducts();
+            fetchDopingQuota();
+        } catch {
+            message.error('İşlem başarısız');
+        }
+    };
 
     useEffect(() => {
         setPagination(p => ({ ...p, current: 1 }));
@@ -198,6 +232,7 @@ const ProductList: React.FC = () => {
     // Sayfa yenilense bile sürmekte olan iş varsa izleme moduna gir —
     // buton "AI İzle" olur, "Çevir" aktif kalıp kafa karıştırmaz.
     useEffect(() => {
+        fetchDopingQuota();
         (async () => {
             try {
                 const all = await getAITasks(undefined, 200);
@@ -315,11 +350,27 @@ const ProductList: React.FC = () => {
         { title: 'Fiyat (TL)', dataIndex: 'priceTRY', key: 'priceTRY', render: (val: number) => `${Number(val).toLocaleString('tr-TR')} ₺` },
         { title: 'Miktar', dataIndex: 'quantity', key: 'quantity' },
         {
+            title: 'Doping',
+            key: 'doping',
+            render: (_: any, record: Product) => isDopedActive(record)
+                ? <Tag color="gold">Dopingli</Tag>
+                : <Tag color="default">Yok</Tag>
+        },
+        {
             title: 'İşlemler',
             key: 'actions',
             render: (_: any, record: Product) => (
                 <Space>
                     <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} />
+                    {isDopedActive(record) ? (
+                        <Tooltip title="Dopingi kaldır (kota yeri boşalır)">
+                            <Button icon={<ThunderboltOutlined />} style={{ color: '#d4a017', borderColor: '#d4a017' }} onClick={() => handleUndope(record)} />
+                        </Tooltip>
+                    ) : (
+                        <Tooltip title={dopingQuota ? `Doping yap (${dopingQuota.used}/${dopingQuota.limit} kullanılıyor)` : 'Doping yap'}>
+                            <Button icon={<ThunderboltOutlined />} onClick={() => handleDope(record)} />
+                        </Tooltip>
+                    )}
                     <Button icon={<DeleteOutlined />} danger onClick={() => handleDelete(record.id, record.title)} />
                 </Space>
             )

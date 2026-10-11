@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { Product, Store, ProductVariant, Category, ProductReview } from '../models';
+import showcaseService from '../services/showcaseService';
 import { Op, Sequelize, WhereOptions } from 'sequelize';
 import { buildProductJsonLd } from '../utils/jsonLd';
 
@@ -111,8 +112,8 @@ function applyTranslation(product: any, lang: string): any {
  */
 async function buildDetailJsonLd(product: any, data: any) {
   try {
-    const approved = await ProductReview.findAll({
-      where: { productId: product.id, isApproved: true },
+      const approved = await ProductReview.findAll({
+        where: { productId: product.id, isApproved: true, source: 'human' },
       order: [['createdAt', 'DESC']],
       limit: 10,
       attributes: ['reviewerName', 'rating', 'title', 'comment', 'createdAt']
@@ -145,7 +146,37 @@ async function buildDetailJsonLd(product: any, data: any) {
 }
 
 export class MarketplaceController {
-  
+
+  /**
+   * GET /api/marketplace/policies/return?lang=tr
+   * Public, girişsiz erişilir (Merchant Center şartı). Dil yoksa en→tr düşer.
+   */
+  static async getReturnPolicy(req: Request, res: Response) {
+    try {
+      const lang = String(req.query.lang || 'tr').toLowerCase();
+      const { default: GlobalSetting } = await import('../models/GlobalSetting');
+      const row = await GlobalSetting.findOne({ where: { key: 'return_policy' } });
+      if (!row?.value) return res.status(404).json({ error: 'Return policy not found' });
+      let parsed: any = {};
+      try {
+        parsed = JSON.parse(row.value);
+      } catch {
+        return res.status(500).json({ error: 'Return policy is malformed' });
+      }
+      const entry = parsed[lang] || parsed.en || parsed.tr;
+      if (!entry) return res.status(404).json({ error: 'Return policy not found' });
+      return res.json({
+        title: entry.title || 'Return Policy',
+        body: entry.body || '',
+        lang: parsed[lang] ? lang : (parsed.en ? 'en' : 'tr'),
+        updatedAt: (row as any).updatedAt || null
+      });
+    } catch (error) {
+      console.error('[Marketplace] getReturnPolicy error:', error);
+      return res.status(500).json({ error: 'Failed to fetch return policy' });
+    }
+  }
+
   /**
    * GET /api/marketplace/products
    * Public discovery for B2C frontend.
@@ -266,15 +297,16 @@ export class MarketplaceController {
         where = { ...where, [Op.and]: andConds };
       }
 
-      let order: any[] = [['createdAt', 'DESC']];
+      let order: any[] = showcaseService.showcaseOrder();
       if (sort === 'price_asc') order = [['priceTRY', 'ASC']];
       else if (sort === 'price_desc') order = [['priceTRY', 'DESC']];
       else if (sort === 'popular') order = [['createdAt', 'DESC']];
+      // sort verilmediyse vitrin sırası: dopingli → mağaza ağırlığı → en yeni
 
       const includeStore: any = {
         model: Store,
         as: 'store',
-        attributes: ['id', 'storeName', 'storeSlug', 'logo']
+        attributes: ['id', 'storeName', 'storeSlug', 'logo', 'showcaseWeight']
       };
       if (storeSlug) {
         includeStore.where = { storeSlug };
@@ -283,7 +315,7 @@ export class MarketplaceController {
 
       const { count, rows: products } = await Product.findAndCountAll({
         where,
-        attributes: ['id', 'title', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'description', 'discountRate', 'discountedPrice'],
+        attributes: ['id', 'title', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'description', 'discountRate', 'discountedPrice', 'isDoped', 'dopedUntil', 'dopingStyle'],
         include: [
           includeStore,
           { model: Category, as: 'categoryRef', attributes: ['id', 'name', 'translations', 'slug'] }
@@ -315,7 +347,7 @@ export class MarketplaceController {
 
       const product = await Product.findOne({
         where: { slug, isActive: true },
-        attributes: ['id', 'title', 'description', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'sku', 'quantity', 'gramWeight', 'marketplaces', 'discountRate', 'discountedPrice', 'ratingAverage', 'ratingCount'],
+        attributes: ['id', 'title', 'description', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'sku', 'quantity', 'gramWeight', 'marketplaces', 'discountRate', 'discountedPrice', 'ratingAverage', 'ratingCount', 'isDoped', 'dopedUntil', 'dopingStyle'],
         include: [
           {
             model: Store,
@@ -351,7 +383,7 @@ export class MarketplaceController {
 
       const product = await Product.findOne({
         where: { id, isActive: true },
-        attributes: ['id', 'title', 'description', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'sku', 'quantity', 'gramWeight', 'marketplaces', 'discountRate', 'discountedPrice', 'ratingAverage', 'ratingCount'],
+        attributes: ['id', 'title', 'description', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'sku', 'quantity', 'gramWeight', 'marketplaces', 'discountRate', 'discountedPrice', 'ratingAverage', 'ratingCount', 'isDoped', 'dopedUntil', 'dopingStyle'],
         include: [
           {
             model: Store,

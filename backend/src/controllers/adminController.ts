@@ -140,15 +140,72 @@ export class AdminController {
     static async updateStore(req: Request, res: Response): Promise<Response> {
         try {
             const { id } = req.params;
-            const { storeName, storeSlug, description, isActive } = req.body;
+            const { storeName, storeSlug, description, isActive, showcaseWeight, showcaseUntil } = req.body;
 
             const store = await Store.findByPk(id);
             if (!store) return res.status(404).json({ error: 'Store not found' });
 
-            await store.update({ storeName, storeSlug, description, isActive });
+            const updateData: any = { storeName, storeSlug, description, isActive };
+            if (showcaseWeight !== undefined) updateData.showcaseWeight = Math.max(0, Number(showcaseWeight) || 0);
+            if (showcaseUntil !== undefined) updateData.showcaseUntil = showcaseUntil || null;
+            await store.update(updateData);
             return res.json(store);
         } catch (error: any) {
             return res.status(400).json({ error: error.message || 'Failed to update store' });
+        }
+    }
+
+    /**
+     * PUT /admin/stores/:id/showcase — mağaza vitrin ağırlığı (admin seçimi).
+     * Body: { showcaseWeight: number, showcaseUntil?: string|null }
+     */
+    static async setStoreShowcase(req: Request, res: Response): Promise<Response> {
+        try {
+            const { id } = req.params;
+            const { showcaseWeight = 0, showcaseUntil = null } = req.body;
+            const store = await Store.findByPk(id);
+            if (!store) return res.status(404).json({ error: 'Store not found' });
+            await store.update({
+                showcaseWeight: Math.max(0, Number(showcaseWeight) || 0),
+                showcaseUntil: showcaseUntil || null
+            });
+            return res.json(store);
+        } catch (error: any) {
+            return res.status(400).json({ error: error.message || 'Failed to update showcase' });
+        }
+    }
+
+    /**
+     * POST /admin/products/:id/dope — herhangi bir ürünü dopingli yap (kotasız, admin).
+     * Body: { days?: number (varsayılan 30), style?: string (varsayılan gold) }
+     */
+    static async dopeAnyProduct(req: Request, res: Response): Promise<Response> {
+        try {
+            const { id } = req.params;
+            const { days = 30, style = 'gold' } = req.body || {};
+            const product = await Product.findByPk(id);
+            if (!product) return res.status(404).json({ error: 'Product not found' });
+            const { default: showcaseService } = await import('../services/showcaseService');
+            await showcaseService.dopeProduct(product, Number(days) || 30, String(style || 'gold'));
+            return res.json({ message: 'Ürün dopinglendi', product });
+        } catch (error: any) {
+            return res.status(400).json({ error: error.message || 'Failed to dope product' });
+        }
+    }
+
+    /**
+     * DELETE /admin/products/:id/dope — doping kaldır (admin).
+     */
+    static async undopeAnyProduct(req: Request, res: Response): Promise<Response> {
+        try {
+            const { id } = req.params;
+            const product = await Product.findByPk(id);
+            if (!product) return res.status(404).json({ error: 'Product not found' });
+            const { default: showcaseService } = await import('../services/showcaseService');
+            await showcaseService.undopeProduct(product);
+            return res.json({ message: 'Doping kaldırıldı', product });
+        } catch (error: any) {
+            return res.status(400).json({ error: error.message || 'Failed to undope product' });
         }
     }
 
@@ -299,7 +356,7 @@ export class AdminController {
 
     static async createSubscriptionPlan(req: Request, res: Response): Promise<Response> {
         try {
-            const { name, description, monthlyPrice, yearlyPrice, currency, interval, productLimit, integrationLimit, aiTranslationEnabled, aiContentEnabled, aiMonthlyCredit, b2bEnabled, bulkUploadEnabled, maxExternalFeeds, features, stripePriceId, stripePriceIdYearly, isActive } = req.body;
+            const { name, description, monthlyPrice, yearlyPrice, currency, interval, productLimit, integrationLimit, aiTranslationEnabled, aiContentEnabled, aiMonthlyCredit, b2bEnabled, bulkUploadEnabled, maxExternalFeeds, dopingMonthlyLimit, dopingDurationDays, features, stripePriceId, stripePriceIdYearly, isActive } = req.body;
             const plan = await SubscriptionPlan.create({
                 name,
                 description,
@@ -315,6 +372,8 @@ export class AdminController {
                 b2bEnabled: b2bEnabled || false,
                 bulkUploadEnabled: bulkUploadEnabled || false,
                 maxExternalFeeds: maxExternalFeeds ?? 0,
+                dopingMonthlyLimit: dopingMonthlyLimit ?? 0,
+                dopingDurationDays: dopingDurationDays ?? 30,
                 features,
                 stripePriceId,
                 stripePriceIdYearly,
@@ -329,7 +388,7 @@ export class AdminController {
     static async updateSubscriptionPlan(req: Request, res: Response) {
         try {
             const { id } = req.params;
-            const { name, description, monthlyPrice, yearlyPrice, currency, interval, productLimit, integrationLimit, aiTranslationEnabled, aiContentEnabled, aiMonthlyCredit, b2bEnabled, bulkUploadEnabled, maxExternalFeeds, features, stripePriceId, stripePriceIdYearly, isActive } = req.body;
+            const { name, description, monthlyPrice, yearlyPrice, currency, interval, productLimit, integrationLimit, aiTranslationEnabled, aiContentEnabled, aiMonthlyCredit, b2bEnabled, bulkUploadEnabled, maxExternalFeeds, dopingMonthlyLimit, dopingDurationDays, features, stripePriceId, stripePriceIdYearly, isActive } = req.body;
             const plan = await SubscriptionPlan.findByPk(id);
             if (!plan) {
                 return res.status(404).json({ error: 'Plan not found' });
@@ -349,6 +408,8 @@ export class AdminController {
                 b2bEnabled: b2bEnabled !== undefined ? b2bEnabled : plan.b2bEnabled,
                 bulkUploadEnabled: bulkUploadEnabled !== undefined ? bulkUploadEnabled : plan.bulkUploadEnabled,
                 maxExternalFeeds: maxExternalFeeds !== undefined ? maxExternalFeeds : plan.maxExternalFeeds,
+                dopingMonthlyLimit: dopingMonthlyLimit !== undefined ? dopingMonthlyLimit : plan.dopingMonthlyLimit,
+                dopingDurationDays: dopingDurationDays !== undefined ? dopingDurationDays : plan.dopingDurationDays,
                 features,
                 stripePriceId,
                 stripePriceIdYearly: stripePriceIdYearly !== undefined ? stripePriceIdYearly : plan.stripePriceIdYearly,
@@ -440,7 +501,8 @@ export class AdminController {
                     'b2bPrice', 'b2bDiscount', 'isB2BEnabled', 'quantity',
                     'images', 'isActive', 'profitMargin', 'storeId',
                     'hasVariants', 'marketplaces', 'gender', 'ageGroup', 'color',
-                    'ratingAverage', 'ratingCount', 'createdAt'
+                    'ratingAverage', 'ratingCount', 'createdAt',
+                    'isDoped', 'dopedUntil', 'dopingStyle'
                 ],
                 include: [{
                     model: Store,

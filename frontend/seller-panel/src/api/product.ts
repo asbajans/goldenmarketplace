@@ -7,6 +7,9 @@ export interface Product {
     gramWeight: number | null;
     milyem: number | null;
     pricingType?: 'gold' | 'fixed';
+    isDoped?: boolean;
+    dopedUntil?: string | null;
+    dopingStyle?: string;
     effectiveMilyem?: number;
     gramHas?: number;
     profitMargin: number;
@@ -61,5 +64,28 @@ export const setAutoSyncStatus = async (autoPriceSync: boolean) => {
 
 export const triggerManualSync = async () => {
     const response = await client.post('/products/store/sync-prices');
+    return response.data;
+};
+
+export interface DopingQuota {
+    allowed: boolean;
+    limit: number;
+    used: number;
+    durationDays: number;
+    message: string;
+}
+
+export const getDopingQuota = async () => {
+    const response = await client.get('/products/store/doping-quota');
+    return response.data as DopingQuota;
+};
+
+export const dopeProduct = async (id: string) => {
+    const response = await client.post(`/products/${id}/dope`);
+    return response.data;
+};
+
+export const undopeProduct = async (id: string) => {
+    const response = await client.delete(`/products/${id}/dope`);
     return response.data;
 };

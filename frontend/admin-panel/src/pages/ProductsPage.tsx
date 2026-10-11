@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Card, Button, Modal, Form, Input, InputNumber, Switch, Select, message, Tag, Space } from 'antd';
-import { EditOutlined, SearchOutlined } from '@ant-design/icons';
+import { EditOutlined, SearchOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { AdminAPI } from '../services/api';
 
 export const ProductsPage: React.FC = () => {
@@ -34,6 +34,29 @@ export const ProductsPage: React.FC = () => {
         fetchProducts();
         AdminAPI.getCategories().then(setCategories).catch(() => {});
     }, []);
+
+    const handleDope = async (record: any) => {
+        try {
+            await AdminAPI.dopeProduct(record.id, { days: 30 });
+            message.success('Ürün dopinglendi (30 gün)');
+            fetchProducts(pagination.current, searchText);
+        } catch (error: any) {
+            message.error(error?.response?.data?.error || 'Doping başarısız');
+        }
+    };
+
+    const handleUndope = async (record: any) => {
+        try {
+            await AdminAPI.undopeProduct(record.id);
+            message.success('Doping kaldırıldı');
+            fetchProducts(pagination.current, searchText);
+        } catch {
+            message.error('İşlem başarısız');
+        }
+    };
+
+    const isDopedActive = (record: any) =>
+        !!record.isDoped && (!record.dopedUntil || new Date(record.dopedUntil).getTime() > Date.now());
 
     const handleEdit = (record: any) => {
         setEditingProduct(record);
@@ -124,10 +147,24 @@ export const ProductsPage: React.FC = () => {
             render: (isActive: boolean) => <Tag color={isActive ? 'success' : 'error'}>{isActive ? 'Aktif' : 'Pasif'}</Tag>
         },
         {
+            title: 'Doping',
+            key: 'doping',
+            render: (_: any, record: any) => isDopedActive(record)
+                ? <Tag color="gold">Dopingli</Tag>
+                : <Tag color="default">Yok</Tag>
+        },
+        {
             title: 'İşlem',
             key: 'actions',
             render: (_: any, record: any) => (
-                <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record)}>Gelişmiş Düzenle</Button>
+                <Space>
+                    <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record)}>Gelişmiş Düzenle</Button>
+                    {isDopedActive(record) ? (
+                        <Button type="link" danger onClick={() => handleUndope(record)}>Dopingi Kaldır</Button>
+                    ) : (
+                        <Button type="link" icon={<ThunderboltOutlined />} onClick={() => handleDope(record)}>Doping Yap</Button>
+                    )}
+                </Space>
             )
         }
     ];
