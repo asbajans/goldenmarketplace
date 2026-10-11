@@ -16,7 +16,9 @@ import {
   InboxOutlined,
   CarOutlined,
   LinkOutlined,
-  ThunderboltOutlined
+  ThunderboltOutlined,
+  StarOutlined,
+  UndoOutlined
 } from '@ant-design/icons';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
@@ -37,6 +39,8 @@ import AICreditsPage from './pages/AICreditsPage';
 import Variations from './pages/Variations';
 import Orders from './pages/Orders';
 import Shipments from './pages/Shipments';
+import Reviews from './pages/Reviews';
+import Returns from './pages/Returns';
 import { getCurrentUser, logout } from './api/auth';
 
 const { Header, Sider, Content } = Layout;
@@ -133,6 +137,18 @@ const App: React.FC = () => {
       icon: <CarOutlined />,
       label: 'Kargolar',
       onClick: () => navigate('/shipments')
+    },
+    {
+      key: '/returns',
+      icon: <UndoOutlined />,
+      label: 'İadeler',
+      onClick: () => navigate('/returns')
+    },
+    {
+      key: '/reviews',
+      icon: <StarOutlined />,
+      label: 'Yorumlar',
+      onClick: () => navigate('/reviews')
     },
     {
       key: '/feeds',
@@ -245,6 +261,8 @@ const App: React.FC = () => {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/shipments" element={<Shipments />} />
+            <Route path="/returns" element={<Returns />} />
+            <Route path="/reviews" element={<Reviews />} />
           </Routes>
         </Content>
       </Layout>

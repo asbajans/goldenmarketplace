@@ -1,13 +1,40 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Card, Button, message, Tag, Space, Select, Rate, Popconfirm, Switch, Alert } from 'antd';
-import { DeleteOutlined, CheckOutlined } from '@ant-design/icons';
+import { Table, Card, Button, message, Tag, Space, Select, Rate, Popconfirm, Switch, Alert, Modal, Form, InputNumber } from 'antd';
+import { DeleteOutlined, CheckOutlined, RobotOutlined } from '@ant-design/icons';
 import { AdminAPI } from '../services/api';
+
+const REVIEW_LANGS = [
+    { value: 'tr', label: 'Türkçe' },
+    { value: 'en', label: 'English' },
+    { value: 'it', label: 'Italiano' },
+    { value: 'es', label: 'Español' },
+    { value: 'ar', label: 'العربية' },
+];
 
 export const ReviewsPage: React.FC = () => {
     const [reviews, setReviews] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [filter, setFilter] = useState<string>('pending');
     const [pagination, setPagination] = useState({ current: 1, pageSize: 50, total: 0 });
+    const [aiVisible, setAiVisible] = useState(false);
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiForm] = Form.useForm();
+    const [productOptions, setProductOptions] = useState<any[]>([]);
+    const [productSearch, setProductSearch] = useState('');
+
+    const searchProducts = async (q: string) => {
+        setProductSearch(q);
+        if (!q || q.length < 2) {
+            setProductOptions([]);
+            return;
+        }
+        try {
+            const res = await AdminAPI.getAllProducts({ page: 1, limit: 20, search: q });
+            setProductOptions(res.data || []);
+        } catch {
+            setProductOptions([]);
+        }
+    };
 
     const fetchReviews = async (page = 1, approved?: boolean) => {
         setLoading(true);
@@ -48,14 +75,60 @@ export const ReviewsPage: React.FC = () => {
         }
     };
 
+    const handleAiGenerate = async (values: any) => {
+        setAiLoading(true);
+        try {
+            const res = await AdminAPI.aiGenerateReviews({
+                productId: values.productId,
+                count: values.count || 5,
+                languages: values.languages && values.languages.length > 0 ? values.languages : undefined
+            });
+            message.success(res.message || 'Yorumlar üretildi');
+            setAiVisible(false);
+            aiForm.resetFields();
+            setFilter('pending');
+            fetchReviews(1, false);
+        } catch (err: any) {
+            message.error(err?.response?.data?.error || 'Üretim başarısız');
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
+    const handleApproveAll = async (productId: string) => {
+        try {
+            const res = await AdminAPI.approveAllReviews(productId);
+            message.success(`${res.approved} yorum onaylandı`);
+            fetchReviews(pagination.current, filter === 'all' ? undefined : filter === 'approved');
+        } catch {
+            message.error('Toplu onay başarısız');
+        }
+    };
+
     const columns = [
         {
             title: 'Ürün',
             key: 'product',
             render: (_: any, r: any) => (
                 <Space direction="vertical" size={0}>
-                    <span style={{ fontWeight: 600 }}>{r.product?.title || r.productId}</span>
+                    {r.product?.slug ? (
+                        <a
+                            href={`https://www.goldencrafters.com/en/p/${encodeURIComponent(r.product.slug)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ fontWeight: 600 }}
+                        >
+                            {r.product?.title || r.productId}
+                        </a>
+                    ) : (
+                        <span style={{ fontWeight: 600 }}>{r.product?.title || r.productId}</span>
+                    )}
                     <span style={{ fontSize: 11, color: '#888' }}>{r.product?.sku}</span>
+                    {!r.isApproved && (
+                        <Button type="link" size="small" onClick={() => handleApproveAll(r.productId)}>
+                            Tümü (bu ürün)
+                        </Button>
+                    )}
                 </Space>
             )
         },
@@ -74,7 +147,10 @@ export const ReviewsPage: React.FC = () => {
                     <span style={{ fontWeight: 600 }}>{r.title}</span>
                     <span>{r.comment}</span>
                     <span style={{ fontSize: 11, color: '#888' }}>
-                        {r.reviewerName} • {new Date(r.createdAt).toLocaleDateString('tr-TR')}
+                        {r.reviewerName} • {r.language ? r.language.toUpperCase() : 'TR'} • {r.createdAt ? new Date(r.createdAt).toLocaleDateString('tr-TR') : ''}
+                        {r.source === 'ai'
+                            ? <Tag color="purple" style={{ marginLeft: 6 }}>AI</Tag>
+                            : <Tag color="blue" style={{ marginLeft: 6 }}>Müşteri</Tag>}
                         {r.isVerifiedPurchase && <Tag color="green" style={{ marginLeft: 6 }}>Doğrulanmış Alışveriş</Tag>}
                     </span>
                 </Space>
@@ -117,11 +193,16 @@ export const ReviewsPage: React.FC = () => {
         <Card
             title="Ürün Yorumları (Moderasyon)"
             extra={
-                <Select value={filter} onChange={setFilter} style={{ width: 200 }}>
-                    <Select.Option value="pending">Onay Bekleyenler</Select.Option>
-                    <Select.Option value="approved">Yayındakiler</Select.Option>
-                    <Select.Option value="all">Tümü</Select.Option>
-                </Select>
+                <Space>
+                    <Button icon={<RobotOutlined />} onClick={() => setAiVisible(true)}>
+                        AI ile Yorum Üret
+                    </Button>
+                    <Select value={filter} onChange={setFilter} style={{ width: 200 }}>
+                        <Select.Option value="pending">Onay Bekleyenler</Select.Option>
+                        <Select.Option value="approved">Yayındakiler</Select.Option>
+                        <Select.Option value="all">Tümü</Select.Option>
+                    </Select>
+                </Space>
             }
         >
             <Alert
@@ -146,6 +227,55 @@ export const ReviewsPage: React.FC = () => {
                 }}
                 size="small"
             />
+
+            <Modal
+                title="AI ile Yorum Üret"
+                open={aiVisible}
+                onCancel={() => setAiVisible(false)}
+                onOk={() => aiForm.submit()}
+                confirmLoading={aiLoading}
+                okText="Üret"
+                cancelText="İptal"
+                width={560}
+            >
+                <Alert
+                    type="warning"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                    message="Üretilen yorumlar ONAYSIZ kaydedilir; yayınlanmadan önce tek tek inceleyin. Puan dağılımı gerçekçi karışıktır (çoğunluk 5/4, ara sıra 3)."
+                />
+                <Form form={aiForm} layout="vertical" onFinish={handleAiGenerate} initialValues={{ count: 5 }}>
+                    <Form.Item
+                        name="productId"
+                        label="Ürün (ad veya SKU ile arayın)"
+                        rules={[{ required: true, message: 'Ürün seçin' }]}
+                    >
+                        <Select
+                            showSearch
+                            filterOption={false}
+                            placeholder="En az 2 harf yazın"
+                            onSearch={searchProducts}
+                            notFoundContent={productSearch.length < 2 ? 'Aramak için yazın' : 'Bulunamadı'}
+                        >
+                            {productOptions.map((p: any) => (
+                                <Select.Option key={p.id} value={p.id}>
+                                    {p.title} ({p.sku})
+                                </Select.Option>
+                            ))}
+                        </Select>
+                    </Form.Item>
+                    <Form.Item name="count" label="Adet (1-10)" rules={[{ required: true }]}>
+                        <InputNumber min={1} max={10} style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item name="languages" label="Diller (boş = 5 dil karışık)">
+                        <Select mode="multiple" placeholder="Seçilmezse en/tr/it/es/ar karışık üretilir">
+                            {REVIEW_LANGS.map(l => (
+                                <Select.Option key={l.value} value={l.value}>{l.label}</Select.Option>
+                            ))}
+                        </Select>
+                    </Form.Item>
+                </Form>
+            </Modal>
         </Card>
     );
 };

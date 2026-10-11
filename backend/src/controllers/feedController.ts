@@ -275,7 +275,7 @@ export class FeedController {
         try {
             const { default: ProductReview } = await import('../models/ProductReview');
             const reviews = await ProductReview.findAll({
-                where: { isApproved: true },
+                where: { isApproved: true, source: 'human' },
                 order: [['createdAt', 'DESC']],
                 limit: 5000,
                 include: [{
@@ -360,7 +360,7 @@ export class FeedController {
                 const { buildProductJsonLd } = await import('../utils/jsonLd');
                 const { default: ProductReview } = await import('../models/ProductReview');
                 const approved = await ProductReview.findAll({
-                    where: { productId: product.id, isApproved: true },
+                    where: { productId: product.id, isApproved: true, source: 'human' },
                     order: [['createdAt', 'DESC']],
                     limit: 10,
                     attributes: ['reviewerName', 'rating', 'title', 'comment', 'createdAt']

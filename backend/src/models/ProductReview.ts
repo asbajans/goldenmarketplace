@@ -20,6 +20,9 @@ interface ProductReviewAttributes {
   rating: number;
   title?: string | null;
   comment?: string | null;
+  language?: string;
+  translations?: any;
+  source?: string;
   isApproved: boolean;
   isVerifiedPurchase: boolean;
   createdAt?: Date;
@@ -34,6 +37,9 @@ class ProductReview extends Model<ProductReviewAttributes> implements ProductRev
   public rating!: number;
   public title?: string | null;
   public comment?: string | null;
+  public language!: string;
+  public translations?: any;
+  public source!: string;
   public isApproved!: boolean;
   public isVerifiedPurchase!: boolean;
   public readonly createdAt!: Date;
@@ -75,6 +81,24 @@ ProductReview.init(
     comment: {
       type: DataTypes.TEXT,
       allowNull: true
+    },
+    language: {
+      type: DataTypes.STRING(10),
+      allowNull: false,
+      defaultValue: 'tr',
+      comment: 'Yorumun yazıldığı dil (en, tr, it, es, ar)'
+    },
+    translations: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: {},
+      comment: 'Okuma anında önbelleğe alınan çeviriler: { en: { title, comment }, ... }'
+    },
+    source: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'human',
+      comment: 'human = müşteri, ai = admin AI üretimi (onaylanmadan yayınlanmaz)'
     },
     isApproved: {
       type: DataTypes.BOOLEAN,

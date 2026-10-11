@@ -1,18 +1,19 @@
 /**
  * Rating Service
- * Recalculates Product.ratingAverage / ratingCount from approved reviews.
+ * Recalculates Product.ratingAverage / ratingCount from approved HUMAN reviews.
+ * AI-generated reviews never move the stars and never reach Google surfaces.
  */
 
 import Product from '../models/Product';
 import ProductReview from '../models/ProductReview';
 
 /**
- * Recalculate aggregates for a product from its APPROVED reviews.
+ * Recalculate aggregates for a product from its APPROVED HUMAN reviews.
  * Returns the new { ratingAverage, ratingCount }.
  */
 export async function recalcProductRating(productId: string): Promise<{ ratingAverage: number; ratingCount: number }> {
   const approved = await ProductReview.findAll({
-    where: { productId, isApproved: true },
+    where: { productId, isApproved: true, source: 'human' },
     attributes: ['rating']
   });
 

@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { ReviewController } from '../controllers/reviewController';
+import { authMiddleware, sellerMiddleware } from '../middleware/authMiddleware';
 import JWTService from '../utils/jwt';
 
 const router = Router();
@@ -24,5 +25,8 @@ function optionalAuth(req: Request, _res: Response, next: NextFunction) {
 // Public — approved reviews + submit (guest or logged-in)
 router.get('/product/:productId', ReviewController.listByProduct);
 router.post('/product/:productId', optionalAuth, ReviewController.submit);
+
+// Seller — kendi ürünlerine gelen yorumlar (salt okunur)
+router.get('/seller', authMiddleware, sellerMiddleware, ReviewController.sellerList);
 
 export default router;
