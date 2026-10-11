@@ -8,6 +8,7 @@ const router = Router();
 router.get('/admin/settings', authMiddleware, adminMiddleware, AIController.getAISettings);
 router.put('/admin/settings', authMiddleware, adminMiddleware, AIController.updateAISettings);
 router.post('/admin/settings/test', authMiddleware, adminMiddleware, AIController.testAIConnection);
+router.get('/admin/ai-models', authMiddleware, adminMiddleware, AIController.listModels);
 
 // Admin AI blog generation (topic or product -> all site languages)
 router.post('/admin/blog/generate', authMiddleware, adminMiddleware, AIController.generateBlogPost);

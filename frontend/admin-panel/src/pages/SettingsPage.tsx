@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, Form, Input, Button, message, Divider, Spin, InputNumber, Alert, Statistic, Row, Col, Select, Space } from 'antd';
+import { Card, Form, Input, Button, message, Divider, Spin, InputNumber, Alert, Statistic, Row, Col, Select, Space, Tooltip } from 'antd';
 import { DollarOutlined, SyncOutlined, GoldOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { AdminAPI } from '../services/api';
 
@@ -8,6 +8,77 @@ interface GoldPriceInfo {
     usdTryRate?: number;
     source: string;
     timestamp: string;
+}
+
+/**
+ * Sağlayıcıdan canlı model listesi çeken seçim kutusu.
+ * Ücretsiz/Ücretli gruplu + aramalı; listede yoksa elle yazılabilir.
+ */
+function ModelSelect({ provider, value, onChange, placeholder, cache }: {
+    provider: string;
+    value: string;
+    onChange: (v: string) => void;
+    placeholder?: string;
+    cache: Map<string, any[]>;
+}) {
+    const [options, setOptions] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        const cached = cache.get(provider);
+        if (cached) {
+            setOptions(cached);
+            return;
+        }
+        setLoading(true);
+        AdminAPI.getAIModels(provider)
+            .then((res: any) => {
+                if (cancelled) return;
+                const models = Array.isArray(res?.models) ? res.models : [];
+                cache.set(provider, models);
+                setOptions(models);
+            })
+            .catch(() => {})
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [provider]);
+
+    const free = options.filter(o => o.free);
+    const paid = options.filter(o => !o.free);
+    const group = (label: string, list: any[]) => list.length > 0 ? (
+        <Select.OptGroup key={label} label={`${label} (${list.length})`}>
+            {list.map(m => (
+                <Select.Option key={m.id} value={m.id} title={m.id}>
+                    {m.name || m.id}{m.context ? ` (${Math.round(m.context / 1000)}k)` : ''}
+                </Select.Option>
+            ))}
+        </Select.OptGroup>
+    ) : null;
+    const custom = value && !options.some(o => o.id === value) ? (
+        <Select.OptGroup key="custom" label="Kayıtlı değer">
+            <Select.Option key={value} value={value}>{value}</Select.Option>
+        </Select.OptGroup>
+    ) : null;
+
+    return (
+        <Select
+            mode="tags"
+            maxCount={1}
+            showSearch
+            allowClear
+            style={{ width: '100%' }}
+            placeholder={placeholder || 'Model seçin veya yazın'}
+            value={value ? [value] : []}
+            onChange={(vals: string[]) => onChange(vals[0] || '')}
+            loading={loading}
+            optionFilterProp="title"
+            filterOption={(input, option) =>
+                String(option?.title || option?.value || '').toLowerCase().includes(input.toLowerCase())}
+        >
+            {custom}{group('Ücretsiz', free)}{group('Ücretli', paid)}
+        </Select>
+    );
 }
 
 export default function SettingsPage() {
@@ -28,6 +99,9 @@ export default function SettingsPage() {
     const [contentModel, setContentModel] = useState<{ provider: string; model: string; apiKey?: string }>({ provider: 'openai', model: '' });
     const [blogModel, setBlogModel] = useState<{ provider: string; model: string; apiKey?: string }>({ provider: 'openai', model: '' });
     const [reviewsModel, setReviewsModel] = useState<{ provider: string; model: string; apiKey?: string }>({ provider: 'openai', model: '' });
+
+    // Sağlayıcı model listesi cache (oturum belleği — OpenRouter ~450 model)
+    const modelListCache = useState(() => new Map<string, any[]>())[0];
     const [goldPrice, setGoldPrice] = useState<GoldPriceInfo | null>(null);
     const [syncResult, setSyncResult] = useState<string | null>(null);
 
@@ -97,6 +171,11 @@ export default function SettingsPage() {
             setBackfilling(false);
         }
     };
+
+    // Sağlayıcı değişince model listeleri tazelenir
+    const aiProviderWatch = Form.useWatch('ai_provider', aiForm);
+    const aiModelWatch = Form.useWatch('ai_model', aiForm);
+    const aiImageModelWatch = Form.useWatch('ai_image_model', aiForm);
 
     const parseModelEntry = (raw: any): { provider: string; model: string; apiKey?: string } => {
         try {
@@ -440,22 +519,38 @@ export default function SettingsPage() {
                             </Form.Item>
                         </Col>
                         <Col span={6}>
-                            <Form.Item
-                                name="ai_model"
-                                label="Model"
-                                tooltip="OpenAI/Gemini: yalın ad (gpt-4o-mini). OpenRouter: ZORUNLU olarak sağlayıcı/model formatı (openai/gpt-4o-mini). Yanlış format 404 verir: No endpoints found."
-                            >
-                                <Input placeholder="gpt-4o-mini" />
-                            </Form.Item>
+                            <div style={{ marginBottom: 24 }}>
+                                <div style={{ marginBottom: 8 }}>
+                                    <span>Model </span>
+                                    <Tooltip title="Listeden seçin veya elle yazın. OpenAI/Gemini: yalın ad (gpt-4o-mini). OpenRouter: ZORUNLU olarak sağlayıcı/model formatı (openai/gpt-4o-mini). Yanlış format 404 verir: No endpoints found.">
+                                        <span style={{ color: '#888' }}>ⓘ</span>
+                                    </Tooltip>
+                                </div>
+                                <ModelSelect
+                                    provider={aiProviderWatch || 'openai'}
+                                    value={aiModelWatch || ''}
+                                    cache={modelListCache}
+                                    placeholder="gpt-4o-mini"
+                                    onChange={v => aiForm.setFieldsValue({ ai_model: v })}
+                                />
+                            </div>
                         </Col>
                         <Col span={6}>
-                            <Form.Item
-                                name="ai_image_model"
-                                label="Görsel Modeli"
-                                tooltip="Blog kapak görselleri için. Aynı API anahtarı kullanılır. OpenRouter: google/gemini-2.5-flash-image veya recraft/recraft-v4.1-flash · OpenAI: gpt-image-1. Boşsa görsel üretilmez."
-                            >
-                                <Input placeholder="google/gemini-2.5-flash-image" />
-                            </Form.Item>
+                            <div style={{ marginBottom: 24 }}>
+                                <div style={{ marginBottom: 8 }}>
+                                    <span>Görsel Modeli </span>
+                                    <Tooltip title="Blog kapak görselleri için. Aynı API anahtarı kullanılır. OpenRouter: google/gemini-2.5-flash-image veya recraft/recraft-v4.1-flash · OpenAI: gpt-image-1. Boşsa görsel üretilmez.">
+                                        <span style={{ color: '#888' }}>ⓘ</span>
+                                    </Tooltip>
+                                </div>
+                                <ModelSelect
+                                    provider={aiProviderWatch || 'openai'}
+                                    value={aiImageModelWatch || ''}
+                                    cache={modelListCache}
+                                    placeholder="google/gemini-2.5-flash-image"
+                                    onChange={v => aiForm.setFieldsValue({ ai_image_model: v })}
+                                />
+                            </div>
                         </Col>
                     </Row>
 
@@ -481,10 +576,12 @@ export default function SettingsPage() {
                                     </Select>
                                 </Col>
                                 <Col span={8}>
-                                    <Input
+                                    <ModelSelect
+                                        provider={m.provider}
                                         value={m.model}
+                                        cache={modelListCache}
                                         placeholder="model (örn. openai/gpt-4o-mini)"
-                                        onChange={e => setTransModels(list => list.map((x, j) => j === i ? { ...x, model: e.target.value } : x))}
+                                        onChange={v => setTransModels(list => list.map((x, j) => j === i ? { ...x, model: v } : x))}
                                     />
                                 </Col>
                                 <Col span={8}>
@@ -519,12 +616,15 @@ export default function SettingsPage() {
                                     <Select.Option value="openrouter">OpenRouter</Select.Option>
                                     <Select.Option value="gemini">Gemini</Select.Option>
                                 </Select>
-                                <Input
+                                <div style={{ marginBottom: 8 }}>
+                                <ModelSelect
+                                    provider={contentModel.provider}
                                     value={contentModel.model}
+                                    cache={modelListCache}
                                     placeholder="model (boş = genel)"
-                                    style={{ marginBottom: 8 }}
-                                    onChange={e => setContentModel(m => ({ ...m, model: e.target.value }))}
+                                    onChange={v => setContentModel(m => ({ ...m, model: v }))}
                                 />
+                                </div>
                                 <Input.Password
                                     value={contentModel.apiKey || ''}
                                     placeholder="Özel anahtar (boş = genel)"
@@ -543,12 +643,15 @@ export default function SettingsPage() {
                                     <Select.Option value="openrouter">OpenRouter</Select.Option>
                                     <Select.Option value="gemini">Gemini</Select.Option>
                                 </Select>
-                                <Input
+                                <div style={{ marginBottom: 8 }}>
+                                <ModelSelect
+                                    provider={blogModel.provider}
                                     value={blogModel.model}
+                                    cache={modelListCache}
                                     placeholder="model (boş = genel)"
-                                    style={{ marginBottom: 8 }}
-                                    onChange={e => setBlogModel(m => ({ ...m, model: e.target.value }))}
+                                    onChange={v => setBlogModel(m => ({ ...m, model: v }))}
                                 />
+                                </div>
                                 <Input.Password
                                     value={blogModel.apiKey || ''}
                                     placeholder="Özel anahtar (boş = genel)"
@@ -567,12 +670,15 @@ export default function SettingsPage() {
                                     <Select.Option value="openrouter">OpenRouter</Select.Option>
                                     <Select.Option value="gemini">Gemini</Select.Option>
                                 </Select>
-                                <Input
+                                <div style={{ marginBottom: 8 }}>
+                                <ModelSelect
+                                    provider={reviewsModel.provider}
                                     value={reviewsModel.model}
+                                    cache={modelListCache}
                                     placeholder="model (boş = genel)"
-                                    style={{ marginBottom: 8 }}
-                                    onChange={e => setReviewsModel(m => ({ ...m, model: e.target.value }))}
+                                    onChange={v => setReviewsModel(m => ({ ...m, model: v }))}
                                 />
+                                </div>
                                 <Input.Password
                                     value={reviewsModel.apiKey || ''}
                                     placeholder="Özel anahtar (boş = genel)"

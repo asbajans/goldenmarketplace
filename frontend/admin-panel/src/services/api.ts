@@ -157,6 +157,13 @@ export const AdminAPI = {
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
         }).then((res) => res.data);
     },
+    getAIModels: (provider?: string) => {
+        const token = localStorage.getItem('token');
+        return axios.get(`${API_URL}/ai/admin/ai-models`, {
+            params: provider ? { provider } : {},
+            headers: { Authorization: `Bearer ${token}` }
+        }).then((res) => res.data);
+    },
     // AI Blog generation (admin: topic/product -> all site languages)
     // Long timeout: draft + 4 translations take a while.
     generateBlogPost: (data: { topic?: string; productId?: string; tone?: string }) => {

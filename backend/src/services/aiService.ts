@@ -53,6 +53,17 @@ function breakerReport(e: AIModelEntry, ok: boolean): void {
   breaker.set(k, b);
 }
 
+export interface AIModelOption {
+  id: string;
+  name: string;
+  free: boolean;
+  context?: number;
+}
+
+/** Sağlayıcı model listesi cache (sınıf dışı, process belleği). */
+const modelListCache = new Map<string, { at: number; data: { provider: string; models: AIModelOption[] } }>();
+const MODEL_LIST_TTL_MS = 60 * 60 * 1000;
+
 class AIService {
   /**
    * Zaman aşımlı fetch. SAĞLAYICI TAKILIRSA kuyruk sonsuza kadar
@@ -318,6 +329,62 @@ class AIService {
   async getProviderInfo(): Promise<{ provider: string; model: string; configured: boolean }> {
     const s = await this.getSettings();
     return { provider: s.provider, model: s.model, configured: !!(s.apiKey && s.apiKey.trim()) };
+  }
+
+  /** Sağlayıcı model listesi (1 saat cache; anahtar server'da kalır, client'a sızmaz). */
+  async listProviderModels(provider?: string): Promise<{ provider: string; models: AIModelOption[] }> {
+    const s = await this.getSettings();
+    const p = (provider || s.provider || 'openrouter').toLowerCase();
+    const cached = modelListCache.get(p);
+    if (cached && Date.now() - cached.at < MODEL_LIST_TTL_MS) return cached.data;
+
+    let models: AIModelOption[] = [];
+    if (p === 'openrouter') {
+      const res = await this.fetchWithTimeout('https://openrouter.ai/api/v1/models', {
+        headers: { ...(s.apiKey ? { Authorization: `Bearer ${s.apiKey}` } : {}) }
+      }, 30000);
+      if (!res.ok) throw new Error(`OpenRouter liste hatası: ${res.status}`);
+      const data: any = await res.json();
+      const list = Array.isArray(data?.data) ? data.data : [];
+      models = list.map((m: any) => ({
+        id: String(m.id || ''),
+        name: String(m.name || m.id || ''),
+        free: String(m?.pricing?.prompt || '') === '0' && String(m?.pricing?.completion || '') === '0',
+        context: typeof m?.context_length === 'number' ? m.context_length : undefined
+      })).filter((m: AIModelOption) => m.id);
+    } else if (p === 'openai') {
+      if (!s.apiKey) throw new Error('Önce genel API anahtarını girin.');
+      const res = await this.fetchWithTimeout('https://api.openai.com/v1/models', {
+        headers: { Authorization: `Bearer ${s.apiKey}` }
+      }, 30000);
+      if (!res.ok) throw new Error(`OpenAI liste hatası: ${res.status}`);
+      const data: any = await res.json();
+      const list = Array.isArray(data?.data) ? data.data : [];
+      models = list
+        .map((m: any) => ({ id: String(m.id || ''), name: String(m.id || ''), free: false }))
+        .filter((m: AIModelOption) => m.id && !/whisper|tts|dall-e|embedding|moderation|realtime|transcribe/i.test(m.id));
+    } else if (p === 'gemini') {
+      if (!s.apiKey) throw new Error('Önce genel API anahtarını girin.');
+      const res = await this.fetchWithTimeout(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(s.apiKey)}`, {}, 30000);
+      if (!res.ok) throw new Error(`Gemini liste hatası: ${res.status}`);
+      const data: any = await res.json();
+      const list = Array.isArray(data?.models) ? data.models : [];
+      models = list
+        .filter((m: any) => (m.supportedGenerationMethods || []).includes('generateContent'))
+        .map((m: any) => ({
+          id: String(m.name || '').replace(/^models\//, ''),
+          name: String(m.displayName || m.name || ''),
+          free: false
+        }))
+        .filter((m: AIModelOption) => m.id);
+    } else {
+      throw new Error(`Bilinmeyen sağlayıcı: ${p}`);
+    }
+
+    const result = { provider: p, models };
+    modelListCache.set(p, { at: Date.now(), data: result });
+    return result;
   }
 
   /** Çeviri hattı hazır mı? Zincirde kullanılabilir ≥1 model + format geçerliliği. */

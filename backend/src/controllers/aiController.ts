@@ -79,6 +79,18 @@ export class AIController {
     }
   }
 
+  /** Admin: sağlayıcının model listesi (anahtar server'da kalır, client'a sızmaz). */
+  static async listModels(req: Request, res: Response) {
+    try {
+      const { default: aiService } = await import('../services/aiService');
+      const provider = String(req.query.provider || (req.body as any)?.provider || '').toLowerCase() || undefined;
+      const list = await aiService.listProviderModels(provider);
+      return res.json(list);
+    } catch (error: any) {
+      return res.json({ provider: '', models: [], error: error.message || 'Liste alınamadı' });
+    }
+  }
+
   static async testAIConnection(req: Request, res: Response) {
     try {
       const result = await aiService.generateContent(
