@@ -471,6 +471,24 @@ class FeedService {
               // Tespit yoksa categoryId'ye dokunma (null ezmesin), ham metni koru
               delete productData.categoryId;
             }
+            // AI/çeviri koruması: AI içeriği (luxury description / çeviriler)
+            // yazılmış üründe feed; başlık, slug ve açıklamayı EZEMEZ.
+            // translations kolonu feed tarafından hiç yazılmadığı için sağ kalır,
+            // ama taban metin ezilirse bayatlar — o yüzden tabanı da koruyoruz.
+            const existingTranslations = (existingProduct as any).translations || {};
+            const hasAIContent = Object.values(existingTranslations).some(
+              (e: any) => e && (e.title || e.description)
+            );
+            if (hasAIContent) {
+              delete productData.title;
+              delete productData.slug;
+              delete productData.description;
+            } else {
+              // AI yoksa bile feed'in BOŞ açıklaması mevcut metni silmesin
+              if (!prod.description) delete productData.description;
+            }
+            // Slug bir kez oluşur: URL/SEO stabilitesi için mevcut üründe asla değişmez
+            delete productData.slug;
             await existingProduct.update(productData);
             result.updated++;
             syncedProductIds.push(existingProduct.id);
