@@ -39,6 +39,9 @@ const ProductList: React.FC = () => {
     const [aiWatching, setAiWatching] = useState(false);
     const [aiActiveCount, setAiActiveCount] = useState(0);
     const aiDoneRef = useRef(false);
+    // Son toplu işlemin kuyruğa atıldığı an — bitiş bildirimi SADECE bu
+    // partinin sonuçlarını sayar (geçmişteki binlerce iş karıştırılmaz).
+    const aiBatchStartRef = useRef<number>(0);
     const [cleanupModalOpen, setCleanupModalOpen] = useState(false);
     const [cleanupKeyword, setCleanupKeyword] = useState('');
     const [cleanupAction, setCleanupAction] = useState<'clear_matching' | 'clear_all'>('clear_matching');
@@ -207,12 +210,40 @@ const ProductList: React.FC = () => {
         if (refresh) refreshProducts();
     };
 
-    const handleAIDone = useCallback(() => {
+    const handleAIDone = useCallback(async () => {
         if (aiDoneRef.current) return;
         aiDoneRef.current = true;
         setAiWatching(false);
         setAiActiveCount(0);
         setAiProgressVisible(false);
+        // Partinin gerçek sonucu: kaç başarılı / kaç başarısız + ilk hata.
+        // (Eskiden her durumda "tamamlandı" deniyordu.)
+        try {
+            const all = await getAITasks(undefined, 200);
+            const arr = Array.isArray(all) ? all : [];
+            const batch = arr.filter((t: any) => {
+                const ts = new Date(t.createdAt).getTime();
+                return !isNaN(ts) && ts >= aiBatchStartRef.current;
+            });
+            if (aiBatchStartRef.current > 0 && batch.length > 0) {
+                const ok = batch.filter((t: any) => t.status === 'completed').length;
+                const fail = batch.filter((t: any) => t.status === 'failed').length;
+                const firstErr = (batch.find((t: any) => t.status === 'failed') as any)?.error;
+                const desc = `${batch.length} üründen ${ok} başarılı${fail > 0 ? `, ${fail} başarısız` : ''}. Liste güncellendi.` +
+                    (firstErr ? ` İlk hata: ${firstErr}` : '');
+                if (fail > 0 && ok === 0) {
+                    notification.error({ message: 'AI işlemleri başarısız', description: desc, duration: 10 });
+                } else if (fail > 0) {
+                    notification.warning({ message: 'AI işlemleri kısmen tamamlandı', description: desc, duration: 10 });
+                } else {
+                    notification.success({ message: 'AI işlemleri tamamlandı', description: desc, duration: 6 });
+                }
+                refreshProducts();
+                return;
+            }
+        } catch {
+            /* özet alınamazsa genel mesaja düş */
+        }
         notification.success({
             message: 'AI işlemleri tamamlandı',
             description: 'Seçili ürünlerin çevirileri işlendi. Liste güncellendi.',
@@ -292,6 +323,7 @@ const ProductList: React.FC = () => {
             const res = await bulkAITranslate(ids, 'both');
             message.success(res.message || `${ids.length} ürün AI kuyruğuna alındı`);
             aiDoneRef.current = false;
+            aiBatchStartRef.current = Date.now();
             setAiWatching(true);
             setAiActiveCount(ids.length);
             setAiProgressVisible(true);
@@ -316,6 +348,7 @@ const ProductList: React.FC = () => {
             const res = await bulkLuxuryDescribe(ids, luxuryLangMode);
             message.success(res.message || `${ids.length} ürün AI kuyruğuna alındı`);
             aiDoneRef.current = false;
+            aiBatchStartRef.current = Date.now();
             setAiWatching(true);
             setAiActiveCount(ids.length);
             setAiProgressVisible(true);
