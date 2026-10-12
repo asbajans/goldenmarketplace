@@ -476,8 +476,8 @@ export class AIController {
         return res.status(403).json({ error: access.message, credits: access });
       }
 
-      // luxury_description: 10 ürünlük toplu Bull işleri (tek çağrıda
-      // 10 ürün) — tekli yola göre ~10x az LLM çağrısı. Diğer tipler
+      // luxury_description: 5 ürünlük toplu Bull işleri (tek çağrıda
+      // 5 ürün) — tekli yola göre ~5x az LLM çağrısı. Diğer tipler
       // ürün başına tek iş olarak kuyruğa girer.
       const tasks = taskType === 'luxury_description'
         ? await queueLuxuryBatch(productIds, userId, langMode)

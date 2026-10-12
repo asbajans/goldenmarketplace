@@ -621,7 +621,7 @@ For EACH of the ${items.length} products below, write an SEO-friendly, professio
 5. Plain text only: NO HTML, NO markdown, NO meta commentary.
 Return ONLY a raw JSON object, no code fences: {"items": [{"id": "<the given ID verbatim>", "description": "..."}, ...]} — one entry per product, same order, IDs copied EXACTLY.`,
       list,
-      { timeoutMs: 120000 }
+      { timeoutMs: 300000 }
     );
     if (!res.success || !res.content) {
       for (const it of items) errors[it.id] = res.error || 'boş yanıt';
@@ -669,7 +669,7 @@ Rules for DESCRIPTION:
 - Natural, persuasive translation; keep jewelry-specific terminology. Already-${langName} text returns EXACTLY unchanged.
 Return ONLY a raw JSON object, no code fences: {"items": [{"id": "<given ID verbatim>", "title": "...", "description": "..."}, ...]} — one entry per product, same order, IDs copied EXACTLY.`,
       list,
-      { timeoutMs: 120000 }
+      { timeoutMs: 300000 }
     );
     if (!res.success || !res.content) {
       const msg = res.error || 'boş yanıt';
@@ -724,7 +724,7 @@ For EACH of the ${items.length} products, generate 5-10 short search tags (lower
 Include material (gold, 22k...), product type, occasion and style words; translate to ${language} where natural, keep codes (22k, 14k) as-is.
 Return ONLY a raw JSON object, no code fences: {"<ID>": ["tag1", "tag2", ...], ...} — IDs copied EXACTLY.`,
         list,
-        { timeoutMs: 120000 }
+        { timeoutMs: 300000 }
       );
       if (!res.success || !res.content) return out;
       const parsed: any = this.extractJson(res.content, 'object');

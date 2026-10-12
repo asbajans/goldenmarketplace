@@ -31,8 +31,10 @@ interface AIJobData {
   batchProductIds?: string[];
 }
 
-/** Bir Bull işinde en fazla kaç ürün (LLM çağrısı başına da bu kadar ürün). */
-const LUXURY_BATCH_SIZE = 10;
+/** Bir Bull işinde en fazla kaç ürün (LLM çağrısı başına da bu kadar ürün).
+ *  Yavaş/ücretsiz modellerde büyük çıktılar zaman aşımına takıldığı için
+ *  küçük tutulur (5 ürün ≈ 1200 token çıktı). */
+const LUXURY_BATCH_SIZE = 5;
 
 /**
  * Kuyruk eşzamanlılığı (ai_queue_concurrency, 1-10, varsayılan 3).
@@ -374,8 +376,8 @@ export async function queueBatchAITranslation(productIds: string[], userId: stri
 /**
  * TOPLU lüks açıklama kuyruğu: ürünler LUXURY_BATCH_SIZE'lık Bull işlerine
  * bölünür; her iş, içindeki TÜM ürünleri LLM'e TEK çağrıda gönderir
- * (açıklama 1 + dil başına 1 + etiket 1 çağrı). Tekli yola göre ~10x az
- * çağrı → aynı iş ~6-8x hızlı biter. Kredi/ürün aynı (en:1, all:2).
+ * (açıklama 1 + dil başına 1 + etiket 1 çağrı). Tekli yola göre ~5x az
+ * çağrı → aynı iş belirgin hızlı biter. Kredi/ürün aynı (en:1, all:2).
  * EN çevirisi başlığı da düzeltir (feed'de EN sütunu Türkçe olabiliyor).
  * Zaten kuyrukta canlı işi olan ürünler atlanır (mükerrerlik yok).
  */
