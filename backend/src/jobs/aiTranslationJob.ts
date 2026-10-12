@@ -122,8 +122,9 @@ async function processTranslationJob(job: Bull.Job<AIJobData>) {
       // başlıktan üretilir. Dil modu: 'en' = tek İngilizce açıklama,
       // 'all' = İngilizce + 4 dile çeviri. Etiketler açıklamadan otomatik.
       const languageMode = (job.data as AIJobData).languageMode || 'all';
-      // İngilizce zaten üretildi — EN→EN çeviri çağrısı israftır, atlanır.
-      const translateLangs = languageMode === 'en' ? [] : AI_TRANSLATION_LANGUAGES.filter(l => l !== 'en');
+      // EN dahil TÜM diller çevrilir: feed'den gelen ürünlerde başlık EN
+      // sütununda Türkçe olabiliyor — EN çevirisi başlığı da düzeltir.
+      const targetLangs = languageMode === 'en' ? ['en'] : AI_TRANSLATION_LANGUAGES;
       const generatedEN = await aiService.generateLuxuryDescriptionFromTitleStrict(
         product.title,
         product.category,
@@ -131,23 +132,27 @@ async function processTranslationJob(job: Bull.Job<AIJobData>) {
       );
       updatedDescription = generatedEN;
       totalCredits += 1;
-      // EN girdisi doğrudan yazılır (çeviri çağrısı YOK)
-      updatedTranslations = {
-        ...updatedTranslations,
-        en: { title: updatedTitle, description: generatedEN }
-      };
       if (taskId) await ProductAITask.update({ progress: 40 }, { where: { id: taskId } });
 
-      if (translateLangs.length > 0) {
-        // Başlık+a açıklama İngilizce lüks metinden kalan dillere çevrilir
+      if (targetLangs.length > 1) {
+        // Başlık + açıklama 5 dile çevrilir. EN çağrısı "israf" değildir:
+        // feed ürünlerinde EN sütunundaki başlık Türkçe olabiliyor, bu
+        // adım başlığı da İngilizceye düzeltir (açıklama zaten İngilizce
+        // üretildiği için aynen geri döner).
         const { translations, errors } = await aiService.translateProduct(
           updatedTitle,
           generatedEN,
-          translateLangs
+          targetLangs
         );
         updatedTranslations = { ...updatedTranslations, ...translations };
         translateWarnings = errors;
         totalCredits += 1;
+      } else {
+        // 'en' modu: tek İngilizce açıklama doğrudan yazılır
+        updatedTranslations = {
+          ...updatedTranslations,
+          en: { title: updatedTitle, description: generatedEN }
+        };
       }
       // Otomatik etiketler (başarısız olursa sessiz geç — açıklama korunur)
       try {
@@ -371,6 +376,7 @@ export async function queueBatchAITranslation(productIds: string[], userId: stri
  * bölünür; her iş, içindeki TÜM ürünleri LLM'e TEK çağrıda gönderir
  * (açıklama 1 + dil başına 1 + etiket 1 çağrı). Tekli yola göre ~10x az
  * çağrı → aynı iş ~6-8x hızlı biter. Kredi/ürün aynı (en:1, all:2).
+ * EN çevirisi başlığı da düzeltir (feed'de EN sütunu Türkçe olabiliyor).
  * Zaten kuyrukta canlı işi olan ürünler atlanır (mükerrerlik yok).
  */
 export async function queueLuxuryBatch(productIds: string[], userId: string, languageMode: 'en' | 'all' = 'all') {
@@ -414,7 +420,10 @@ export async function queueLuxuryBatch(productIds: string[], userId: string, lan
  */
 async function processLuxuryBatchJob(job: Bull.Job<AIJobData>) {
   const { batchProductIds = [], userId, languageMode = 'all' } = job.data as AIJobData;
-  const translateLangs = languageMode === 'en' ? [] : AI_TRANSLATION_LANGUAGES.filter(l => l !== 'en');
+  // EN dahil TÜM diller: feed ürünlerinde EN sütunundaki başlık Türkçe
+  // olabiliyor — EN çevirisi başlığı düzeltir (açıklama zaten İngilizce
+  // üretildiği için aynen döner). 'en' modunda çeviri yok, direkt yazılır.
+  const translateLangs = languageMode === 'en' ? [] : AI_TRANSLATION_LANGUAGES;
   const creditPerProduct = translateLangs.length > 0 ? 2 : 1;
 
   const products = await Product.findAll({ where: { id: batchProductIds } });
@@ -502,7 +511,7 @@ async function processLuxuryBatchJob(job: Bull.Job<AIJobData>) {
     transByProduct.set((p as any).id, { en: { title: (p as any).title, description: enDesc.get((p as any).id)! } });
   }
   for (const lang of translateLangs) {
-    const langName = lang === 'tr' ? 'Turkish' : lang === 'it' ? 'Italian' : lang === 'es' ? 'Spanish' : 'Arabic';
+    const langName = lang === 'en' ? 'English' : lang === 'tr' ? 'Turkish' : lang === 'it' ? 'Italian' : lang === 'es' ? 'Spanish' : 'Arabic';
     try {
       const { translations, errors } = await aiService.translateBatchStrict(
         withDesc.map(p => ({ id: (p as any).id, title: (p as any).title, description: enDesc.get((p as any).id)! })),

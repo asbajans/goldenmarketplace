@@ -244,7 +244,7 @@ Admin panel (`ProductsPage.tsx`) artık kategori için plain `<Input>` yerine **
 2. `aiTranslationJob.ts` işler:
    - `generate_content`: Açıklama yoksa/<50 karakterse Türkçe açıklama üret
    - `translate`: Başlık + açıklamayı 5 dile (en, tr, it, es, ar) çevir
-   - `luxury_description`: Mevcut açıklama KULLANILMAZ, sadece başlıktan lüks/SEO açıklama + otomatik etiket. Dil modu: `en` (1 kredi) veya `all` (2 kredi). **TOPLU çalışır:** `queueLuxuryBatch()` ürünleri 10'luk Bull işlerine böler, her iş 10 ürünü LLM'e TEK çağrıda gönderir (açıklama 1 + dil başına 1 + etiket 1 çağrı) — tekli yola göre ~10x az çağrı. Eksik kalan ürüne tekli yedek uygulanır. EN→EN çeviri çağrısı yapılmaz.
+   - `luxury_description`: Mevcut açıklama KULLANILMAZ, sadece başlıktan lüks/SEO açıklama + otomatik etiket. Dil modu: `en` (1 kredi) veya `all` (2 kredi). **TOPLU çalışır:** `queueLuxuryBatch()` ürünleri 10'luk Bull işlerine böler, her iş 10 ürünü LLM'e TEK çağrıda gönderir (açıklama 1 + dil başına 1 + etiket 1 çağrı) — tekli yola göre ~10x az çağrı. Eksik kalan ürüne tekli yedek uygulanır. EN çevirisi başlığı da düzeltir (feed ürünlerinde EN sütunu Türkçe olabiliyor).
    - Sonuç `Product.translations` JSONB alanına kaydedilir
 3. Kredi düşülür (generate=1, translate=1 kredi)
 
