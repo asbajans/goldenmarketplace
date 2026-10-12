@@ -27,6 +27,11 @@ export const getAIQueueStatus = () =>
 export const cancelAITasks = () =>
   client.post('/ai/tasks/cancel').then(res => res.data);
 
+// Bitmiş logları sil (completed/failed). Bekleyen/işlenen işlere ve
+// Bull kuyruğuna dokunmaz — arka plan aynen çalışmaya devam eder.
+export const clearAITaskLogs = () =>
+  client.delete('/ai/tasks/logs').then(res => res.data);
+
 export const translateProduct = (id: string) =>
   client.post(`/ai/products/${id}/translate`).then(res => res.data);
 

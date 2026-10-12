@@ -235,6 +235,23 @@ export class AIController {
     }
   }
 
+  /**
+   * Bitmiş iş LOGLARINI sil (completed/failed satırları).
+   * pending/processing satırlarına ve Bull kuyruğundaki işlere
+   * DOKUNULMAZ — arka planda süren işler aynen devam eder.
+   */
+  static async clearFinishedLogs(req: Request, res: Response) {
+    try {
+      const userId = (req as any).user.id;
+      const deleted = await ProductAITask.destroy({
+        where: { userId, status: ['completed', 'failed'] }
+      });
+      return res.json({ success: true, deleted });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message || 'Loglar silinemedi' });
+    }
+  }
+
   // ─── Credits ───
 
   static async getCreditBalance(req: Request, res: Response) {

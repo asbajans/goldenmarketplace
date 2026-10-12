@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Modal, Progress, List, Tag, Typography, Space, Spin, Button, Popconfirm, message } from 'antd';
-import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ClockCircleOutlined, StopOutlined } from '@ant-design/icons';
-import { getAITasks, getAITaskSummary, cancelAITasks, AITaskSummary } from '../api/ai';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { Modal, Progress, List, Tag, Typography, Space, Spin, Button, Popconfirm, message, Card, Statistic, Row, Col } from 'antd';
+import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ClockCircleOutlined, StopOutlined, DeleteOutlined } from '@ant-design/icons';
+import { getAITasks, getAITaskSummary, cancelAITasks, clearAITaskLogs, AITaskSummary } from '../api/ai';
 
 const { Text } = Typography;
 
@@ -12,8 +12,19 @@ interface Task {
   status: string;
   progress: number;
   error?: string;
+  createdAt?: string;
   product?: { title: string; sku: string };
 }
+
+const taskTypeLabel = (t: string) => {
+  switch (t) {
+    case 'translate': return 'Çeviri';
+    case 'generate_content': return 'İçerik üretimi';
+    case 'both': return 'İçerik + Çeviri';
+    case 'luxury_description': return 'Lüks açıklama';
+    default: return t || 'AI işlemi';
+  }
+};
 
 interface AITaskProgressProps {
   visible: boolean;
@@ -45,7 +56,24 @@ const AITaskProgress: React.FC<AITaskProgressProps> = ({ visible, onClose, onAll
   const [summary, setSummary] = useState<AITaskSummary>({ total: 0, pending: 0, processing: 0, completed: 0, failed: 0 });
   const [initialLoading, setInitialLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchTasks = useCallback(async () => {
+    try {
+      // Liste son 200 işi gösterir (detay için); sayılar özet endpointten
+      // gelir — 200 barajına takılmaz.
+      const [data, sum] = await Promise.all([
+        getAITasks(undefined, 200),
+        getAITaskSummary().catch(() => null),
+      ]);
+      setTasks(Array.isArray(data) ? data : []);
+      if (sum) setSummary(sum);
+      setInitialLoading(false);
+    } catch {
+      setInitialLoading(false);
+    }
+  }, []);
 
   const handleClearQueue = async () => {
     setCancelling(true);
@@ -53,10 +81,27 @@ const AITaskProgress: React.FC<AITaskProgressProps> = ({ visible, onClose, onAll
       const res = await cancelAITasks();
       message.info(`${res.cancelled || 0} bekleyen işlem iptal edildi`);
       onQueueCleared?.();
+      fetchTasks();
     } catch {
       message.error('Kuyruk temizlenemedi');
     } finally {
       setCancelling(false);
+    }
+  };
+
+  // Yalnızca BİTMİŞ logları siler (completed/failed). Bekleyen/işlenen
+  // işlere ve Bull kuyruğuna dokunmaz — arka plan aynen sürer.
+  const handleClearLogs = async () => {
+    setClearing(true);
+    try {
+      const res = await clearAITaskLogs();
+      message.success(`${res.deleted || 0} bitmiş kayıt silindi. Süren işlere dokunulmadı.`);
+      onQueueCleared?.();
+      fetchTasks();
+    } catch {
+      message.error('Loglar silinemedi');
+    } finally {
+      setClearing(false);
     }
   };
 
@@ -66,29 +111,13 @@ const AITaskProgress: React.FC<AITaskProgressProps> = ({ visible, onClose, onAll
       return;
     }
 
-    const fetchTasks = async () => {
-      try {
-        // Liste son 200 işi gösterir (detay için); sayılar özet endpointten
-        // gelir — 200 barajına takılmaz.
-        const [data, sum] = await Promise.all([
-          getAITasks(undefined, 200),
-          getAITaskSummary().catch(() => null),
-        ]);
-        setTasks(Array.isArray(data) ? data : []);
-        if (sum) setSummary(sum);
-        setInitialLoading(false);
-      } catch {
-        setInitialLoading(false);
-      }
-    };
-
     fetchTasks();
     pollingRef.current = setInterval(fetchTasks, 3000);
 
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
-  }, [visible]);
+  }, [visible, fetchTasks]);
 
   useEffect(() => {
     if (!visible) return;
@@ -104,6 +133,36 @@ const AITaskProgress: React.FC<AITaskProgressProps> = ({ visible, onClose, onAll
   const failed = summary.failed;
   const processing = summary.pending + summary.processing;
   const percent = total > 0 ? Math.round(((completed + failed) / total) * 100) : 0;
+
+  // SON İŞLEM ÖZETİ: aynı dakikada toplu açılan kayıtlar tek iş sayılır
+  // (bulk kuyruklama tüm satırları aynı anda yazar). En güncel grup alınır.
+  const lastBatch = useMemo(() => {
+    if (tasks.length === 0) return null;
+    const groups = new Map<string, Task[]>();
+    for (const t of tasks) {
+      const key = t.createdAt ? t.createdAt.slice(0, 16) : 'bilinmiyor';
+      const arr = groups.get(key) || [];
+      arr.push(t);
+      groups.set(key, arr);
+    }
+    const latestKey = [...groups.keys()].sort().reverse()[0];
+    const items = groups.get(latestKey) || [];
+    const byStatus = { completed: 0, failed: 0, pending: 0, processing: 0 };
+    for (const t of items) {
+      if (t.status === 'completed') byStatus.completed++;
+      else if (t.status === 'failed') byStatus.failed++;
+      else if (t.status === 'processing') byStatus.processing++;
+      else byStatus.pending++;
+    }
+    const types = [...new Set(items.map(t => taskTypeLabel(t.taskType)))];
+    return {
+      key: latestKey,
+      total: items.length,
+      ...byStatus,
+      types,
+      time: latestKey === 'bilinmiyor' ? '' : latestKey.replace('T', ' ').slice(0, 16),
+    };
+  }, [tasks]);
 
   return (
     <Modal
@@ -121,6 +180,16 @@ const AITaskProgress: React.FC<AITaskProgressProps> = ({ visible, onClose, onAll
         <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>
       ) : (
         <>
+          {lastBatch && lastBatch.total > 0 && (
+            <Card size="small" title={`Son işlem${lastBatch.time ? ` · ${lastBatch.time}` : ''}`} style={{ marginBottom: 16 }} extra={<Text type="secondary">{lastBatch.types.join(', ')}</Text>}>
+              <Row gutter={8}>
+                <Col span={6}><Statistic title="Ürün" value={lastBatch.total} /></Col>
+                <Col span={6}><Statistic title="Başarılı" value={lastBatch.completed} valueStyle={{ color: '#52c41a' }} /></Col>
+                <Col span={6}><Statistic title="Başarısız" value={lastBatch.failed} valueStyle={{ color: lastBatch.failed > 0 ? '#ff4d4f' : undefined }} /></Col>
+                <Col span={6}><Statistic title="Bekleyen" value={lastBatch.pending + lastBatch.processing} valueStyle={{ color: '#faad14' }} /></Col>
+              </Row>
+            </Card>
+          )}
           <div style={{ marginBottom: 20 }}>
             <Progress
               percent={percent}
@@ -133,21 +202,39 @@ const AITaskProgress: React.FC<AITaskProgressProps> = ({ visible, onClose, onAll
               {failed > 0 && <Tag color="red">{failed} başarısız</Tag>}
               {processing > 0 && <Tag color="blue">{processing} işleniyor</Tag>}
             </Space>
-            {processing > 0 && (
-              <div style={{ textAlign: 'center', marginTop: 8 }}>
-                <Popconfirm
-                  title="Kuyruk temizlensin mi?"
-                  description="Bekleyen tüm işlemler iptal edilir. Bitenler durur, kalanları yeniden seçip çevirebilirsin."
-                  okText="Evet, Temizle"
-                  cancelText="Vazgeç"
-                  onConfirm={handleClearQueue}
-                >
-                  <Button size="small" danger icon={<StopOutlined />} loading={cancelling}>
-                    Kuyruğu Temizle
-                  </Button>
-                </Popconfirm>
+            <div style={{ textAlign: 'center', marginTop: 8 }}>
+              <Space>
+                {processing > 0 && (
+                  <Popconfirm
+                    title="Kuyruk temizlensin mi?"
+                    description="Bekleyen tüm işlemler iptal edilir. Bitenler durur, kalanları yeniden seçip çevirebilirsin."
+                    okText="Evet, Temizle"
+                    cancelText="Vazgeç"
+                    onConfirm={handleClearQueue}
+                  >
+                    <Button size="small" danger icon={<StopOutlined />} loading={cancelling}>
+                      Kuyruğu Temizle
+                    </Button>
+                  </Popconfirm>
+                )}
+                {(completed + failed) > 0 && (
+                  <Popconfirm
+                    title="Bitmiş loglar silinsin mi?"
+                    description="Yalnızca tamamlanan/başarısız kayıtlar silinir. Bekleyen ve işlenen işlere dokunulmaz, arka plan aynen sürer."
+                    okText="Evet, Sil"
+                    cancelText="Vazgeç"
+                    onConfirm={handleClearLogs}
+                  >
+                    <Button size="small" icon={<DeleteOutlined />} loading={clearing}>
+                      Logları Temizle
+                    </Button>
+                  </Popconfirm>
+                )}
+              </Space>
+              <div style={{ marginTop: 4 }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>Aşağıdaki çubuk tüm zamanları gösterir; son işin dökümü üstteki karttadır.</Text>
               </div>
-            )}
+            </div>
           </div>
 
           <List

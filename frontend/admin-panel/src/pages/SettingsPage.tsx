@@ -61,16 +61,26 @@ function ModelSelect({ provider, value, onChange, placeholder, cache }: {
         </Select.OptGroup>
     ) : null;
 
+    // Seçili değerin ücret grubunu göster — kaydedilecek modelin hangisi
+    // olduğu gözle doğrulanabilsin.
+    const selectedOpt = value ? options.find(o => o.id === value) : undefined;
+    const selectedInfo = !value || loading ? null : selectedOpt
+        ? (selectedOpt.free ? 'Ücretsiz grup' : 'Ücretli grup')
+        : 'Listede yok (elle girilmiş değer)';
+
     return (
+        <>
         <Select
             mode="tags"
-            maxCount={1}
             showSearch
             allowClear
             style={{ width: '100%' }}
             placeholder={placeholder || 'Model seçin veya yazın'}
             value={value ? [value] : []}
-            onChange={(vals: string[]) => onChange(vals[0] || '')}
+            // tags modunda yeni seçim diziye EKLENİR; maxCount engeline
+            // takılmamak için tek değer yerine SON seçileni alıyoruz —
+            // böylece listeden tek tıkla değiştirme çalışır.
+            onChange={(vals: string[]) => onChange(vals[vals.length - 1] || '')}
             loading={loading}
             optionFilterProp="title"
             filterOption={(input, option) =>
@@ -78,6 +88,12 @@ function ModelSelect({ provider, value, onChange, placeholder, cache }: {
         >
             {custom}{group('Ücretsiz', free)}{group('Ücretli', paid)}
         </Select>
+        {selectedInfo && (
+            <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+                Seçili: {value} · {selectedInfo}
+            </div>
+        )}
+        </>
     );
 }
 

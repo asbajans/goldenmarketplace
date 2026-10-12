@@ -32,6 +32,10 @@ router.get('/tasks', authMiddleware, AIController.listAITasks);
 // Cancel my pending AI tasks (flush queue)
 router.post('/tasks/cancel', authMiddleware, AIController.cancelMyTasks);
 
+// Delete finished task LOGS only (completed/failed). Pending/processing rows
+// and Bull jobs are NEVER touched — background work keeps running.
+router.delete('/tasks/logs', authMiddleware, AIController.clearFinishedLogs);
+
 // Queue health (waiting/active/delayed/failed counts)
 router.get('/queue-status', authMiddleware, AIController.queueStatus);
 
