@@ -380,35 +380,48 @@ export async function queueBatchAITranslation(productIds: string[], userId: stri
  * Zaten kuyrukta canlı işi olan ürünler atlanır (mükerrerlik yok).
  */
 export async function queueLuxuryBatch(productIds: string[], userId: string, languageMode: 'en' | 'all' = 'all') {
-  const taskByProduct = new Map<string, any>();
-  for (const productId of productIds) {
-    const existing = await ProductAITask.findOne({
-      where: { productId, taskType: 'luxury_description', status: ['pending', 'processing'] },
-      order: [['createdAt', 'DESC']]
-    });
-    if (existing) {
-      if (await isJobLive(existing.jobId)) continue;
-      await existing.update({
+  // HIZLI kuyruklama: ürün başına tekil sorgu yerine toplu sorgular
+  // (100 üründe ~210 ardışık sorgu → 3-4 sorgu; istek zaman aşımına düşmez).
+  const unique = [...new Set(productIds)];
+  const open = await ProductAITask.findAll({
+    where: { productId: unique, taskType: 'luxury_description', status: ['pending', 'processing'] }
+  });
+  const skip = new Set<string>();
+  const staleIds: string[] = [];
+  for (const t of open) {
+    if (await isJobLive((t as any).jobId)) skip.add((t as any).productId);
+    else staleIds.push((t as any).id);
+  }
+  if (staleIds.length > 0) {
+    await ProductAITask.update(
+      {
         status: 'failed',
         error: 'Kuyruktaki karşılığı bulunamadı (kesintiye uğradı), işlem tekrar kuyruğa alındı.',
         completedAt: new Date()
-      }).catch(() => undefined);
-    }
-    const task = await ProductAITask.create({ productId, userId, taskType: 'luxury_description', status: 'pending' });
-    taskByProduct.set(productId, task);
+      },
+      { where: { id: staleIds } }
+    ).catch(() => undefined);
   }
-  const fresh = [...taskByProduct.keys()];
-  for (let i = 0; i < fresh.length; i += LUXURY_BATCH_SIZE) {
-    const chunk = fresh.slice(i, i + LUXURY_BATCH_SIZE);
+  const freshIds = unique.filter(id => !skip.has(id));
+  const created = freshIds.length > 0
+    ? await ProductAITask.bulkCreate(
+        freshIds.map(pid => ({ productId: pid, userId, taskType: 'luxury_description', status: 'pending' } as any))
+      )
+    : [];
+  const taskIdByProduct = new Map<string, string>();
+  for (const t of created) taskIdByProduct.set((t as any).productId, (t as any).id);
+  for (let i = 0; i < freshIds.length; i += LUXURY_BATCH_SIZE) {
+    const chunk = freshIds.slice(i, i + LUXURY_BATCH_SIZE);
     const job = await aiTranslationQueue.add(
       { userId, taskType: 'luxury_description', batchProductIds: chunk, languageMode } as AIJobData,
       { attempts: 3, backoff: { type: 'exponential', delay: 5000 } }
     );
-    for (const pid of chunk) {
-      await taskByProduct.get(pid).update({ jobId: String(job.id) } as any).catch(() => undefined);
-    }
+    await ProductAITask.update(
+      { jobId: String(job.id) } as any,
+      { where: { id: chunk.map(pid => taskIdByProduct.get(pid)!) } }
+    ).catch(() => undefined);
   }
-  return [...taskByProduct.values()];
+  return created;
 }
 
 /**
