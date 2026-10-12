@@ -454,11 +454,15 @@ export class AIController {
   static async bulkAITranslate(req: Request, res: Response) {
     try {
       const userId = (req as any).user.id;
-      const { productIds, taskType = 'both' } = req.body;
+      const { productIds, taskType = 'both', languageMode = 'all' } = req.body;
 
       if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
         return res.status(400).json({ error: 'productIds array is required' });
       }
+      if (!['translate', 'generate_content', 'both', 'luxury_description'].includes(taskType)) {
+        return res.status(400).json({ error: 'taskType translate|generate_content|both|luxury_description olmalı' });
+      }
+      const langMode = languageMode === 'en' ? 'en' : 'all';
 
       // Kuyruğa almadan önce sağlayıcıyı kontrol et — anahtar/model
       // sorunsa sahte "başarılı" dönüp sessiz kalma.
@@ -472,7 +476,7 @@ export class AIController {
         return res.status(403).json({ error: access.message, credits: access });
       }
 
-      const tasks = await queueBatchAITranslation(productIds, userId, taskType);
+      const tasks = await queueBatchAITranslation(productIds, userId, taskType, langMode);
       return res.json({ message: `${tasks.length} products queued for AI processing`, queued: tasks.length });
     } catch (error: any) {
       return res.status(500).json({ error: error.message });

@@ -36,8 +36,11 @@ export const generateProductContent = (id: string) =>
 export const getProductAIStatus = (id: string) =>
   client.get(`/ai/products/${id}/ai-status`).then(res => res.data);
 
-export const bulkAITranslate = (productIds: string[], taskType = 'both') =>
-  client.post('/ai/products/bulk-ai', { productIds, taskType }).then(res => res.data);
+export const bulkAITranslate = (productIds: string[], taskType = 'both', languageMode: 'en' | 'all' = 'all') =>
+  client.post('/ai/products/bulk-ai', { productIds, taskType, languageMode }).then(res => res.data);
+
+export const bulkLuxuryDescribe = (productIds: string[], languageMode: 'en' | 'all' = 'all') =>
+  client.post('/ai/products/bulk-ai', { productIds, taskType: 'luxury_description', languageMode }).then(res => res.data);
 
 export const generateDescriptionSync = (title: string, category: string, tags?: string[], language?: string) =>
   client.post('/ai/generate-description', { title, category, tags, language }).then(res => res.data);

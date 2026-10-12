@@ -24,7 +24,9 @@ const aiTranslationQueue = new Bull('ai-translation', process.env.REDIS_URL || '
 interface AIJobData {
   productId: string;
   userId: string;
-  taskType: 'translate' | 'generate_content' | 'both';
+  taskType: 'translate' | 'generate_content' | 'both' | 'luxury_description';
+  /** luxury_description için: 'en' = sadece İngilizce, 'all' = 5 dil */
+  languageMode?: 'en' | 'all';
 }
 
 /**
@@ -79,6 +81,7 @@ async function processTranslationJob(job: Bull.Job<AIJobData>) {
     // AI'ya kirli HTML gitmesin ve kirli çeviri geri yazılmasın: girişte temizle
     let updatedDescription = cleanFeedDescription(product.description || '');
     let updatedTranslations = product.translations || {};
+    let translateWarnings: Record<string, string> = {};
 
     // Check access before starting
     const access = await planAccessService.checkAIAccess(userId, 2);
@@ -90,7 +93,47 @@ async function processTranslationJob(job: Bull.Job<AIJobData>) {
     }
 
     // Step 1: Generate description if needed
-    if (taskType === 'generate_content' || taskType === 'both') {
+    if (taskType === 'luxury_description') {
+      // LÜKS TOPLU AÇIKLAMA: mevcut açıklama BİLEREK okunmaz — sadece
+      // başlıktan üretilir. Dil modu: 'en' = tek İngilizce açıklama,
+      // 'all' = İngilizce + 4 dile çeviri. Etiketler açıklamadan otomatik.
+      const languageMode = (job.data as AIJobData).languageMode || 'all';
+      const targetLangs = languageMode === 'en' ? ['en'] : AI_TRANSLATION_LANGUAGES;
+      const generatedEN = await aiService.generateLuxuryDescriptionFromTitleStrict(
+        product.title,
+        product.category,
+        'English'
+      );
+      updatedDescription = generatedEN;
+      totalCredits += 1;
+      if (taskId) await ProductAITask.update({ progress: 40 }, { where: { id: taskId } });
+
+      if (targetLangs.length > 1) {
+        // Başlık her dile çevrilir; açıklama İngilizce lüks metinden çevrilir
+        const { translations, errors } = await aiService.translateProduct(
+          updatedTitle,
+          generatedEN,
+          targetLangs
+        );
+        updatedTranslations = { ...updatedTranslations, ...translations };
+        translateWarnings = errors;
+        totalCredits += 1;
+      } else {
+        updatedTranslations = {
+          ...updatedTranslations,
+          en: { title: updatedTitle, description: generatedEN }
+        };
+      }
+      // Otomatik etiketler (başarısız olursa sessiz geç — açıklama korunur)
+      try {
+        const tags = await aiService.generateTagsFromDescription(updatedTitle, generatedEN, 'English');
+        if (tags.length > 0) {
+          const existing = Array.isArray((product as any).tags) ? (product as any).tags : [];
+          (product as any).set('tags', [...new Set([...existing, ...tags])].slice(0, 20));
+        }
+      } catch { /* etiket opsiyonel */ }
+      if (taskId) await ProductAITask.update({ progress: 80 }, { where: { id: taskId } });
+    } else if (taskType === 'generate_content' || taskType === 'both') {
       if (!product.description || product.description.length < 50) {
         // Üretim başarısızsa sessiz geçme — task failed olsun, satıcı nedenini görsün
         const generated = await aiService.generateProductDescriptionStrict(
@@ -106,7 +149,6 @@ async function processTranslationJob(job: Bull.Job<AIJobData>) {
     }
 
     // Step 2: Translate title + description to all languages
-    let translateWarnings: Record<string, string> = {};
     if (taskType === 'translate' || taskType === 'both') {
       const needTranslate = AI_TRANSLATION_LANGUAGES.some(
         lang => !updatedTranslations[lang]?.title || !updatedTranslations[lang]?.description
@@ -140,7 +182,11 @@ async function processTranslationJob(job: Bull.Job<AIJobData>) {
     await (product as any).update({
       title: updatedTitle,
       description: cleanFeedDescription(updatedDescription),
-      translations: updatedTranslations
+      translations: updatedTranslations,
+      // luxury_description dalında set() ile biriken etiketleri de yaz
+      ...(taskType === 'luxury_description' && (product as any).changed('tags')
+        ? { tags: (product as any).get('tags') }
+        : {})
     });
 
     // Deduct credits
@@ -190,14 +236,16 @@ async function isJobLive(jobId: string | null | undefined): Promise<boolean> {
   }
 }
 
-async function addJob(productId: string, userId: string, taskType: 'translate' | 'generate_content' | 'both') {
+export type AITaskType = 'translate' | 'generate_content' | 'both' | 'luxury_description';
+
+async function addJob(productId: string, userId: string, taskType: AITaskType, languageMode?: 'en' | 'all') {
   return aiTranslationQueue.add(
-    { productId, userId, taskType },
+    { productId, userId, taskType, languageMode },
     { attempts: 3, backoff: { type: 'exponential', delay: 5000 } }
   );
 }
 
-export async function queueAITranslation(productId: string, userId: string, taskType: 'translate' | 'generate_content' | 'both' = 'both') {
+export async function queueAITranslation(productId: string, userId: string, taskType: AITaskType = 'both', languageMode?: 'en' | 'all') {
   const existing = await ProductAITask.findOne({
     where: { productId, taskType, status: ['pending', 'processing'] },
     order: [['createdAt', 'DESC']]
@@ -215,7 +263,7 @@ export async function queueAITranslation(productId: string, userId: string, task
 
   const task = await ProductAITask.create({ productId, userId, taskType, status: 'pending' });
 
-  const job = await addJob(productId, userId, taskType);
+  const job = await addJob(productId, userId, taskType, languageMode);
   await task.update({ jobId: String(job.id) } as any).catch(() => undefined);
 
   return task;
@@ -284,10 +332,10 @@ export async function requeueOrphanedTasks(olderThanMin = 15): Promise<number> {
   return requeued;
 }
 
-export async function queueBatchAITranslation(productIds: string[], userId: string, taskType: 'translate' | 'generate_content' | 'both' = 'both') {
+export async function queueBatchAITranslation(productIds: string[], userId: string, taskType: AITaskType = 'both', languageMode?: 'en' | 'all') {
   const results: any[] = [];
   for (const productId of productIds) {
-    const task = await queueAITranslation(productId, userId, taskType);
+    const task = await queueAITranslation(productId, userId, taskType, languageMode);
     results.push(task);
   }
   return results;

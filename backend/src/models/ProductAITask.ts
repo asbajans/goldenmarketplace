@@ -5,7 +5,7 @@ interface ProductAITaskAttributes {
   id?: string;
   productId: string;
   userId: string;
-  taskType: 'translate' | 'generate_content' | 'both';
+  taskType: 'translate' | 'generate_content' | 'both' | 'luxury_description';
   status: 'pending' | 'processing' | 'completed' | 'failed';
   progress?: number;
   creditsConsumed?: number;

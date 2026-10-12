@@ -36,7 +36,7 @@ export class ProductController {
    */
   static async getProducts(req: Request, res: Response) {
     try {
-      const { storeId, category, page = 1, limit = 25, search, marketplaces } = req.query;
+      const { storeId, category, categoryId, page = 1, limit = 25, search, marketplaces, minPrice, maxPrice } = req.query;
 
       const where: any = { isActive: true };
 
@@ -50,6 +50,15 @@ export class ProductController {
         else return res.status(403).json({ error: { message: 'Shop not found' } });
       }
       if (category) where.category = category;
+      if (categoryId) where.categoryId = categoryId;
+      if (minPrice !== undefined && minPrice !== '' || maxPrice !== undefined && maxPrice !== '') {
+        const priceCond: any = {};
+        const min = minPrice !== undefined && minPrice !== '' ? parseFloat(minPrice as string) : NaN;
+        const max = maxPrice !== undefined && maxPrice !== '' ? parseFloat(maxPrice as string) : NaN;
+        if (!isNaN(min)) priceCond[Op.gte] = min;
+        if (!isNaN(max)) priceCond[Op.lte] = max;
+        if (Object.keys(priceCond).length > 0) where.priceTRY = priceCond;
+      }
       if (search) {
         where.title = { [Op.iLike]: `%${search}%` };
       }

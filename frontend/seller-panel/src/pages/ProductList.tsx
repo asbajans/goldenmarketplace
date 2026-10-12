@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Table, Button, Space, message, Modal, Tabs, Tag, Switch, Typography, Input, Checkbox, Row, Col, Tooltip, Select, notification } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined, DollarOutlined, GoldOutlined, ThunderboltOutlined, EyeOutlined } from '@ant-design/icons';
 import { deleteProduct, getAutoSyncStatus, setAutoSyncStatus, triggerManualSync, getDopingQuota, dopeProduct, undopeProduct, DopingQuota, Product } from '../api/product';
-import { bulkAITranslate, cleanupDescriptions, getAITasks } from '../api/ai';
+import { bulkAITranslate, bulkLuxuryDescribe, cleanupDescriptions, getAITasks } from '../api/ai';
 import client from '../api/client';
 import AddProduct from './AddProduct';
 import AITaskProgress from './AITaskProgress';
@@ -20,6 +20,15 @@ const ProductList: React.FC = () => {
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedMarketplaces, setSelectedMarketplaces] = useState<string[]>([]);
+    const [categories, setCategories] = useState<any[]>([]);
+    const [filterCategoryId, setFilterCategoryId] = useState<string | undefined>(undefined);
+    const [filterMinPrice, setFilterMinPrice] = useState('');
+    const [filterMaxPrice, setFilterMaxPrice] = useState('');
+    // Toplu lüks açıklama modalı: dil modu 'en' = sadece İngilizce,
+    // 'all' = 5 dilde açıklama + otomatik etiket.
+    const [luxuryModalOpen, setLuxuryModalOpen] = useState(false);
+    const [luxuryLangMode, setLuxuryLangMode] = useState<'en' | 'all'>('all');
+    const [luxuryLoading, setLuxuryLoading] = useState(false);
     const [totalCount, setTotalCount] = useState(0);
     const [pagination, setPagination] = useState<{ current: number; pageSize: number }>({ current: 1, pageSize: 15 });
     const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
@@ -51,7 +60,7 @@ const ProductList: React.FC = () => {
         try {
             await dopeProduct(record.id);
             message.success(`Doping aktif (${dopingQuota?.durationDays || 30} gün) — ürün vitrinde öne çıkar`);
-            fetchProducts();
+            refreshProducts();
             fetchDopingQuota();
         } catch (err: any) {
             message.error(err?.response?.data?.error?.message || err?.response?.data?.error || 'Doping başarısız');
@@ -62,7 +71,7 @@ const ProductList: React.FC = () => {
         try {
             await undopeProduct(record.id);
             message.success('Doping kaldırıldı');
-            fetchProducts();
+            refreshProducts();
             fetchDopingQuota();
         } catch {
             message.error('İşlem başarısız');
@@ -71,10 +80,21 @@ const ProductList: React.FC = () => {
 
     useEffect(() => {
         setPagination(p => ({ ...p, current: 1 }));
-        fetchProducts(searchTerm, selectedMarketplaces);
+        fetchProducts(searchTerm, selectedMarketplaces, filterCategoryId, filterMinPrice, filterMaxPrice);
         fetchGoldPrice();
         fetchSyncStatus();
-    }, [searchTerm, selectedMarketplaces]);
+        fetchCategories();
+    }, [searchTerm, selectedMarketplaces, filterCategoryId, filterMinPrice, filterMaxPrice]);
+
+    const fetchCategories = async () => {
+        try {
+            const { data } = await client.get('/categories');
+            const list = Array.isArray(data) ? data : (data?.data || []);
+            setCategories(list);
+        } catch {
+            /* sessiz geç */
+        }
+    };
 
     const fetchGoldPrice = async () => {
         try {
@@ -109,7 +129,7 @@ const ProductList: React.FC = () => {
         try {
             const res = await triggerManualSync();
             message.success(res.message || 'Fiyatlar başarıyla senkronize edildi.');
-            fetchProducts();
+            refreshProducts();
         } catch (error) {
             message.error('Senkronizasyon sırasında hata oluştu.');
         } finally {
@@ -117,7 +137,7 @@ const ProductList: React.FC = () => {
         }
     };
 
-    const fetchProducts = async (search?: string, marketplaces?: string[]) => {
+    const fetchProducts = async (search?: string, marketplaces?: string[], categoryId?: string, minPrice?: string, maxPrice?: string) => {
         setLoading(true);
         try {
             const marketplaceParams = marketplaces && marketplaces.length > 0 ? marketplaces : undefined;
@@ -125,7 +145,14 @@ const ProductList: React.FC = () => {
             // bu listeden türetilir). Limit 100 iken 100+ üründe hem liste eksik
             // kalıyor hem sayaçlar tutmuyordu.
             const response = await client.get('/products', {
-                params: { limit: 1000, search, marketplaces: marketplaceParams?.join(',') }
+                params: {
+                    limit: 1000,
+                    search,
+                    marketplaces: marketplaceParams?.join(','),
+                    categoryId: categoryId || undefined,
+                    minPrice: minPrice || undefined,
+                    maxPrice: maxPrice || undefined,
+                }
             });
             const data = response.data?.data || [];
             const pagination = response.data?.pagination;
@@ -157,7 +184,7 @@ const ProductList: React.FC = () => {
                 try {
                     await deleteProduct(id);
                     message.success('Ürün silindi.');
-                    fetchProducts();
+                    refreshProducts();
                 } catch (error) {
                     message.error('Silme işlemi başarısız.');
                 }
@@ -177,7 +204,7 @@ const ProductList: React.FC = () => {
 
     const handleModalClose = (refresh: boolean) => {
         setIsModalVisible(false);
-        if (refresh) fetchProducts();
+        if (refresh) refreshProducts();
     };
 
     const handleAIDone = useCallback(() => {
@@ -191,7 +218,7 @@ const ProductList: React.FC = () => {
             description: 'Seçili ürünlerin çevirileri işlendi. Liste güncellendi.',
             duration: 6
         });
-        fetchProducts();
+        refreshProducts();
     }, []);
 
     const handleQueueCleared = useCallback(() => {
@@ -204,7 +231,7 @@ const ProductList: React.FC = () => {
             description: 'Bekleyen işlemler iptal edildi. Çevirisi biten ürünler duruyor; kalanları yeniden seçip çevirebilirsin.',
             duration: 6
         });
-        fetchProducts();
+        refreshProducts();
     }, []);
 
     // İzleme modu açıkken kuyruğu yokla: bitince bildir + butonu geri çevir.
@@ -249,6 +276,8 @@ const ProductList: React.FC = () => {
         })();
     }, []);
 
+    const refreshProducts = () => fetchProducts(searchTerm, selectedMarketplaces, filterCategoryId, filterMinPrice, filterMaxPrice);
+
     const handleBulkTranslate = async () => {
         if (selectedRowKeys.length === 0) {
             message.warning('Lütfen çevrilecek ürünleri seçin.');
@@ -274,6 +303,31 @@ const ProductList: React.FC = () => {
         }
     };
 
+    const handleBulkLuxuryDescribe = async () => {
+        if (selectedRowKeys.length === 0) {
+            message.warning('Lütfen açıklama yazılacak ürünleri seçin.');
+            return;
+        }
+        setLuxuryLoading(true);
+        try {
+            const ids = selectedRowKeys.map(k => String(k));
+            // luxury_description: mevcut açıklama KULLANILMAZ, sadece başlıktan
+            // lüks/SEO açıklaması üretilir + otomatik etiket eklenir.
+            const res = await bulkLuxuryDescribe(ids, luxuryLangMode);
+            message.success(res.message || `${ids.length} ürün AI kuyruğuna alındı`);
+            aiDoneRef.current = false;
+            setAiWatching(true);
+            setAiActiveCount(ids.length);
+            setAiProgressVisible(true);
+            setLuxuryModalOpen(false);
+            setSelectedRowKeys([]);
+        } catch (err: any) {
+            message.error(err?.response?.data?.error || 'Toplu açıklama başlatılamadı');
+        } finally {
+            setLuxuryLoading(false);
+        }
+    };
+
     const handleCleanup = async () => {
         if (cleanupAction === 'clear_matching' && !cleanupKeyword.trim()) {
             message.warning('Lütfen temizlenecek kelimeyi girin.');
@@ -285,7 +339,7 @@ const ProductList: React.FC = () => {
             message.success(res.message || `${res.cleaned} ürün temizlendi`);
             setCleanupModalOpen(false);
             setCleanupKeyword('');
-            fetchProducts();
+            refreshProducts();
         } catch (err: any) {
             message.error(err?.response?.data?.error || 'Temizleme başarısız');
         } finally {
@@ -437,9 +491,42 @@ const ProductList: React.FC = () => {
                                 placeholder="Ürün ara..."
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
-                                onPressEnter={() => fetchProducts(searchTerm, selectedMarketplaces)}
+                                onPressEnter={() => refreshProducts()}
                                 style={{ width: 220 }}
                               />
+
+                              {/* Category + Price Filters */}
+                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                <Select
+                                  placeholder="Kategori"
+                                  allowClear
+                                  value={filterCategoryId}
+                                  onChange={v => setFilterCategoryId(v)}
+                                  style={{ width: 180 }}
+                                  options={categories.map((c: any) => ({ label: c.name || c.slug, value: c.id }))}
+                                />
+                                <Input
+                                  placeholder="Min ₺"
+                                  value={filterMinPrice}
+                                  onChange={e => setFilterMinPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                                  style={{ width: 100 }}
+                                />
+                                <Input
+                                  placeholder="Max ₺"
+                                  value={filterMaxPrice}
+                                  onChange={e => setFilterMaxPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                                  style={{ width: 100 }}
+                                />
+                                {(filterCategoryId || filterMinPrice || filterMaxPrice) && (
+                                  <Button
+                                    size="small"
+                                    type="link"
+                                    onClick={() => { setFilterCategoryId(undefined); setFilterMinPrice(''); setFilterMaxPrice(''); }}
+                                  >
+                                    Temizle
+                                  </Button>
+                                )}
+                              </div>
                               
                               {/* Marketplace Filters */}
                               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -456,7 +543,7 @@ const ProductList: React.FC = () => {
                                   value={selectedMarketplaces}
                                   onChange={values => {
                                     setSelectedMarketplaces(values);
-                                    fetchProducts(searchTerm, values);
+                                    fetchProducts(searchTerm, values, filterCategoryId, filterMinPrice, filterMaxPrice);
                                   }}
                                 />
                               </div>
@@ -515,6 +602,17 @@ const ProductList: React.FC = () => {
                                 </Button>
                             </Tooltip>
                             )}
+                            <Tooltip title={selectedRowKeys.length === 0 ? 'Önce ürünleri seçin' : 'Seçili ürünlere SADECE başlıktan lüks/SEO açıklaması yazılır (mevcut açıklama kullanılmaz) + otomatik etiket'}>
+                                <Button
+                                    type="default"
+                                    icon={<EditOutlined />}
+                                    onClick={() => setLuxuryModalOpen(true)}
+                                    disabled={selectedRowKeys.length === 0 || aiWatching}
+                                    style={{ borderColor: '#d4a017', color: '#d4a017' }}
+                                >
+                                    AI ile Açıklama Yaz ({selectedRowKeys.length})
+                                </Button>
+                            </Tooltip>
                            <Button
                                type="default"
                                onClick={() => setCleanupModalOpen(true)}
@@ -582,6 +680,36 @@ const ProductList: React.FC = () => {
                         />
                     </div>
                 )}
+            </Modal>
+
+            <Modal
+                title="AI ile Toplu Açıklama Yaz"
+                open={luxuryModalOpen}
+                onCancel={() => setLuxuryModalOpen(false)}
+                onOk={handleBulkLuxuryDescribe}
+                confirmLoading={luxuryLoading}
+                okText={`${selectedRowKeys.length} ürüne açıklama yaz`}
+            >
+                <div style={{ marginBottom: 16 }}>
+                    <Text>
+                        Seçili <Text strong>{selectedRowKeys.length} ürün</Text> için mevcut açıklama{' '}
+                        <Text strong>kullanılmadan</Text>, <Text strong>sadece ürün başlığından</Text> lüks,
+                        SEO uyumlu profesyonel açıklama üretilir. Başlıktaki karat (22K, 14K, 585...), gram ve
+                        ölçü bilgileri özellik listesi olarak alt alta yazılır. Açıklamaya göre otomatik etiketler de oluşturulur.
+                    </Text>
+                </div>
+                <div>
+                    <Text strong>Açıklama dili</Text>
+                    <Select
+                        value={luxuryLangMode}
+                        onChange={v => setLuxuryLangMode(v)}
+                        style={{ width: '100%', marginTop: 4 }}
+                        options={[
+                            { label: '5 dilde (EN + TR + IT + ES + AR) + etiket', value: 'all' },
+                            { label: 'Sadece İngilizce + etiket', value: 'en' }
+                        ]}
+                    />
+                </div>
             </Modal>
 
             <AITaskProgress

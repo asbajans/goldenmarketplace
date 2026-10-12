@@ -468,8 +468,7 @@ class AIService {
   }
 
   /** Hata fırlatan açıklama üretimi (ürün hattı için). */
-  async generateProductDescriptionStrict(title: string, category: string, language: string, keywords?: string): Promise<string> {
-    const res = await this.generateForPurpose(
+  async generateProductDescriptionStrict(title: string, category: string, language: string, keywords?: string): Promise<string> {    const res = await this.generateForPurpose(
       'content',
       `You are a professional jewelry product description writer for an e-commerce marketplace.
 Generate a detailed, persuasive product description in ${language} for the following item.
@@ -505,6 +504,80 @@ Do NOT include HTML tags, markdown, or meta text. Return ONLY the description te
       `Title: ${title}\nCategory: ${category}${keywords ? `\nKeywords: ${keywords}` : ''}`
     );
     return res.success ? res.content : title;
+  }
+
+  /**
+   * LÜKS toplu açıklama: SADECE başlıktan üretilir, mevcut açıklama
+   * bilerek okunmaz/kullanılmaz. Başlıktaki karat (22K, 14K, 585, 750,
+   * 916...), gram, ölçü/uzunluk gibi somut veriler özellik listesinde
+   * alt alta verilir. SEO uyumlu, profesyonel, lüks marka dili.
+   * Hata fırlatır (sessiz fallback yok) — kuyruk task'ı failed olur.
+   */
+  async generateLuxuryDescriptionFromTitleStrict(title: string, category: string, language: string): Promise<string> {
+    const res = await this.generateForPurpose(
+      'content',
+      `You are a luxury fine-jewelry copywriter and SEO specialist writing for Golden Crafters, a high-end gold jewelry marketplace.
+Write ONLY in ${language}. IMPORTANT: you are given ONLY the product TITLE (and category). There is NO existing description — do NOT reference, reuse or mention any previous description.
+
+Rules:
+1. Write an SEO-friendly, professional luxury product description (120-220 words).
+2. Start with 1 elegant marketing paragraph (craftsmanship, shine, prestige, gifting/occasion).
+3. Then add a features section titled appropriately in ${language} (e.g. "Product Features" / "Ürün Özellikleri"):
+   - Extract EVERY concrete attribute present in the TITLE and list each on its OWN bullet line starting with "• ":
+     carat/karat stamps (22K, 18K, 14K, 8K, 585, 750, 916, 333, 999), gold color (yellow/rose/white),
+     gram weight, length/size/measurements, stone details, model/collection codes.
+   - NEVER invent numbers the title does not contain. If the title has no measurable attribute, list only material/product-type facts.
+4. Naturally include 2-3 SEO keywords (gold bracelet, 22 ayar bilezik, luxury gold jewelry, etc. — translated to ${language}).
+5. End with 1 short care/wearing sentence.
+6. Plain text only: NO HTML tags, NO markdown headings/bold, NO meta commentary. Return ONLY the description text.`,
+      `Title: ${title}\nCategory: ${category || 'gold jewelry'}`
+    );
+    const text = (res.content || '').trim();
+    if (!res.success || !text || text === title.trim()) {
+      throw new Error(
+        `AI açıklama üretimi başarısız. API anahtarını ve modeli Admin → Sistem Ayarları → AI bölümünden kontrol edin.` +
+        (res.error ? ` Sağlayıcı yanıtı: ${res.error.slice(0, 300)}` : '')
+      );
+    }
+    return text.length > 4000 ? text.slice(0, 4000).trim() : text;
+  }
+
+  /**
+   * Açıklamadan otomatik etiket üretimi: 5-10 adet, küçük harf,
+   * virgül/JSON artığı yok. Hata fırlatmaz — boş dizi döner.
+   */
+  async generateTagsFromDescription(title: string, description: string, language = 'English'): Promise<string[]> {
+    try {
+      const res = await this.generateForPurpose(
+        'content',
+        `You are an SEO tag specialist for a luxury gold jewelry marketplace.
+Given the product title and description (in ${language}), generate 5-10 short search tags.
+Rules:
+- lowercase, 1-3 words each, no duplicates, no numbering.
+- Include material (gold, 22k, 22 ayar...), product type, occasion (wedding, gift, düğün, hediye) and style words.
+- Translate tags to ${language} where natural, but keep universal codes (22k, 14k, sku-like tokens) as-is.
+- Return ONLY a raw JSON array of strings, e.g. ["gold bracelet","22k","wedding gift"]. No code fences, no extra text.`,
+        `Title: ${title}\nDescription: ${(description || '').slice(0, 1500)}`
+      );
+      if (!res.success || !res.content) return [];
+      let parsed: unknown = null;
+      try {
+        parsed = JSON.parse(res.content.trim());
+      } catch {
+        const m = res.content.match(/\[[\s\S]*\]/);
+        if (m) {
+          try { parsed = JSON.parse(m[0]); } catch { parsed = null; }
+        }
+      }
+      if (!Array.isArray(parsed)) return [];
+      const tags = (parsed as unknown[])
+        .filter((t): t is string => typeof t === 'string')
+        .map(t => t.trim().toLowerCase().replace(/^["'•\-\d.)\s]+/, '').replace(/\s+/g, ' ').slice(0, 40))
+        .filter(t => t.length >= 2 && t.length <= 40);
+      return [...new Set(tags)].slice(0, 10);
+    } catch {
+      return [];
+    }
   }
 
   /**
