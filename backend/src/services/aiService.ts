@@ -420,7 +420,7 @@ class AIService {
   }
 
   /** 401/403/404 tipi hatalar yapılandırma hatasıdır — retry anlamsız. */
-  private isConfigError(message: string): boolean {
+  isConfigError(message: string): boolean {
     return /401|403|404|unauthorized|forbidden|not found|no endpoints|invalid.*(key|model|api)|authentication/i.test(message || '');
   }
 
@@ -577,6 +577,171 @@ Rules:
       return [...new Set(tags)].slice(0, 10);
     } catch {
       return [];
+    }
+  }
+
+  /** Ham model çıktısından JSON blok çıkarır (fence/kırpıntı toleranslı). */
+  private extractJson(content: string, kind: 'object' | 'array'): unknown | null {
+    const t = (content || '').replace(/```json|```/gi, '').trim();
+    try {
+      return JSON.parse(t);
+    } catch { /* fallthrough */ }
+    const m = kind === 'array' ? t.match(/\[[\s\S]*\]/) : t.match(/\{[\s\S]*\}/);
+    if (m) {
+      try { return JSON.parse(m[0]); } catch { return null; }
+    }
+    return null;
+  }
+
+  /**
+   * TOPLU lüks açıklama: N ürünün başlığı TEK çağrıda gönderilir, her biri
+   * için lüks/SEO açıklama dönülür. Eksik/bozuk dönen ürünler `errors`'ta —
+   * çağıran tekli metoda düşer. Hata fırlatmaz.
+   */
+  async generateLuxuryDescriptionsBatch(
+    items: Array<{ id: string; title: string; category?: string }>,
+    language: string
+  ): Promise<{ descriptions: Record<string, string>; errors: Record<string, string> }> {
+    const descriptions: Record<string, string> = {};
+    const errors: Record<string, string> = {};
+    if (items.length === 0) return { descriptions, errors };
+    const list = items
+      .map((it, i) => `PRODUCT ${i + 1} — ID: ${it.id}\nTitle: ${it.title}\nCategory: ${it.category || 'gold jewelry'}`)
+      .join('\n\n');
+    const res = await this.generateForPurpose(
+      'content',
+      `You are a luxury fine-jewelry copywriter and SEO specialist writing for Golden Crafters, a high-end gold jewelry marketplace.
+Write ONLY in ${language}. You are given ONLY product TITLES (no existing descriptions — never reference or reuse any previous description).
+
+For EACH of the ${items.length} products below, write an SEO-friendly, professional luxury description (120-220 words):
+1. Start with 1 elegant marketing paragraph (craftsmanship, shine, prestige, gifting/occasion).
+2. Then a features section titled appropriately in ${language}: extract EVERY concrete attribute present in THAT product's title and list each on its OWN bullet line starting with "• " (carat stamps like 22K/18K/14K/585/750/916, gold color, gram weight, length/size, stone details, model codes). NEVER invent numbers the title does not contain.
+3. Naturally include 2-3 SEO keywords translated to ${language}.
+4. End with 1 short care/wearing sentence.
+5. Plain text only: NO HTML, NO markdown, NO meta commentary.
+Return ONLY a raw JSON object, no code fences: {"items": [{"id": "<the given ID verbatim>", "description": "..."}, ...]} — one entry per product, same order, IDs copied EXACTLY.`,
+      list,
+      { timeoutMs: 120000 }
+    );
+    if (!res.success || !res.content) {
+      for (const it of items) errors[it.id] = res.error || 'boş yanıt';
+      return { descriptions, errors };
+    }
+    const parsed: any = this.extractJson(res.content, 'object');
+    const arr = Array.isArray(parsed?.items) ? parsed.items : [];
+    const byId = new Map<string, string>();
+    for (const e of arr) {
+      if (e && typeof e.id === 'string' && typeof e.description === 'string') {
+        const d = this.cleanDescription(e.description);
+        if (d.length > 50) byId.set(e.id, d);
+      }
+    }
+    for (const it of items) {
+      const d = byId.get(it.id);
+      if (d && d !== it.title.trim()) descriptions[it.id] = d;
+      else errors[it.id] = 'model bu ürüne açıklama döndürmedi';
+    }
+    return { descriptions, errors };
+  }
+
+  /**
+   * TOPLU çeviri: N ürünün (başlık+a açıklama) TEK çağrıda hedef dile
+   * çevrilir. Eksikler `errors`'ta — çağıran tekliye düşer. Hata fırlatmaz.
+   */
+  async translateBatchStrict(
+    items: Array<{ id: string; title: string; description: string }>,
+    langName: string
+  ): Promise<{ translations: Record<string, { title: string; description: string }>; errors: Record<string, string> }> {
+    const translations: Record<string, { title: string; description: string }> = {};
+    const errors: Record<string, string> = {};
+    if (items.length === 0) return { translations, errors };
+    const list = items
+      .map((it, i) => `PRODUCT ${i + 1} — ID: ${it.id}\nTITLE: ${it.title}\nDESCRIPTION: ${it.description || '(empty)'}`)
+      .join('\n\n');
+    const res = await this.generateForPurpose(
+      'translation',
+      `You are an expert translator for a jewelry e-commerce site. Translate EACH of the ${items.length} products' TITLE and DESCRIPTION to ${langName}.
+Rules for TITLE:
+- Translate descriptive words naturally for shoppers.
+- DO NOT translate model names, collection codes, SKU-like tokens, numbers, carat stamps (22K, 14K, 585, 916, 750, 333, 999) or measurements — keep them exactly as-is, in place.
+- If a title is already in ${langName}, return it EXACTLY unchanged.
+Rules for DESCRIPTION:
+- Natural, persuasive translation; keep jewelry-specific terminology. Already-${langName} text returns EXACTLY unchanged.
+Return ONLY a raw JSON object, no code fences: {"items": [{"id": "<given ID verbatim>", "title": "...", "description": "..."}, ...]} — one entry per product, same order, IDs copied EXACTLY.`,
+      list,
+      { timeoutMs: 120000 }
+    );
+    if (!res.success || !res.content) {
+      const msg = res.error || 'boş yanıt';
+      // Yapılandırma hatasıysa toplu halde bildir (çağıran fail-fast yapar).
+      for (const it of items) errors[it.id] = msg;
+      return { translations, errors };
+    }
+    const parsed: any = this.extractJson(res.content, 'object');
+    const arr = Array.isArray(parsed?.items) ? parsed.items : [];
+    const byId = new Map<string, { title: string; description: string }>();
+    for (const e of arr) {
+      if (e && typeof e.id === 'string' && typeof e.title === 'string') {
+        const t = this.cleanTitle(e.title);
+        const d = typeof e.description === 'string' ? this.cleanDescription(e.description) : '';
+        if (t) byId.set(e.id, { title: t, description: d });
+      }
+    }
+    for (const it of items) {
+      const got = byId.get(it.id);
+      if (got && !(it.description && it.description.trim() && !got.description)) {
+        translations[it.id] = got;
+      } else {
+        errors[it.id] = 'model bu ürüne çeviri döndürmedi';
+      }
+    }
+    return { translations, errors };
+  }
+
+  /** Tek ürün çevirisi (toplu çağrıda eksik kalanların yedeği). */
+  async translateSingleStrict(title: string, description: string, langName: string): Promise<{ title: string; description: string }> {
+    return this.translateOneLanguageStrict(title, description, langName);
+  }
+
+  /**
+   * TOPLU etiket: N ürün için TEK çağrıda 5-10'ar SEO etiketi.
+   * Hata fırlatmaz — başarısız ürünler sonuçta yer almaz.
+   */
+  async generateTagsBatch(
+    items: Array<{ id: string; title: string; description: string }>,
+    language = 'English'
+  ): Promise<Record<string, string[]>> {
+    const out: Record<string, string[]> = {};
+    if (items.length === 0) return out;
+    try {
+      const list = items
+        .map((it, i) => `PRODUCT ${i + 1} — ID: ${it.id}\nTitle: ${it.title}\nDescription: ${(it.description || '').slice(0, 800)}`)
+        .join('\n\n');
+      const res = await this.generateForPurpose(
+        'content',
+        `You are an SEO tag specialist for a luxury gold jewelry marketplace.
+For EACH of the ${items.length} products, generate 5-10 short search tags (lowercase, 1-3 words, no duplicates).
+Include material (gold, 22k...), product type, occasion and style words; translate to ${language} where natural, keep codes (22k, 14k) as-is.
+Return ONLY a raw JSON object, no code fences: {"<ID>": ["tag1", "tag2", ...], ...} — IDs copied EXACTLY.`,
+        list,
+        { timeoutMs: 120000 }
+      );
+      if (!res.success || !res.content) return out;
+      const parsed: any = this.extractJson(res.content, 'object');
+      if (!parsed || typeof parsed !== 'object') return out;
+      for (const it of items) {
+        const arr = (parsed as any)[it.id];
+        if (!Array.isArray(arr)) continue;
+        const tags = arr
+          .filter((t: unknown): t is string => typeof t === 'string')
+          .map(t => t.trim().toLowerCase().replace(/^["'•\-\d.)\s]+/, '').replace(/\s+/g, ' ').slice(0, 40))
+          .filter(t => t.length >= 2 && t.length <= 40);
+        const uniq = [...new Set(tags)].slice(0, 10);
+        if (uniq.length > 0) out[it.id] = uniq;
+      }
+      return out;
+    } catch {
+      return out;
     }
   }
 

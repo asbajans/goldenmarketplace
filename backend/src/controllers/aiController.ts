@@ -5,7 +5,7 @@ import ProductAITask from '../models/ProductAITask';
 import GlobalSetting from '../models/GlobalSetting';
 import aiService from '../services/aiService';
 import planAccessService from '../services/planAccessService';
-import { queueAITranslation, queueBatchAITranslation } from '../jobs/aiTranslationJob';
+import { queueAITranslation, queueBatchAITranslation, queueLuxuryBatch } from '../jobs/aiTranslationJob';
 
 export class AIController {
 
@@ -476,7 +476,12 @@ export class AIController {
         return res.status(403).json({ error: access.message, credits: access });
       }
 
-      const tasks = await queueBatchAITranslation(productIds, userId, taskType, langMode);
+      // luxury_description: 10 ürünlük toplu Bull işleri (tek çağrıda
+      // 10 ürün) — tekli yola göre ~10x az LLM çağrısı. Diğer tipler
+      // ürün başına tek iş olarak kuyruğa girer.
+      const tasks = taskType === 'luxury_description'
+        ? await queueLuxuryBatch(productIds, userId, langMode)
+        : await queueBatchAITranslation(productIds, userId, taskType, langMode);
       return res.json({ message: `${tasks.length} products queued for AI processing`, queued: tasks.length });
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
