@@ -546,6 +546,13 @@ export default function SettingsPage() {
                     layout="vertical"
                     onFinish={handleSaveAI}
                 >
+                    {/* ai_model / ai_image_model: ModelSelect bunları ham
+                        setFieldsValue ile yazar. Form.Item'sız alanlar
+                        getFieldsValue()'ya GİRMEZ (kaydet/test sırasında
+                        sessizce düşerler) — hidden Item'larla forma
+                        kaydediyoruz ki değerler backend'e ulaşsın. */}
+                    <Form.Item name="ai_model" hidden><Input /></Form.Item>
+                    <Form.Item name="ai_image_model" hidden><Input /></Form.Item>
                     <Row gutter={16}>
                         <Col span={6}>
                             <Form.Item name="ai_provider" label="AI Sağlayıcı" rules={[{ required: true }]}>
