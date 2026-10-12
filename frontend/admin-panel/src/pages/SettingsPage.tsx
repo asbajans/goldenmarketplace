@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Card, Form, Input, Button, message, Divider, Spin, InputNumber, Alert, Statistic, Row, Col, Select, Space, Tooltip } from 'antd';
 import { DollarOutlined, SyncOutlined, GoldOutlined, RobotOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { AdminAPI } from '../services/api';
@@ -23,25 +23,38 @@ function ModelSelect({ provider, value, onChange, placeholder, cache }: {
 }) {
     const [options, setOptions] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [listError, setListError] = useState<string | null>(null);
+    const seqRef = useRef(0);
 
-    useEffect(() => {
-        let cancelled = false;
-        const cached = cache.get(provider);
+    const loadModels = async (prov: string) => {
+        const mySeq = ++seqRef.current;
+        const cached = cache.get(prov);
         if (cached) {
             setOptions(cached);
+            setListError(null);
             return;
         }
         setLoading(true);
-        AdminAPI.getAIModels(provider)
-            .then((res: any) => {
-                if (cancelled) return;
-                const models = Array.isArray(res?.models) ? res.models : [];
-                cache.set(provider, models);
-                setOptions(models);
-            })
-            .catch(() => {})
-            .finally(() => { if (!cancelled) setLoading(false); });
-        return () => { cancelled = true; };
+        setListError(null);
+        try {
+            const res: any = await AdminAPI.getAIModels(prov);
+            if (mySeq !== seqRef.current) return;
+            const models = Array.isArray(res?.models) ? res.models : [];
+            if (res?.error && models.length === 0) throw new Error(res.error);
+            cache.set(prov, models);
+            setOptions(models);
+        } catch (e: any) {
+            if (mySeq !== seqRef.current) return;
+            setListError(e?.message || 'Liste alınamadı');
+            setOptions([]);
+        } finally {
+            if (mySeq === seqRef.current) setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadModels(provider);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [provider]);
 
     const free = options.filter(o => o.free);
@@ -62,11 +75,13 @@ function ModelSelect({ provider, value, onChange, placeholder, cache }: {
     ) : null;
 
     // Seçili değerin ücret grubunu göster — kaydedilecek modelin hangisi
-    // olduğu gözle doğrulanabilsin.
+    // olduğu gözle doğrulanabilsin. ":free" soneki OpenRouter günlük
+    // kotasına (429) takılır, açıkça uyar.
     const selectedOpt = value ? options.find(o => o.id === value) : undefined;
+    const isFreeSuffix = !!value && value.endsWith(':free');
     const selectedInfo = !value || loading ? null : selectedOpt
-        ? (selectedOpt.free ? 'Ücretsiz grup' : 'Ücretli grup')
-        : 'Listede yok (elle girilmiş değer)';
+        ? (selectedOpt.free || isFreeSuffix ? 'Ücretsiz grup' : 'Ücretli grup')
+        : (isFreeSuffix ? 'Ücretsiz grup (:free)' : 'Listede yok (elle girilmiş değer)');
 
     return (
         <>
@@ -77,10 +92,16 @@ function ModelSelect({ provider, value, onChange, placeholder, cache }: {
             style={{ width: '100%' }}
             placeholder={placeholder || 'Model seçin veya yazın'}
             value={value ? [value] : []}
-            // tags modunda yeni seçim diziye EKLENİR; maxCount engeline
-            // takılmamak için tek değer yerine SON seçileni alıyoruz —
-            // böylece listeden tek tıkla değiştirme çalışır.
-            onChange={(vals: string[]) => onChange(vals[vals.length - 1] || '')}
+            // Doğrudan seçim olayları: tıklanan değer aynen alınır.
+            // (tags onChange dizisi yerine — tek tıkla değiştirme garantisi.)
+            onSelect={(v: any) => onChange(String(v ?? ''))}
+            onDeselect={() => onChange('')}
+            onChange={(vals: string[]) => { if (!vals || vals.length === 0) onChange(''); }}
+            onDropdownVisibleChange={(open) => {
+                // Liste boşken menü açılınca yeniden dene (ilk yükleme
+                // hatası sessizce takılı kalmasın).
+                if (open && options.length === 0 && !loading) loadModels(provider);
+            }}
             loading={loading}
             optionFilterProp="title"
             filterOption={(input, option) =>
@@ -89,8 +110,14 @@ function ModelSelect({ provider, value, onChange, placeholder, cache }: {
             {custom}{group('Ücretsiz', free)}{group('Ücretli', paid)}
         </Select>
         {selectedInfo && (
-            <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: isFreeSuffix || selectedInfo.startsWith('Ücretsiz') ? '#cf1322' : '#888', marginTop: 4 }}>
                 Seçili: {value} · {selectedInfo}
+                {(isFreeSuffix || selectedInfo.startsWith('Ücretsiz')) && ' — günlük kota hatası (429) alırsanız ücretli modele geçin'}
+            </div>
+        )}
+        {listError && (
+            <div style={{ fontSize: 12, color: '#cf1322', marginTop: 4 }}>
+                Liste alınamadı: {listError} — değeri elle yazabilir veya menüyü kapatıp açarak yeniden deneyebilirsiniz.
             </div>
         )}
         </>
