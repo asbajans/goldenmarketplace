@@ -14,7 +14,7 @@ import {
 } from '@ant-design/icons';
 import { createProduct, updateProduct } from '../api/product';
 import { generateDescriptionSync, generateAllDescriptionsSync } from '../api/ai';
-import { getGemstones, getProductStones, addProductStone, deleteProductStone } from '../api/gemstones';
+import { getGemstones, getProductStones, addProductStone, deleteProductStone, getStoneLists } from '../api/gemstones';
 import client from '../api/client';
 
 const { Option } = Select;
@@ -70,6 +70,8 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [hasStones, setHasStones] = useState(false);
     const [gemCatalog, setGemCatalog] = useState<any[]>([]);
     const [initialStoneIds, setInitialStoneIds] = useState<string[]>([]);
+    const [stoneCuts, setStoneCuts] = useState<string[]>([]);
+    const [stoneQualities, setStoneQualities] = useState<string[]>([]);
     const [tags, setTags] = useState<string[]>([]);
     const [integrations, setIntegrations] = useState<Integration[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -215,6 +217,13 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             setGemCatalog(Array.isArray(list) ? list.filter((g: any) => g.isActive !== false) : []);
         } catch (error) {
             console.error('Failed to fetch gemstones:', error);
+        }
+        try {
+            const lists = await getStoneLists();
+            setStoneCuts(lists.cuts);
+            setStoneQualities(lists.qualities);
+        } catch {
+            // fallback'lar api içinde
         }
     };
 
@@ -952,10 +961,18 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                                                 <InputNumber style={{ width: '100%' }} min={0} step={0.01} placeholder="0.50" />
                                             </Form.Item>
                                             <Form.Item {...restField} name={[name, 'cut']} label="Kesim" style={{ marginBottom: 0, flex: 1 }}>
-                                                <Input placeholder="baget" />
+                                                <Select placeholder="Seç" allowClear>
+                                                    {stoneCuts.map((c: string) => (
+                                                        <Select.Option key={c} value={c}>{c}</Select.Option>
+                                                    ))}
+                                                </Select>
                                             </Form.Item>
                                             <Form.Item {...restField} name={[name, 'quality']} label="Özellik" style={{ marginBottom: 0, flex: 1 }}>
-                                                <Input placeholder="FG/SI" />
+                                                <Select placeholder="Seç" allowClear>
+                                                    {stoneQualities.map((q: string) => (
+                                                        <Select.Option key={q} value={q}>{q}</Select.Option>
+                                                    ))}
+                                                </Select>
                                             </Form.Item>
                                             <Form.Item {...restField} name={[name, 'isFixed']} label="Sabit" valuePropName="checked" tooltip="Seçilemez, bilgi olarak gösterilir" style={{ marginBottom: 0 }}>
                                                 <Checkbox />

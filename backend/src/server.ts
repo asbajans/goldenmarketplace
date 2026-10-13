@@ -65,6 +65,9 @@ async function syncAndSeedSettings() {
       { key: 'ai_blog_model', value: '{}', description: 'Model for blog draft + translations: {provider, model, apiKey?}', isPublic: false },
       { key: 'ai_reviews_model', value: '{}', description: 'Model for AI review generation: {provider, model, apiKey?}', isPublic: false },
       { key: 'ai_queue_concurrency', value: '3', description: 'AI translation queue parallelism 1-10 (needs restart)', isPublic: true },
+      // Taş kesim/özellik listeleri (admin yönetir, satıcı dropdown'dan seçer)
+      { key: 'gemstone_cuts', value: '["baget", "markiz", "oval", "prenses", "yuvarlak", "damla", "zümrüt", "kalemli"]', description: 'Taş kesim listesi (JSON array)', isPublic: true },
+      { key: 'gemstone_qualities', value: '["FG/SI", "VS1", "VS2", "VVS1", "VVS2", "SI1"]', description: 'Taş özellik listesi (JSON array)', isPublic: true },
       // Bank Transfer
       { key: 'bank_name', value: '', description: 'Bank Name for Wire Transfer', isPublic: true },
       { key: 'bank_iban', value: '', description: 'IBAN for Wire Transfer', isPublic: true },

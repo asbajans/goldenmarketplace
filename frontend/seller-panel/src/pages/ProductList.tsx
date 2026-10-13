@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Table, Button, Space, message, Modal, Tabs, Tag, Switch, Typography, Input, Checkbox, Row, Col, Tooltip, Select, notification, Form, InputNumber } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined, DollarOutlined, GoldOutlined, ThunderboltOutlined, EyeOutlined, StarOutlined } from '@ant-design/icons';
 import { deleteProduct, getAutoSyncStatus, setAutoSyncStatus, triggerManualSync, getDopingQuota, dopeProduct, undopeProduct, DopingQuota, Product } from '../api/product';
-import { getGemstones, getProductStones, addProductStone, deleteProductStone, Gemstone } from '../api/gemstones';
+import { getGemstones, getProductStones, addProductStone, deleteProductStone, getStoneLists, Gemstone } from '../api/gemstones';
 import { bulkAITranslate, bulkLuxuryDescribe, cleanupDescriptions, getAITasks } from '../api/ai';
 import client from '../api/client';
 import AddProduct from './AddProduct';
@@ -50,6 +50,8 @@ const ProductList: React.FC = () => {
     const [stonesProduct, setStonesProduct] = useState<Product | null>(null);
     const [stonesList, setStonesList] = useState<any[]>([]);
     const [gemCatalog, setGemCatalog] = useState<Gemstone[]>([]);
+    const [stoneCuts, setStoneCuts] = useState<string[]>([]);
+    const [stoneQualities, setStoneQualities] = useState<string[]>([]);
     const [stonesLoading, setStonesLoading] = useState(false);
     const [stoneForm] = Form.useForm();
 
@@ -58,12 +60,17 @@ const ProductList: React.FC = () => {
         stoneForm.resetFields();
         setStonesLoading(true);
         try {
-            const [stones, gems] = await Promise.all([
+            const [stones, gems, lists] = await Promise.all([
                 getProductStones(record.id).catch(() => []),
-                getGemstones().catch(() => [])
+                getGemstones().catch(() => []),
+                getStoneLists().catch(() => null)
             ]);
             setStonesList(Array.isArray(stones) ? stones : []);
             setGemCatalog(Array.isArray(gems) ? gems : []);
+            if (lists) {
+                setStoneCuts(lists.cuts);
+                setStoneQualities(lists.qualities);
+            }
         } finally {
             setStonesLoading(false);
         }
@@ -849,12 +856,20 @@ const ProductList: React.FC = () => {
                         </Col>
                         <Col span={4}>
                             <Form.Item name="cut" label="Kesim">
-                                <Input placeholder="baget" />
+                                <Select placeholder="Seç" allowClear>
+                                    {stoneCuts.map((c: string) => (
+                                        <Select.Option key={c} value={c}>{c}</Select.Option>
+                                    ))}
+                                </Select>
                             </Form.Item>
                         </Col>
                         <Col span={4}>
                             <Form.Item name="quality" label="Özellik">
-                                <Input placeholder="FG/SI" />
+                                <Select placeholder="Seç" allowClear>
+                                    {stoneQualities.map((q: string) => (
+                                        <Select.Option key={q} value={q}>{q}</Select.Option>
+                                    ))}
+                                </Select>
                             </Form.Item>
                         </Col>
                         <Col span={4}>

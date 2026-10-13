@@ -35,6 +35,30 @@ const objToLines = (obj?: Record<string, number>): string =>
 
 export const gemstoneHelpers = { linesToObj, objToLines };
 
+export const FALLBACK_CUTS = ['baget', 'markiz', 'oval', 'prenses', 'yuvarlak', 'damla', 'zümrüt', 'kalemli'];
+export const FALLBACK_QUALITIES = ['FG/SI', 'VS1', 'VS2', 'VVS1', 'VVS2', 'SI1'];
+
+const parseList = (raw: any, fallback: string[]): string[] => {
+  try {
+    const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return Array.isArray(arr) && arr.length > 0 ? arr.map((x: any) => String(x)) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+export const getStoneLists = async (): Promise<{ cuts: string[]; qualities: string[] }> => {
+  try {
+    const { data } = await client.get('/settings/public');
+    return {
+      cuts: parseList(data?.gemstone_cuts, FALLBACK_CUTS),
+      qualities: parseList(data?.gemstone_qualities, FALLBACK_QUALITIES)
+    };
+  } catch {
+    return { cuts: FALLBACK_CUTS, qualities: FALLBACK_QUALITIES };
+  }
+};
+
 export const getGemstones = () =>
   client.get<{ data: Gemstone[] }>('/gemstones').then(r => r.data.data);
 

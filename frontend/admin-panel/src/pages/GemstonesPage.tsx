@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Card, Button, message, Tag, Space, Modal, Form, Input, InputNumber, Switch, Popconfirm, Alert } from 'antd';
+import { Table, Card, Button, message, Tag, Space, Modal, Form, Input, InputNumber, Switch, Popconfirm, Alert, Select } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { AdminAPI } from '../services/api';
 
@@ -24,6 +24,43 @@ export const GemstonesPage: React.FC = () => {
     const [modalVisible, setModalVisible] = useState(false);
     const [editing, setEditing] = useState<any>(null);
     const [form] = Form.useForm();
+    const [cutList, setCutList] = useState<string[]>([]);
+    const [qualityList, setQualityList] = useState<string[]>([]);
+    const [listsSaving, setListsSaving] = useState(false);
+
+    const parseListSetting = (raw: any): string[] => {
+        try {
+            const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            return Array.isArray(arr) ? arr.map((x: any) => String(x)) : [];
+        } catch {
+            return [];
+        }
+    };
+
+    const fetchLists = async () => {
+        try {
+            const settings = await AdminAPI.getSettings();
+            setCutList(parseListSetting(settings.gemstone_cuts));
+            setQualityList(parseListSetting(settings.gemstone_qualities));
+        } catch {
+            // sessiz
+        }
+    };
+
+    const saveLists = async () => {
+        setListsSaving(true);
+        try {
+            await AdminAPI.updateSettings({
+                gemstone_cuts: JSON.stringify(cutList),
+                gemstone_qualities: JSON.stringify(qualityList)
+            });
+            message.success('Listeler kaydedildi!');
+        } catch {
+            message.error('Kaydetme hatası');
+        } finally {
+            setListsSaving(false);
+        }
+    };
 
     const fetchStones = async () => {
         setLoading(true);
@@ -37,7 +74,7 @@ export const GemstonesPage: React.FC = () => {
         }
     };
 
-    useEffect(() => { fetchStones(); }, []);
+    useEffect(() => { fetchStones(); fetchLists(); }, []);
 
     const handleAdd = () => {
         setEditing(null);
@@ -110,6 +147,39 @@ export const GemstonesPage: React.FC = () => {
     ];
 
     return (
+        <>
+        <Card title="Kesim & Özellik Listeleri" style={{ marginBottom: 16 }} extra={<Button type="primary" loading={listsSaving} onClick={saveLists}>Listeleri Kaydet</Button>}>
+            <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message="Satıcılar ürün taşında kesim/özelliği bu listelerden seçer (serbest yazı yok)."
+            />
+            <Space size="large" wrap style={{ width: '100%' }}>
+                <div style={{ minWidth: 280 }}>
+                    <div style={{ marginBottom: 8, fontWeight: 600 }}>Kesimler</div>
+                    <Select
+                        mode="tags"
+                        style={{ width: '100%' }}
+                        value={cutList}
+                        onChange={setCutList}
+                        placeholder="baget, markiz..."
+                        tokenSeparators={[',']}
+                    />
+                </div>
+                <div style={{ minWidth: 280 }}>
+                    <div style={{ marginBottom: 8, fontWeight: 600 }}>Özellikler</div>
+                    <Select
+                        mode="tags"
+                        style={{ width: '100%' }}
+                        value={qualityList}
+                        onChange={setQualityList}
+                        placeholder="FG/SI, VS1..."
+                        tokenSeparators={[',']}
+                    />
+                </div>
+            </Space>
+        </Card>
         <Card title="Taş Kataloğu (Global + Satıcı)" extra={<Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>Yeni Taş</Button>}>
             <Alert
                 type="info"
@@ -147,6 +217,7 @@ export const GemstonesPage: React.FC = () => {
                 </Form>
             </Modal>
         </Card>
+        </>
     );
 };
 
