@@ -1,7 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Card, Button, message, Tag, Space, Modal, Form, Input, InputNumber, Switch, Popconfirm, Alert, Select } from 'antd';
+import { Table, Card, Button, message, Tag, Space, Modal, Form, Input, InputNumber, Switch, Popconfirm, Alert, Select, Tabs } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { AdminAPI } from '../services/api';
+
+const { TabPane } = Tabs;
+
+const LANGS = [
+    { key: 'en', label: 'English', flag: '🇺🇸' },
+    { key: 'tr', label: 'Türkçe', flag: '🇹🇷' },
+    { key: 'it', label: 'Italiano', flag: '🇮🇹' },
+    { key: 'es', label: 'Español', flag: '🇪🇸' },
+    { key: 'ar', label: 'العربية', flag: '🇸🇦' },
+];
 
 const { TextArea } = Input;
 
@@ -24,6 +34,7 @@ export const GemstonesPage: React.FC = () => {
     const [modalVisible, setModalVisible] = useState(false);
     const [editing, setEditing] = useState<any>(null);
     const [form] = Form.useForm();
+    const [activeLang, setActiveLang] = useState('en');
     const [cutList, setCutList] = useState<string[]>([]);
     const [qualityList, setQualityList] = useState<string[]>([]);
     const [listsSaving, setListsSaving] = useState(false);
@@ -79,7 +90,8 @@ export const GemstonesPage: React.FC = () => {
     const handleAdd = () => {
         setEditing(null);
         form.resetFields();
-        form.setFieldsValue({ pricePerCaratUSD: 0, isActive: true, cutLines: 'baget=1.2\nmarkiz=1.15\noval=1.1\nprenses=1.1', qualityLines: '' });
+        form.setFieldsValue({ pricePerCaratUSD: 0, isActive: true, cutLines: 'baget=1.2\nmarkiz=1.15\noval=1.1\nprenses=1.1', qualityLines: '', translations: {} });
+        setActiveLang('en');
         setModalVisible(true);
     };
 
@@ -88,8 +100,10 @@ export const GemstonesPage: React.FC = () => {
         form.setFieldsValue({
             ...record,
             cutLines: objToLines(record.cutMultipliers),
-            qualityLines: objToLines(record.qualityMultipliers)
+            qualityLines: objToLines(record.qualityMultipliers),
+            translations: record.translations || {}
         });
+        setActiveLang('en');
         setModalVisible(true);
     };
 
@@ -199,8 +213,17 @@ export const GemstonesPage: React.FC = () => {
                 width={600}
             >
                 <Form form={form} layout="vertical" onFinish={handleSave}>
-                    <Form.Item name="name" label="Taş Adı" rules={[{ required: true }]}>
+                    <Form.Item name="name" label="Taş Adı (varsayılan)" rules={[{ required: true }]}>
                         <Input placeholder="Pırlanta, Yakut, Zümrüt..." />
+                    </Form.Item>
+
+                    <Tabs activeKey={activeLang} onChange={setActiveLang} type="card" style={{ marginBottom: 16 }}>
+                        {LANGS.map(lang => (
+                            <TabPane tab={<span>{lang.flag} {lang.label}</span>} key={lang.key} />
+                        ))}
+                    </Tabs>
+                    <Form.Item name={['translations', activeLang, 'name']} label={`Taş Adı (${activeLang.toUpperCase()})`}>
+                        <Input placeholder="Boşsa varsayılan ad kullanılır" />
                     </Form.Item>
                     <Form.Item name="pricePerCaratUSD" label="Baz Karat Fiyatı (USD)" tooltip="TRY karşılığı güncel USD kuruyla hesaplanır">
                         <InputNumber min={0} style={{ width: '100%' }} />

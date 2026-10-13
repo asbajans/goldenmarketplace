@@ -421,7 +421,7 @@ export class MarketplaceController {
       data.jsonLd = await buildDetailJsonLd(product, data);
       try {
         const { default: gemstoneService } = await import('../services/gemstoneService');
-        data.stones = await gemstoneService.getProductStones(product.id);
+        data.stones = await gemstoneService.getProductStones(product.id, lang);
       } catch {
         data.stones = [];
       }
@@ -463,7 +463,7 @@ export class MarketplaceController {
       data.jsonLd = await buildDetailJsonLd(product, data);
       try {
         const { default: gemstoneService } = await import('../services/gemstoneService');
-        data.stones = await gemstoneService.getProductStones(product.id);
+        data.stones = await gemstoneService.getProductStones(product.id, lang);
       } catch {
         data.stones = [];
       }

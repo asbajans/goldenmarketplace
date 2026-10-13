@@ -13,6 +13,7 @@ interface GemstoneAttributes {
   id?: string;
   storeId?: string | null;
   name: string;
+  translations?: any;
   pricePerCaratUSD?: number;
   cutMultipliers?: any;
   qualityMultipliers?: any;
@@ -25,6 +26,7 @@ class Gemstone extends Model<GemstoneAttributes> implements GemstoneAttributes {
   public id!: string;
   public storeId?: string | null;
   public name!: string;
+  public translations?: any;
   public pricePerCaratUSD!: number;
   public cutMultipliers?: any;
   public qualityMultipliers?: any;
@@ -50,6 +52,12 @@ Gemstone.init(
     name: {
       type: DataTypes.STRING(120),
       allowNull: false
+    },
+    translations: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: {},
+      comment: 'Taş adı çevirileri: { en: { name }, tr: {...}, ... }'
     },
     pricePerCaratUSD: {
       type: DataTypes.DECIMAL(15, 2),

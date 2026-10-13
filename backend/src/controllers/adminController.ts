@@ -548,13 +548,14 @@ export class AdminController {
     static async createGemstone(req: Request, res: Response): Promise<Response> {
         try {
             const { default: Gemstone } = await import('../models/Gemstone');
-            const { name, pricePerCaratUSD, cutMultipliers, qualityMultipliers, isActive } = req.body;
+            const { name, translations, pricePerCaratUSD, cutMultipliers, qualityMultipliers, isActive } = req.body;
             if (!name || !String(name).trim()) {
                 return res.status(400).json({ error: 'Taş adı zorunludur' });
             }
             const stone = await Gemstone.create({
                 storeId: null,
                 name: String(name).trim().substring(0, 120),
+                translations: translations || {},
                 pricePerCaratUSD: Math.max(0, Number(pricePerCaratUSD) || 0),
                 cutMultipliers: cutMultipliers || {},
                 qualityMultipliers: qualityMultipliers || {},
@@ -573,6 +574,10 @@ export class AdminController {
             if (!stone) return res.status(404).json({ error: 'Gemstone not found' });
             const patch: any = {};
             if (req.body.name !== undefined) patch.name = String(req.body.name).trim().substring(0, 120);
+            if (req.body.translations !== undefined) {
+                const existing = (stone.get('translations') as any) || {};
+                patch.translations = { ...(typeof existing === 'object' ? existing : {}), ...(req.body.translations || {}) };
+            }
             if (req.body.pricePerCaratUSD !== undefined) patch.pricePerCaratUSD = Math.max(0, Number(req.body.pricePerCaratUSD) || 0);
             if (req.body.cutMultipliers !== undefined) patch.cutMultipliers = req.body.cutMultipliers;
             if (req.body.qualityMultipliers !== undefined) patch.qualityMultipliers = req.body.qualityMultipliers;

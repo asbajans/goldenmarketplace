@@ -22,6 +22,9 @@ DO $$ BEGIN
 EXCEPTION WHEN undefined_column THEN NULL;
 END $$;
 
+-- Taş adı çevirileri
+ALTER TABLE gemstones ADD COLUMN IF NOT EXISTS "translations" JSONB NULL DEFAULT '{}';
+
 CREATE TABLE IF NOT EXISTS "product_stones" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "productId" UUID NOT NULL REFERENCES products("id") ON DELETE CASCADE,

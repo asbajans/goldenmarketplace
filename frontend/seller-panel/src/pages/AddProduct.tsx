@@ -72,6 +72,36 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [initialStoneIds, setInitialStoneIds] = useState<string[]>([]);
     const [stoneCuts, setStoneCuts] = useState<string[]>([]);
     const [stoneQualities, setStoneQualities] = useState<string[]>([]);
+    const watchedStones: any[] = Form.useWatch('stones', form) || [];
+
+    const stoneTotalTRY = (() => {
+        if (!hasStones) return 0;
+        const low = (s: any) => String(s || '').trim().toLowerCase();
+        let sum = 0;
+        for (const row of watchedStones || []) {
+            if (!row?.gemstoneId) continue;
+            const gem = gemCatalog.find((g: any) => g.id === row.gemstoneId);
+            const carat = Number(row.carat) || 0;
+            const ppc = Number(gem?.pricePerCaratUSD) || 0;
+            if (carat <= 0 || ppc <= 0) continue;
+            const cutMult = (() => {
+                const m = gem?.cutMultipliers || {};
+                for (const [k, v] of Object.entries(m)) {
+                    if (low(k) === low(row.cut)) return Number(v) || 1;
+                }
+                return 1;
+            })();
+            const qMult = (() => {
+                const m = gem?.qualityMultipliers || {};
+                for (const [k, v] of Object.entries(m)) {
+                    if (low(k) === low(row.quality)) return Number(v) || 1;
+                }
+                return 1;
+            })();
+            sum += carat * ppc * cutMult * qMult * usdTryRate;
+        }
+        return Math.round(sum * 100) / 100;
+    })();
     const [tags, setTags] = useState<string[]>([]);
     const [integrations, setIntegrations] = useState<Integration[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -986,6 +1016,12 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                                         </Button>
                                     ) : (
                                         <p style={{ color: '#888' }}>En fazla 5 çeşit taş eklenebilir.</p>
+                                    )}
+                                    {stoneTotalTRY > 0 && (
+                                        <div style={{ marginTop: 8, background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 4, padding: '8px 12px' }}>
+                                            Taş toplamı: <strong>+{stoneTotalTRY.toLocaleString('tr-TR')} ₺</strong>
+                                            {' '}→ Tahmini genel toplam: <strong>{(priceTRY + stoneTotalTRY).toLocaleString('tr-TR')} ₺</strong>
+                                        </div>
                                     )}
                                 </div>
                             )}

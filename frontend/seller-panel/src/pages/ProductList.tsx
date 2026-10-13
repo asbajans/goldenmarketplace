@@ -808,6 +808,12 @@ const ProductList: React.FC = () => {
                 destroyOnClose
                 width={640}
             >
+                {stonesProduct && (
+                    <p style={{ color: '#666', marginBottom: 12 }}>
+                        Taban fiyat: <strong>{Number(stonesProduct.priceTRY || 0).toLocaleString('tr-TR')} ₺</strong>
+                        <span style={{ color: '#999' }}> (taş seçimi sepette üstüne eklenir)</span>
+                    </p>
+                )}
                 {gemCatalog.length === 0 && (
                     <p style={{ color: '#888' }}>
                         Önce <a href="/gemstones">Taşlar</a> sayfasından katalog oluşturun.

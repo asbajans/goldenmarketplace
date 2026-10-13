@@ -66,10 +66,10 @@ async function getUsdTryRate(): Promise<number> {
 }
 
 /** Ürünün taş seçenekleri (fiyatları hesaplanmış). Pasif taşlar dahil edilmez. */
-export async function getProductStones(productId: string): Promise<EnrichedStone[]> {
+export async function getProductStones(productId: string, lang?: string): Promise<EnrichedStone[]> {
   const rows = await ProductStone.findAll({
     where: { productId },
-    include: [{ model: Gemstone, as: 'gemstone', attributes: ['id', 'name', 'pricePerCaratUSD', 'cutMultipliers', 'qualityMultipliers', 'isActive'] }],
+    include: [{ model: Gemstone, as: 'gemstone', attributes: ['id', 'name', 'translations', 'pricePerCaratUSD', 'cutMultipliers', 'qualityMultipliers', 'isActive'] }],
     order: [['createdAt', 'ASC']]
   });
   const usdTryRate = await getUsdTryRate();
@@ -81,10 +81,11 @@ export async function getProductStones(productId: string): Promise<EnrichedStone
       r.carat, (g as any).pricePerCaratUSD, r.cut, r.quality,
       (g as any).cutMultipliers, (g as any).qualityMultipliers, usdTryRate
     );
+    const tr = ((g as any).translations || {})[String(lang || '').toLowerCase()];
     out.push({
       id: r.id,
       gemstoneId: r.gemstoneId,
-      gemstoneName: (g as any).name,
+      gemstoneName: (tr && tr.name) || (g as any).name,
       carat: r.carat !== null && r.carat !== undefined ? Number(r.carat) : null,
       cut: r.cut || null,
       quality: r.quality || null,
