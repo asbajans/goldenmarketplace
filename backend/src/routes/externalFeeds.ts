@@ -161,13 +161,10 @@ router.post('/:id/sync', async (req, res) => {
     if (!feed) return res.status(404).json({ error: 'Feed bulunamadı' });
     if (!feed.isActive) return res.status(400).json({ error: 'Feed aktif değil' });
 
-    // Trigger async sync
+    // Tek koşu: kuyruk üzerinden (retry destekli). Eskiden burada ek olarak
+    // doğrudan syncFeed de çağrılıyordu — aynı feed aynı saniyede İKİ kez
+    // koşuyor, koşulardan biri boş sonuçla fiyatları ezebiliyordu.
     await triggerFeedSync(feed.id);
-
-    // Start sync immediately (not via queue, for immediate feedback)
-    feedService.syncFeed(feed.id).catch(err => {
-      console.error(`[Feeds] Background sync error for ${feed.id}:`, err);
-    });
 
     return res.json({ message: 'Senkronizasyon başlatıldı. Bu işlem arka planda çalışmaktadır.' });
   } catch (err: any) {

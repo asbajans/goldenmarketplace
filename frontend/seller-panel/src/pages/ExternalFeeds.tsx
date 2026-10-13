@@ -5,7 +5,7 @@ import {
 } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, SyncOutlined, LinkOutlined,
-  CheckCircleOutlined,
+  CheckCircleOutlined, EyeOutlined,
   SettingOutlined, ThunderboltOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -45,6 +45,7 @@ const ExternalFeeds: React.FC = () => {
   const [form] = Form.useForm();
   const [testResult, setTestResult] = useState<{ headers: string[]; sampleData: any[]; total: number } | null>(null);
   const [testing, setTesting] = useState(false);
+  const [sampleVisible, setSampleVisible] = useState(false);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
   const navigate = useNavigate();
@@ -506,6 +507,15 @@ const ExternalFeeds: React.FC = () => {
         type="info" showIcon style={{ marginBottom: 16 }}
       />
       {testResult && (
+        <Button
+          icon={<EyeOutlined />}
+          onClick={() => setSampleVisible(true)}
+          style={{ marginBottom: 16 }}
+        >
+          Örnek Veriyi Gör ({testResult.sampleData.length} satır)
+        </Button>
+      )}
+      {testResult && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {[
             { key: 'title', label: 'Ürün Adı (Zorunlu)' },
@@ -686,6 +696,57 @@ const ExternalFeeds: React.FC = () => {
             )}
           </Space>
         </div>
+      </Modal>
+
+      <Modal
+        title="Feed Örnek Verisi (ilk satırlar)"
+        open={sampleVisible}
+        onCancel={() => setSampleVisible(false)}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setSampleVisible(false)}>Kapat</Button>
+        ]}
+        width="90%"
+        style={{ maxWidth: 1200 }}
+      >
+        {testResult ? (
+          <>
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 12 }}
+              message={`Toplam ${testResult.total} ürün, ${testResult.headers.length} sütun. Aşağıdaki ilk ${testResult.sampleData.length} satıra bakarak hangi sütunun hangi alan olduğunu doğrulayın.`}
+            />
+            <Table
+              dataSource={testResult.sampleData.map((row, i) => ({ ...row, __idx: i + 1 }))}
+              rowKey="__idx"
+              pagination={false}
+              scroll={{ x: 'max-content', y: 480 }}
+              size="small"
+              columns={[
+                { title: '#', dataIndex: '__idx', key: '__idx', width: 50, fixed: 'left' as const },
+                ...testResult.headers.map(h => ({
+                  title: h,
+                  dataIndex: h,
+                  key: h,
+                  width: 220,
+                  render: (val: any) => {
+                    if (val === undefined || val === null || val === '') {
+                      return <span style={{ color: '#ccc' }}>—</span>;
+                    }
+                    const text = typeof val === 'object' ? JSON.stringify(val) : String(val);
+                    return (
+                      <span title={text.length > 200 ? text : undefined}>
+                        {text.length > 120 ? `${text.slice(0, 120)}…` : text}
+                      </span>
+                    );
+                  }
+                }))
+              ]}
+            />
+          </>
+        ) : (
+          <p>Önce feed'i test edin.</p>
+        )}
       </Modal>
     </div>
   );

@@ -35,6 +35,7 @@ interface SyncResult {
   failed: number;
   skipped: number;
   errors: string[];
+  warnings: string[];
   aiQueued?: number;
   translationApproval?: {
     required: boolean;
@@ -367,7 +368,7 @@ class FeedService {
       startedAt: new Date()
     });
 
-    const result: SyncResult = { total: 0, added: 0, updated: 0, skipped: 0, failed: 0, errors: [] };
+    const result: SyncResult = { total: 0, added: 0, updated: 0, skipped: 0, failed: 0, errors: [], warnings: [] };
     // Bu sync'te dokunulan ürün ID'leri + AI kredi tahmini (try dışında da lazım: onay state'i)
     const syncedProductIds: string[] = [];
     let estimatedCredits = 0;
@@ -489,6 +490,19 @@ class FeedService {
             }
             // Slug bir kez oluşur: URL/SEO stabilitesi için mevcut üründe asla değişmez
             delete productData.slug;
+            // Kaynakta fiyat boşsa (0) mevcut fiyatı SIFIRLAMA — feed'ler zaman
+            // zaman fiyatsız satır döner, 08:37 sync'inde 3 ürün böyle sıfırlandı.
+            const incomingTRY = Number(productData.priceTRY) || 0;
+            const incomingUSD = Number(productData.priceUSD) || 0;
+            const currentTRY = Number((existingProduct as any).priceTRY) || 0;
+            const currentUSD = Number((existingProduct as any).priceUSD) || 0;
+            if (incomingTRY <= 0 && currentTRY > 0) {
+              delete productData.priceTRY;
+              delete productData.priceUSD;
+              result.warnings.push(`SKU ${prod.sku}: kaynakta fiyat yok, mevcut fiyat korundu`);
+            } else if (incomingUSD <= 0 && currentUSD > 0 && incomingTRY > 0) {
+              delete productData.priceUSD;
+            }
             await existingProduct.update(productData);
             result.updated++;
             syncedProductIds.push(existingProduct.id);
