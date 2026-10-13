@@ -400,7 +400,7 @@ export class MarketplaceController {
 
       const product = await Product.findOne({
         where: { slug, isActive: true },
-        attributes: ['id', 'title', 'description', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'sku', 'quantity', 'gramWeight', 'marketplaces', 'discountRate', 'discountedPrice', 'ratingAverage', 'ratingCount', 'isDoped', 'dopedUntil', 'dopingStyle'],
+        attributes: ['id', 'title', 'description', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'sku', 'quantity', 'gramWeight', 'marketplaces', 'discountRate', 'discountedPrice', 'ratingAverage', 'ratingCount', 'isDoped', 'dopedUntil', 'dopingStyle', 'specs'],
         include: [
           {
             model: Store,
@@ -419,6 +419,12 @@ export class MarketplaceController {
       if (!product) return res.status(404).json({ error: 'Product not found' });
       const data = applyTranslation(product, lang);
       data.jsonLd = await buildDetailJsonLd(product, data);
+      try {
+        const { default: gemstoneService } = await import('../services/gemstoneService');
+        data.stones = await gemstoneService.getProductStones(product.id);
+      } catch {
+        data.stones = [];
+      }
       return res.json(data);
     } catch (error: any) {
       console.error('[Marketplace] getProductBySlug error:', error);
@@ -436,7 +442,7 @@ export class MarketplaceController {
 
       const product = await Product.findOne({
         where: { id, isActive: true },
-        attributes: ['id', 'title', 'description', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'sku', 'quantity', 'gramWeight', 'marketplaces', 'discountRate', 'discountedPrice', 'ratingAverage', 'ratingCount', 'isDoped', 'dopedUntil', 'dopingStyle'],
+        attributes: ['id', 'title', 'description', 'slug', 'category', 'categoryId', 'priceTRY', 'priceUSD', 'images', 'createdAt', 'translations', 'defaultLanguage', 'sku', 'quantity', 'gramWeight', 'marketplaces', 'discountRate', 'discountedPrice', 'ratingAverage', 'ratingCount', 'isDoped', 'dopedUntil', 'dopingStyle', 'specs'],
         include: [
           {
             model: Store,
@@ -455,6 +461,12 @@ export class MarketplaceController {
       if (!product) return res.status(404).json({ error: 'Product not found' });
       const data = applyTranslation(product, lang);
       data.jsonLd = await buildDetailJsonLd(product, data);
+      try {
+        const { default: gemstoneService } = await import('../services/gemstoneService');
+        data.stones = await gemstoneService.getProductStones(product.id);
+      } catch {
+        data.stones = [];
+      }
       return res.json(data);
     } catch (error: any) {
       console.error('[Marketplace] getProductById error:', error);

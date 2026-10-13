@@ -91,13 +91,13 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // Add item to cart
-// Body: { productId?, variantId?, quantity = 1, replace = false }
+// Body: { productId?, variantId?, productStoneId?, quantity = 1, replace = false }
 // `replace: true` sets the absolute quantity instead of incrementing —
 // storefronts should use it when (re-)syncing the cart on page mount so a
 // repeated call can never inflate the quantity (and the Stripe amount).
 router.post('/add', async (req: Request, res: Response) => {
   try {
-    const { productId, variantId, quantity = 1, replace = false } = req.body;
+    const { productId, variantId, productStoneId, quantity = 1, replace = false } = req.body;
     const userId = extractUser(req)?.id;
     const cartId = getCartId(req);
 
@@ -137,6 +137,18 @@ router.post('/add', async (req: Request, res: Response) => {
       unitPrice = goldPriceService.discountedPrice(unitPrice, discountRate);
     }
 
+    // Taş seçeneği: katalogdan doğrulanır, güncel fiyatı eklenir (indirimsiz).
+    let stoneId: string | null = null;
+    if (productStoneId) {
+      const gemstoneService = require('../services/gemstoneService').default;
+      const stonePrice = await gemstoneService.getStonePrice(product.id, productStoneId);
+      if (!stonePrice) {
+        return res.status(400).json({ error: 'Geçersiz taş seçeneği.' });
+      }
+      stoneId = productStoneId;
+      unitPrice = Math.round((unitPrice + stonePrice.priceTRY) * 100) / 100;
+    }
+
     const cartWhere: any = { status: 'pending' };
     if (userId) {
       cartWhere.customerId = userId;
@@ -160,7 +172,7 @@ router.post('/add', async (req: Request, res: Response) => {
     }
 
     const existingItem = await OrderItem.findOne({
-      where: { orderId: cart.id, productId: product.id }
+      where: { orderId: cart.id, productId: product.id, variantId: variant?.id || null, productStoneId: stoneId }
     } as any);
 
     if (existingItem) {
@@ -176,6 +188,7 @@ router.post('/add', async (req: Request, res: Response) => {
         orderId: cart.id,
         productId: product.id,
         variantId: variantId || undefined,
+        productStoneId: stoneId,
         title: product.title,
         sku: variant?.sku || product.sku,
         quantity,
@@ -427,6 +440,16 @@ router.post('/checkout', async (req: Request, res: Response) => {
           unitPrice = goldPriceService.discountedPrice(unitPrice, discountRate);
         }
 
+        // Taş seçeneği (doğrulanmış güncel fiyat, indirimsiz eklenir)
+        if (ci.productStoneId) {
+          const gemstoneService = require('../services/gemstoneService').default;
+          const stonePrice = await gemstoneService.getStonePrice(product.id, ci.productStoneId);
+          if (!stonePrice) {
+            return res.status(400).json({ error: `Geçersiz taş seçeneği: ${ci.productStoneId}` });
+          }
+          unitPrice = Math.round((unitPrice + stonePrice.priceTRY) * 100) / 100;
+        }
+
         const qty = ci.quantity || 1;
         const total = unitPrice * qty;
         orderTotal += total;
@@ -434,6 +457,7 @@ router.post('/checkout', async (req: Request, res: Response) => {
         orderItems.push({
           productId: product.id,
           variantId: variant?.id || null,
+          productStoneId: ci.productStoneId || null,
           title: product.title,
           sku: variant?.sku || product.sku || 'N/A',
           quantity: qty,

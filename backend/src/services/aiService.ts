@@ -466,9 +466,9 @@ class AIService {
     }
     return res.content;
   }
-
   /** Hata fırlatan açıklama üretimi (ürün hattı için). */
-  async generateProductDescriptionStrict(title: string, category: string, language: string, keywords?: string): Promise<string> {    const res = await this.generateForPurpose(
+  async generateProductDescriptionStrict(title: string, category: string, language: string, keywords?: string, stonesSummary?: string): Promise<string> {
+    const res = await this.generateForPurpose(
       'content',
       `You are a professional jewelry product description writer for an e-commerce marketplace.
 Generate a detailed, persuasive product description in ${language} for the following item.
@@ -477,10 +477,10 @@ The description should be 2-4 sentences, covering:
 - Craftsmanship and design details
 - Ideal for gifting or special occasions
 - Any care or wearing tips if applicable
-
+${stonesSummary ? `- Gemstones MUST be mentioned with carat/cut facts: ${stonesSummary}` : ''}
 Use natural, flowing language appropriate for the target language.
 Do NOT include HTML tags, markdown, or meta text. Return ONLY the description text.`,
-      `Title: ${title}\nCategory: ${category}${keywords ? `\nKeywords: ${keywords}` : ''}`
+      `Title: ${title}\nCategory: ${category}${keywords ? `\nKeywords: ${keywords}` : ''}${stonesSummary ? `\nGemstones: ${stonesSummary}` : ''}`
     );
     if (!res.success || !res.content || !res.content.trim() || res.content.trim() === title.trim()) {
       throw this.providerError('açıklama üretimi', res.error);
@@ -488,7 +488,7 @@ Do NOT include HTML tags, markdown, or meta text. Return ONLY the description te
     return res.content;
   }
 
-  async generateProductDescription(title: string, category: string, language: string, keywords?: string): Promise<string> {
+  async generateProductDescription(title: string, category: string, language: string, keywords?: string, stonesSummary?: string): Promise<string> {
     const res = await this.generateForPurpose(
       'content',
       `You are a professional jewelry product description writer for an e-commerce marketplace. 
@@ -498,10 +498,10 @@ The description should be 2-4 sentences, covering:
 - Craftsmanship and design details
 - Ideal for gifting or special occasions
 - Any care or wearing tips if applicable
-
+${stonesSummary ? `- Gemstones MUST be mentioned with carat/cut facts: ${stonesSummary}` : ''}
 Use natural, flowing language appropriate for the target language.
 Do NOT include HTML tags, markdown, or meta text. Return ONLY the description text.`,
-      `Title: ${title}\nCategory: ${category}${keywords ? `\nKeywords: ${keywords}` : ''}`
+      `Title: ${title}\nCategory: ${category}${keywords ? `\nKeywords: ${keywords}` : ''}${stonesSummary ? `\nGemstones: ${stonesSummary}` : ''}`
     );
     return res.success ? res.content : title;
   }

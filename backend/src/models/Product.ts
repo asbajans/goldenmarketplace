@@ -33,6 +33,7 @@ interface ProductAttributes {
   isDoped?: boolean;
   dopedUntil?: Date | null;
   dopingStyle?: string;
+  specs?: any;
   quantity: number;
   images: string[];
   videos?: string[];
@@ -83,6 +84,7 @@ class Product extends Model<ProductAttributes> implements ProductAttributes {
   public isDoped!: boolean;
   public dopedUntil?: Date | null;
   public dopingStyle?: string;
+  public specs?: any;
   public quantity!: number;
   public images!: string[];
   public videos?: string[];
@@ -258,6 +260,12 @@ Product.init(
       allowNull: false,
       defaultValue: 'gold',
       comment: 'Vitrin görsel stili sözleşmesi (örn. gold = altın çerçeve). market/ reposu uygular.'
+    },
+    specs: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: null,
+      comment: 'Tedarikçi detay sayfasından scrape edilen teknik özellikler (ALTIN GRAMI, PIRLANTA KARATI...). Feed sync dokunmaz, apply-feed-specs yazar.'
     },
     quantity: {
       type: DataTypes.INTEGER,

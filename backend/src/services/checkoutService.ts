@@ -116,7 +116,7 @@ export interface StripeLineItem {
  *    converted with the current usd_try_rate — TRY is never sent as USD.
  */
 export async function buildStripeLineItems(
-  items: Array<{ title: string; quantity: number; unitPrice: number | string; productId?: string; variantId?: string }>
+  items: Array<{ title: string; quantity: number; unitPrice: number | string; productId?: string; variantId?: string; productStoneId?: string }>
 ): Promise<{ lineItems: StripeLineItem[]; stripeTotalUSD: number }> {
   const Product = require('../models/Product').default;
   const ProductVariant = require('../models/ProductVariant').default;
@@ -158,6 +158,18 @@ export async function buildStripeLineItems(
       usdPrice = round2(discTry / usdTryRate);
     } else if (discountRate > 0) {
       usdPrice = round2(usdPrice * (1 - discountRate / 100));
+    }
+
+    // Taş seçeneği: doğrulanmış güncel fiyat her iki para birimine eklenir.
+    const stoneId = (item as any).productStoneId;
+    const stoneProductId = (item as any).productId;
+    if (stoneId && stoneProductId) {
+      const { default: gemstoneService } = await import('./gemstoneService');
+      const stonePrice = await gemstoneService.getStonePrice(stoneProductId, stoneId);
+      if (stonePrice) {
+        tryPrice = round2(tryPrice + stonePrice.priceTRY);
+        usdPrice = round2(usdPrice + stonePrice.priceUSD);
+      }
     }
 
     const qty = Number((item as any).quantity) || 1;

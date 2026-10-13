@@ -27,6 +27,7 @@ import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import OrdersPage from './pages/OrdersPage';
 import ReviewsPage from './pages/ReviewsPage';
+import GemstonesPage from './pages/GemstonesPage';
 import ContentManagementPage from './pages/ContentManagementPage';
 import PixelsTrackingPage from './pages/PixelsTrackingPage';
 import PaymentSettingsPage from './pages/PaymentSettingsPage';
@@ -137,6 +138,11 @@ function App() {
       label: 'Yorumlar'
     },
     {
+      key: 'gemstones',
+      icon: <StarOutlined />,
+      label: 'Taşlar'
+    },
+    {
       key: 'payment',
       icon: <WalletOutlined />,
       label: 'Ödeme Yönetimi'
@@ -214,6 +220,9 @@ function App() {
 
       case 'reviews':
         return <ReviewsPage />;
+
+      case 'gemstones':
+        return <GemstonesPage />;
 
       case 'payment':
         return <PaymentSettingsPage />;

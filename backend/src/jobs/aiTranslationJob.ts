@@ -168,11 +168,18 @@ async function processTranslationJob(job: Bull.Job<AIJobData>) {
     } else if (taskType === 'generate_content' || taskType === 'both') {
       if (!product.description || product.description.length < 50) {
         // Üretim başarısızsa sessiz geçme — task failed olsun, satıcı nedenini görsün
+        let stoneCtx = '';
+        try {
+          const { default: gemstoneService } = await import('../services/gemstoneService');
+          const stones = await gemstoneService.getProductStones(product.id);
+          stoneCtx = gemstoneService.stonesSummary(stones as any);
+        } catch { /* taş yoksa bağlamsız üret */ }
         const generated = await aiService.generateProductDescriptionStrict(
           product.title,
           product.category,
           'Turkish',
-          (product.tags || []).join(', ')
+          (product.tags || []).join(', '),
+          stoneCtx || undefined
         );
         updatedDescription = generated;
         totalCredits += 1;

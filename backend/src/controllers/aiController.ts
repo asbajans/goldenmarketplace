@@ -316,7 +316,7 @@ export class AIController {
   static async generateDescriptionSync(req: Request, res: Response) {
     try {
       const userId = (req as any).user.id;
-      const { title, category, tags, language } = req.body;
+      const { title, category, tags, language, stones } = req.body;
 
       if (!title || !category) {
         return res.status(400).json({ error: 'title and category are required' });
@@ -330,7 +330,7 @@ export class AIController {
       // Modal hangi dil sekmesindeyse o dilde üret (eski davranış: hep Türkçe).
       const targetLanguage = AIController.resolveLanguageName(language) || 'Turkish';
       const tagsStr = Array.isArray(tags) ? tags.join(', ') : (tags || '');
-      const description = await aiService.generateProductDescription(title, category, targetLanguage, tagsStr);
+      const description = await aiService.generateProductDescription(title, category, targetLanguage, tagsStr, stones);
 
       if (!description || description === title) {
         return res.status(500).json({ error: 'AI açıklama oluşturamadı' });

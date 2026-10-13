@@ -29,6 +29,12 @@ router.post('/categories', AdminController.createCategory);
 router.put('/categories/:id', AdminController.updateCategory);
 router.delete('/categories/:id', AdminController.deleteCategory);
 
+// --- GEMSTONES (admin global kataloğu) ---
+router.get('/gemstones', AdminController.getGemstones);
+router.post('/gemstones', AdminController.createGemstone);
+router.put('/gemstones/:id', AdminController.updateGemstone);
+router.delete('/gemstones/:id', AdminController.deleteGemstone);
+
 // --- SUBSCRIPTION PLANS ---
 router.get('/subscription-plans', AdminController.getSubscriptionPlans);
 router.post('/subscription-plans', AdminController.createSubscriptionPlan);

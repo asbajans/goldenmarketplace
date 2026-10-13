@@ -88,6 +88,10 @@ export const AdminAPI = {
     deleteCategory: (id: string) => api.delete(`/categories/${id}`).then((res) => res.data),
     autoCategorizeProducts: (data: { preview?: boolean; onlyGeneral?: boolean; limit?: number }) =>
         api.post('/products/auto-categorize', data).then((res) => res.data),
+    getGemstones: () => api.get('/gemstones').then((res) => res.data),
+    createGemstone: (data: any) => api.post('/gemstones', data).then((res) => res.data),
+    updateGemstone: (id: string, data: any) => api.put(`/gemstones/${id}`, data).then((res) => res.data),
+    deleteGemstone: (id: string) => api.delete(`/gemstones/${id}`).then((res) => res.data),
 
     // Subscription Plans
     getSubscriptionPlans: () => api.get('/subscription-plans').then((res) => res.data),

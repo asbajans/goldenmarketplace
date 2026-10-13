@@ -41,6 +41,7 @@ import Orders from './pages/Orders';
 import Shipments from './pages/Shipments';
 import Reviews from './pages/Reviews';
 import Returns from './pages/Returns';
+import Gemstones from './pages/Gemstones';
 import { getCurrentUser, logout } from './api/auth';
 
 const { Header, Sider, Content } = Layout;
@@ -107,6 +108,12 @@ const App: React.FC = () => {
       icon: <AppstoreOutlined />,
       label: 'Varyasyonlar',
       onClick: () => navigate('/variations')
+    },
+    {
+      key: '/gemstones',
+      icon: <StarOutlined />,
+      label: 'Taşlar',
+      onClick: () => navigate('/gemstones')
     },
     {
       key: '/b2b/market',
@@ -253,6 +260,7 @@ const App: React.FC = () => {
             <Route path="/feeds/:id" element={<FeedDetail />} />
             <Route path="/credits" element={<AICreditsPage />} />
             <Route path="/variations" element={<Variations />} />
+            <Route path="/gemstones" element={<Gemstones />} />
             {/* Public store page — accessible from shared links */}
             <Route path="/store/:storeSlug" element={<StoreStorefront />} />
             <Route path="/integrations" element={<IntegrationSettings />} />

@@ -890,6 +890,81 @@ export class ProductController {
   }
 
   /**
+   * GET /products/:id/stones — ürünün taş seçenekleri (fiyat hesaplı).
+   */
+  static async listStones(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const product = await Product.findByPk(id);
+      if (!product) return res.status(404).json({ error: { message: 'Ürün bulunamadı.', status: 404 } });
+      const { default: gemstoneService } = await import('../services/gemstoneService');
+      return res.status(200).json({ data: await gemstoneService.getProductStones(id) });
+    } catch (error: any) {
+      return res.status(500).json({ error: { message: error.message || 'Taşlar alınamadı', status: 500 } });
+    }
+  }
+
+  /**
+   * POST /products/:id/stones — taşa seçenek ekle (kendi ürünü + kendi kataloğu).
+   * Body: { gemstoneId, carat?, cut?, quality?, quantity? }
+   */
+  static async addStone(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const user = (req as any).user;
+      const { gemstoneId, carat, cut, quality, quantity, isFixed } = req.body;
+      const store = await Store.findOne({ where: { userId: user.id } });
+      if (!store) return res.status(400).json({ error: { message: 'Mağazanız yok.', status: 400 } });
+      const product = await Product.findOne({ where: { id, storeId: store.id } });
+      if (!product) return res.status(404).json({ error: { message: 'Ürün bulunamadı.', status: 404 } });
+      const { default: Gemstone } = await import('../models/Gemstone');
+      const { Op: OpSt } = require('sequelize');
+      const gem = await Gemstone.findOne({
+        where: { id: gemstoneId, [OpSt.or]: [{ storeId: null }, { storeId: store.id }] }
+      });
+      if (!gem) return res.status(404).json({ error: { message: 'Taş kataloğunuzda yok.', status: 404 } });
+      const { default: ProductStone } = await import('../models/ProductStone');
+      const existingCount = await ProductStone.count({ where: { productId: id } });
+      if (existingCount >= 5) {
+        return res.status(400).json({ error: { message: 'Bir ürüne en fazla 5 çeşit taş eklenebilir.', status: 400 } });
+      }
+      const row = await ProductStone.create({
+        productId: id,
+        gemstoneId,
+        carat: carat !== undefined && carat !== null && carat !== '' ? Number(carat) : null,
+        cut: cut ? String(cut).substring(0, 60) : null,
+        quality: quality ? String(quality).substring(0, 120) : null,
+        quantity: Math.max(1, parseInt(quantity) || 1),
+        isFixed: !!isFixed
+      });
+      return res.status(201).json({ data: row });
+    } catch (error: any) {
+      return res.status(500).json({ error: { message: error.message || 'Taş eklenemedi', status: 500 } });
+    }
+  }
+
+  /**
+   * DELETE /products/stones/:stoneId — taş seçeneğini kaldır.
+   */
+  static async deleteStone(req: Request, res: Response) {
+    try {
+      const { stoneId } = req.params;
+      const user = (req as any).user;
+      const store = await Store.findOne({ where: { userId: user.id } });
+      if (!store) return res.status(400).json({ error: { message: 'Mağazanız yok.', status: 400 } });
+      const { default: ProductStone } = await import('../models/ProductStone');
+      const row = await ProductStone.findByPk(stoneId);
+      if (!row) return res.status(404).json({ error: { message: 'Kayıt bulunamadı.', status: 404 } });
+      const product = await Product.findOne({ where: { id: (row as any).productId, storeId: store.id } });
+      if (!product) return res.status(403).json({ error: { message: 'Yetkisiz.', status: 403 } });
+      await row.destroy();
+      return res.status(200).json({ message: 'Taş seçeneği kaldırıldı' });
+    } catch (error: any) {
+      return res.status(500).json({ error: { message: error.message || 'İşlem başarısız', status: 500 } });
+    }
+  }
+
+  /**
    * Generate tags from title and category
    */
   private static generateTags(title: string, category: string): string[] {

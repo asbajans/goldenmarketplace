@@ -33,6 +33,11 @@ router.get('/store/doping-quota', authMiddleware, sellerMiddleware, ProductContr
 router.post('/:id/dope', authMiddleware, sellerMiddleware, ProductController.dopeProduct);
 router.delete('/:id/dope', authMiddleware, sellerMiddleware, ProductController.undopeProduct);
 
+// Product stones (müşteri seçimi + fiyat)
+router.get('/:id/stones', authMiddleware, ProductController.listStones);
+router.post('/:id/stones', authMiddleware, sellerMiddleware, ProductController.addStone);
+router.delete('/stones/:stoneId', authMiddleware, sellerMiddleware, ProductController.deleteStone);
+
 // Bulk Upload
 router.post('/bulk-parse', authMiddleware, sellerMiddleware, upload.single('file'), productBulkController.parseBulkFile);
 router.post('/bulk-import', authMiddleware, sellerMiddleware, productBulkController.importBulkProducts);

@@ -22,6 +22,9 @@ import FeedSyncLog from './FeedSyncLog';
 import ProductAITask from './ProductAITask';
 import ProductReview from './ProductReview';
 import ReturnRequest from './ReturnRequest';
+import ExternalProductSpec from './ExternalProductSpec';
+import Gemstone from './Gemstone';
+import ProductStone from './ProductStone';
 import Payment from './Payment';
 import CreditTransaction from './CreditTransaction';
 
@@ -126,6 +129,14 @@ ReturnRequest.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 Store.hasMany(ReturnRequest, { foreignKey: 'storeId', as: 'returnRequests' });
 ReturnRequest.belongsTo(Store, { foreignKey: 'storeId', as: 'store' });
 
+// Gemstone <-> ProductStone associations
+Store.hasMany(Gemstone, { foreignKey: 'storeId', as: 'gemstones' });
+Gemstone.belongsTo(Store, { foreignKey: 'storeId', as: 'store' });
+Product.hasMany(ProductStone, { foreignKey: 'productId', as: 'stones' });
+ProductStone.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+Gemstone.hasMany(ProductStone, { foreignKey: 'gemstoneId', as: 'productStones' });
+ProductStone.belongsTo(Gemstone, { foreignKey: 'gemstoneId', as: 'gemstone' });
+
 // User <-> Payment / CreditTransaction (One-to-Many)
 User.hasMany(Payment, { foreignKey: 'userId', as: 'payments' });
 Payment.belongsTo(User, { foreignKey: 'userId', as: 'user' });
@@ -158,6 +169,9 @@ export {
     ProductAITask,
     ProductReview,
     ReturnRequest,
+    ExternalProductSpec,
+    Gemstone,
+    ProductStone,
     Payment,
     CreditTransaction
 };

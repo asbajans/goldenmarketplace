@@ -14,6 +14,7 @@ interface IOrderItem {
   orderId: string;
   productId: string;
   variantId?: string;
+  productStoneId?: string | null;
   title: string;
   sku: string;
   quantity: number;
@@ -26,6 +27,7 @@ class OrderItem extends Model<IOrderItem> implements IOrderItem {
   public orderId!: string;
   public productId!: string;
   public variantId?: string;
+  public productStoneId?: string | null;
   public title!: string;
   public sku!: string;
   public quantity!: number;
@@ -55,6 +57,11 @@ OrderItem.init(
     variantId: {
       type: DataTypes.UUID,
       allowNull: true
+    },
+    productStoneId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      comment: 'Seçilen taş seçeneği (fiyat unitPrice/totalPrice içine gömülü hesaplanır)'
     },
     title: {
       type: DataTypes.STRING,

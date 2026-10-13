@@ -1,8 +1,9 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Table, Button, Space, message, Modal, Tabs, Tag, Switch, Typography, Input, Checkbox, Row, Col, Tooltip, Select, notification } from 'antd';
-import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined, DollarOutlined, GoldOutlined, ThunderboltOutlined, EyeOutlined } from '@ant-design/icons';
+import { Table, Button, Space, message, Modal, Tabs, Tag, Switch, Typography, Input, Checkbox, Row, Col, Tooltip, Select, notification, Form, InputNumber } from 'antd';
+import { PlusOutlined, DeleteOutlined, EditOutlined, SyncOutlined, DollarOutlined, GoldOutlined, ThunderboltOutlined, EyeOutlined, StarOutlined } from '@ant-design/icons';
 import { deleteProduct, getAutoSyncStatus, setAutoSyncStatus, triggerManualSync, getDopingQuota, dopeProduct, undopeProduct, DopingQuota, Product } from '../api/product';
+import { getGemstones, getProductStones, addProductStone, deleteProductStone, Gemstone } from '../api/gemstones';
 import { bulkAITranslate, bulkLuxuryDescribe, cleanupDescriptions, getAITasks } from '../api/ai';
 import client from '../api/client';
 import AddProduct from './AddProduct';
@@ -46,6 +47,50 @@ const ProductList: React.FC = () => {
     const [cleanupKeyword, setCleanupKeyword] = useState('');
     const [cleanupAction, setCleanupAction] = useState<'clear_matching' | 'clear_all'>('clear_matching');
     const [cleanupLoading, setCleanupLoading] = useState(false);
+    const [stonesProduct, setStonesProduct] = useState<Product | null>(null);
+    const [stonesList, setStonesList] = useState<any[]>([]);
+    const [gemCatalog, setGemCatalog] = useState<Gemstone[]>([]);
+    const [stonesLoading, setStonesLoading] = useState(false);
+    const [stoneForm] = Form.useForm();
+
+    const openStones = async (record: Product) => {
+        setStonesProduct(record);
+        stoneForm.resetFields();
+        setStonesLoading(true);
+        try {
+            const [stones, gems] = await Promise.all([
+                getProductStones(record.id).catch(() => []),
+                getGemstones().catch(() => [])
+            ]);
+            setStonesList(Array.isArray(stones) ? stones : []);
+            setGemCatalog(Array.isArray(gems) ? gems : []);
+        } finally {
+            setStonesLoading(false);
+        }
+    };
+
+    const handleAddStone = async (values: any) => {
+        if (!stonesProduct) return;
+        try {
+            await addProductStone(stonesProduct.id, values);
+            message.success('Taş eklendi');
+            stoneForm.resetFields();
+            setStonesList(await getProductStones(stonesProduct.id).catch(() => []));
+        } catch (err: any) {
+            message.error(err?.response?.data?.error || 'Taş eklenemedi');
+        }
+    };
+
+    const handleDeleteStone = async (stoneId: string) => {
+        if (!stonesProduct) return;
+        try {
+            await deleteProductStone(stoneId);
+            message.success('Taş kaldırıldı');
+            setStonesList(await getProductStones(stonesProduct.id).catch(() => []));
+        } catch {
+            message.error('İşlem başarısız');
+        }
+    };
     const [dopingQuota, setDopingQuota] = useState<DopingQuota | null>(null);
 
     const isDopedActive = (p: Product) =>
@@ -449,6 +494,9 @@ const ProductList: React.FC = () => {
             render: (_: any, record: Product) => (
                 <Space>
                     <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} />
+                    <Tooltip title="Taşlar (müşteri seçimi + fiyat)">
+                        <Button icon={<StarOutlined />} onClick={() => openStones(record)} />
+                    </Tooltip>
                     {isDopedActive(record) ? (
                         <Tooltip title="Dopingi kaldır (kota yeri boşalır)">
                             <Button icon={<ThunderboltOutlined />} style={{ color: '#d4a017', borderColor: '#d4a017' }} onClick={() => handleUndope(record)} />
@@ -743,6 +791,85 @@ const ProductList: React.FC = () => {
                         ]}
                     />
                 </div>
+            </Modal>
+
+            <Modal
+                title={`Taşlar: ${stonesProduct?.title || ''} (${stonesList.length}/5 çeşit)`}
+                open={!!stonesProduct}
+                onCancel={() => setStonesProduct(null)}
+                footer={null}
+                destroyOnClose
+                width={640}
+            >
+                {gemCatalog.length === 0 && (
+                    <p style={{ color: '#888' }}>
+                        Önce <a href="/gemstones">Taşlar</a> sayfasından katalog oluşturun.
+                    </p>
+                )}
+                <Table
+                    dataSource={stonesList}
+                    rowKey="id"
+                    loading={stonesLoading}
+                    pagination={false}
+                    size="small"
+                    style={{ marginBottom: 16 }}
+                    columns={[
+                        { title: 'Taş', key: 'gem', render: (_: any, r: any) => r.gemstoneName || r.gemstone?.name || '—' },
+                        { title: 'Karat', dataIndex: 'carat', key: 'carat', render: (v: any) => v ?? '—' },
+                        { title: 'Kesim', dataIndex: 'cut', key: 'cut', render: (v: any) => v || '—' },
+                        { title: 'Özellik', dataIndex: 'quality', key: 'quality', render: (v: any) => v || '—' },
+                        { title: 'Fiyat', dataIndex: 'priceTRY', key: 'priceTRY', render: (v: any) => v > 0 ? `${Number(v).toLocaleString('tr-TR')} ₺` : 'Teşhir' },
+                        { title: 'Tür', key: 'fixed', render: (_: any, r: any) => r.isFixed ? <Tag>Sabit</Tag> : <Tag color="blue">Seçimli</Tag> },
+                        {
+                            title: '', key: 'x', width: 50,
+                            render: (_: any, r: any) => (
+                                <Button size="small" danger onClick={() => handleDeleteStone(r.id)}>Kaldır</Button>
+                            )
+                        }
+                    ]}
+                />
+                {stonesList.length >= 5 ? (
+                    <p style={{ color: '#888' }}>En fazla 5 çeşit taş eklenebilir. Yeni eklemek için birini kaldırın.</p>
+                ) : (
+                <Form form={stoneForm} layout="vertical" onFinish={handleAddStone}>
+                    <Row gutter={8}>
+                        <Col span={6}>
+                            <Form.Item name="gemstoneId" label="Taş" rules={[{ required: true }]}>
+                                <Select placeholder="Katalogdan seç">
+                                    {gemCatalog.filter(g => g.isActive).map(g => (
+                                        <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>
+                                    ))}
+                                </Select>
+                            </Form.Item>
+                        </Col>
+                        <Col span={3}>
+                            <Form.Item name="carat" label="Karat">
+                                <InputNumber min={0} step={0.01} style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Col>
+                        <Col span={4}>
+                            <Form.Item name="cut" label="Kesim">
+                                <Input placeholder="baget" />
+                            </Form.Item>
+                        </Col>
+                        <Col span={4}>
+                            <Form.Item name="quality" label="Özellik">
+                                <Input placeholder="FG/SI" />
+                            </Form.Item>
+                        </Col>
+                        <Col span={4}>
+                            <Form.Item name="isFixed" label="Sabit taş" valuePropName="checked" tooltip="Seçim yapılamaz, bilgi olarak gösterilir">
+                                <Switch size="small" />
+                            </Form.Item>
+                        </Col>
+                        <Col span={3}>
+                            <Form.Item label=" " >
+                                <Button type="primary" htmlType="submit">Ekle</Button>
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                </Form>
+                )}
             </Modal>
 
             <AITaskProgress
