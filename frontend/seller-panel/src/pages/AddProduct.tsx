@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons';
 import { createProduct, updateProduct } from '../api/product';
 import { generateDescriptionSync, generateAllDescriptionsSync } from '../api/ai';
+import { getGemstones, getProductStones, addProductStone, deleteProductStone } from '../api/gemstones';
 import client from '../api/client';
 
 const { Option } = Select;
@@ -66,6 +67,9 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
     const [gramHas, setGramHas] = useState<number>(0);
     const [isB2BEnabled, setIsB2BEnabled] = useState(false);
     const [hasVariants, setHasVariants] = useState(false);
+    const [hasStones, setHasStones] = useState(false);
+    const [gemCatalog, setGemCatalog] = useState<any[]>([]);
+    const [initialStoneIds, setInitialStoneIds] = useState<string[]>([]);
     const [tags, setTags] = useState<string[]>([]);
     const [integrations, setIntegrations] = useState<Integration[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -97,6 +101,10 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
         fetchIntegrations();
         fetchCategories();
         fetchVariations();
+        fetchGemstones();
+        if (initialValues?.id) {
+            fetchProductStones(initialValues.id);
+        }
         
         if (initialValues?.images && Array.isArray(initialValues.images) && initialValues.images.length > 0) {
             setFileList(
@@ -198,6 +206,53 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             setVariationTemplates(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Failed to fetch variations:', error);
+        }
+    };
+
+    const fetchGemstones = async () => {
+        try {
+            const list = await getGemstones();
+            setGemCatalog(Array.isArray(list) ? list.filter((g: any) => g.isActive !== false) : []);
+        } catch (error) {
+            console.error('Failed to fetch gemstones:', error);
+        }
+    };
+
+    const fetchProductStones = async (productId: string) => {
+        try {
+            const list = await getProductStones(productId);
+            if (Array.isArray(list) && list.length > 0) {
+                setHasStones(true);
+                setInitialStoneIds(list.map((s: any) => s.id));
+                setTimeout(() => {
+                    form.setFieldsValue({
+                        hasStones: true,
+                        stones: list.map((s: any) => ({
+                            id: s.id,
+                            gemstoneId: s.gemstoneId,
+                            carat: s.carat,
+                            cut: s.cut,
+                            quality: s.quality,
+                            quantity: s.quantity || 1,
+                            isFixed: !!s.isFixed
+                        }))
+                    });
+                }, 150);
+            }
+        } catch (error) {
+            console.error('Failed to fetch product stones:', error);
+        }
+    };
+
+    const syncProductStones = async (productId: string, rows: any[]) => {
+        const currentIds = (rows || []).map((r: any) => r.id).filter(Boolean);
+        for (const goneId of initialStoneIds.filter(id => !currentIds.includes(id))) {
+            await deleteProductStone(goneId).catch(() => undefined);
+        }
+        for (const row of rows || []) {
+            if (!row || row.id || !row.gemstoneId) continue;
+            const { id, ...payload } = row;
+            await addProductStone(productId, payload);
         }
     };
 
@@ -426,8 +481,9 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             const base64Videos: string[] = await Promise.all(rawVideoFiles.map(convertToBase64));
 
             const cat = categories.find(c => c.id === values.categoryId);
+            const { hasStones: _hasStones, stones: stoneRows, ...restValues } = values;
             const productPayload = {
-                ...values,
+                ...restValues,
                 category: cat ? cat.slug : 'genel',
                 title: translations[activeLanguage]?.title || values.title || '',
                 description: translations[activeLanguage]?.description || values.description || '',
@@ -456,8 +512,15 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             if (initialValues?.id) {
                 await updateProduct(initialValues.id, productPayload);
                 message.success('Ürün başarıyla güncellendi!');
+                if (hasStones) {
+                    await syncProductStones(initialValues.id, stoneRows || []);
+                }
             } else {
-                await createProduct(productPayload);
+                const created: any = await createProduct(productPayload);
+                const newId = created?.product?.id || created?.id;
+                if (newId && hasStones) {
+                    await syncProductStones(newId, stoneRows || []);
+                }
                 message.success('Ürün başarıyla eklendi!');
             }
 
@@ -467,6 +530,8 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
             setB2bPrice(0);
             setIsB2BEnabled(false);
             setHasVariants(false);
+            setHasStones(false);
+            setInitialStoneIds([]);
             setTags([]);
             setFileList([]);
             setVideoFile([]);
@@ -522,6 +587,9 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                     calculateLivePrice(allValues.gramWeight, allValues.milyem, allValues.effectiveMilyem, allValues.profitMargin, allValues.priceMultiplier, allValues.b2bDiscount);
                     if (changed.hasVariants !== undefined) {
                         setHasVariants(changed.hasVariants);
+                    }
+                    if ((changed as any).hasStones !== undefined) {
+                        setHasStones((changed as any).hasStones);
                     }
                 }
                 if (changed.marketplaces) {
@@ -854,6 +922,57 @@ const AddProduct: React.FC<AddProductProps> = ({ initialValues, onSuccess }) => 
                                 }}
                             </Form.List>
                         </div>
+                    )}
+                </div>
+
+                {/* Değerli Taşlar */}
+                <div style={{ background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
+                    <Form.Item name="hasStones" valuePropName="checked" style={{ marginBottom: 0 }}>
+                        <Checkbox disabled={isCloned} onChange={e => setHasStones(e.target.checked)} style={{ fontWeight: 600 }}>
+                            💎 Değerli Taş İçeriyor (müşteri seçer, fiyata yansır)
+                        </Checkbox>
+                    </Form.Item>
+
+                    {hasStones && !isCloned && (
+                        <Form.List name="stones">
+                            {(fields, { add, remove }) => (
+                                <div style={{ marginTop: 12 }}>
+                                    {fields.map(({ key, name, ...restField }) => (
+                                        <div key={key} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'flex-start', background: '#fff', padding: 12, borderRadius: 4, border: '1px solid #e8e8e8' }}>
+                                            <Form.Item {...restField} name={[name, 'gemstoneId']} label="Taş" rules={[{ required: true, message: 'Zorunlu' }]} style={{ marginBottom: 0, flex: 2 }}>
+                                                <Select placeholder="Katalogdan seç">
+                                                    {gemCatalog.map((g: any) => (
+                                                        <Select.Option key={g.id} value={g.id}>
+                                                            {g.name}{g.storeId ? '' : ' (Global)'}
+                                                        </Select.Option>
+                                                    ))}
+                                                </Select>
+                                            </Form.Item>
+                                            <Form.Item {...restField} name={[name, 'carat']} label="Karat" style={{ marginBottom: 0, flex: 1 }}>
+                                                <InputNumber style={{ width: '100%' }} min={0} step={0.01} placeholder="0.50" />
+                                            </Form.Item>
+                                            <Form.Item {...restField} name={[name, 'cut']} label="Kesim" style={{ marginBottom: 0, flex: 1 }}>
+                                                <Input placeholder="baget" />
+                                            </Form.Item>
+                                            <Form.Item {...restField} name={[name, 'quality']} label="Özellik" style={{ marginBottom: 0, flex: 1 }}>
+                                                <Input placeholder="FG/SI" />
+                                            </Form.Item>
+                                            <Form.Item {...restField} name={[name, 'isFixed']} label="Sabit" valuePropName="checked" tooltip="Seçilemez, bilgi olarak gösterilir" style={{ marginBottom: 0 }}>
+                                                <Checkbox />
+                                            </Form.Item>
+                                            <MinusCircleOutlined onClick={() => remove(name)} style={{ color: 'red', cursor: 'pointer', fontSize: 20, marginTop: 30 }} />
+                                        </div>
+                                    ))}
+                                    {fields.length < 5 ? (
+                                        <Button type="dashed" onClick={() => add({ quantity: 1 })} block>
+                                            + Taş Ekle ({fields.length}/5)
+                                        </Button>
+                                    ) : (
+                                        <p style={{ color: '#888' }}>En fazla 5 çeşit taş eklenebilir.</p>
+                                    )}
+                                </div>
+                            )}
+                        </Form.List>
                     )}
                 </div>
 
